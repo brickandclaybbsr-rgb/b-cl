@@ -165,4 +165,4 @@ scripts/   generate-icons.mjs   (regenerate PWA icons)
   art (re-run `node scripts/generate-icons.mjs` or drop in your own PNGs).
 - **Petpooja** POS import is stubbed in `lib/petpooja.ts` for Phase 2.
 
-_Built for Brick & Clay, Bhubaneswar · Powered by Eminora Ventures_
+_Built for Brick & Clay, Bhubaneswar · SS Brick & Clay (Pvt.) Ltd_

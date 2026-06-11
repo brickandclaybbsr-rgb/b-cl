@@ -78,7 +78,7 @@ export default function LoginPage({
         </div>
 
         <p className="mt-6 text-center text-xs text-content-secondary">
-          Powered by Eminora Ventures
+          SS Brick & Clay (Pvt.) Ltd
         </p>
       </div>
     </main>
