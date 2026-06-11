@@ -1,0 +1,207 @@
+"use client";
+
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import type { Role } from "@/lib/database.types";
+import { BrandLogo } from "@/components/brand-logo";
+import { SignOutButton } from "./sign-out-button";
+import { OWNER_NAV, STAFF_NAV, isActive, type NavItem } from "./nav-config";
+import { initials, cn } from "@/lib/utils";
+
+export function AppShell({
+  role,
+  name,
+  children,
+}: {
+  role: Role;
+  name: string;
+  children: React.ReactNode;
+}) {
+  return role === "owner" ? (
+    <OwnerShell name={name}>{children}</OwnerShell>
+  ) : (
+    <StaffShell name={name}>{children}</StaffShell>
+  );
+}
+
+/* ─────────────────────────── Owner ─────────────────────────── */
+
+function OwnerShell({
+  name,
+  children,
+}: {
+  name: string;
+  children: React.ReactNode;
+}) {
+  const pathname = usePathname();
+  return (
+    <div className="min-h-dvh md:flex">
+      {/* Desktop sidebar */}
+      <aside className="sticky top-0 hidden h-dvh w-60 shrink-0 flex-col border-r border-border bg-bg-card/60 px-3 py-6 backdrop-blur md:flex">
+        <div className="px-2.5 pb-1">
+          <BrandLogo height={26} />
+        </div>
+        <nav className="mt-9 flex flex-1 flex-col gap-1">
+          {OWNER_NAV.map((item) => (
+            <SidebarLink key={item.label} item={item} active={isActive(item, pathname)} />
+          ))}
+        </nav>
+        <UserChip name={name} role="Owner" />
+      </aside>
+
+      {/* Mobile top bar + tabs */}
+      <div className="flex min-w-0 flex-1 flex-col">
+        <header className="sticky top-0 z-20 border-b border-border bg-bg-primary/80 backdrop-blur-xl md:hidden">
+          <div className="flex items-center justify-between px-4 py-3.5">
+            <BrandLogo height={22} />
+            <SignOutButton label="" className="px-2" />
+          </div>
+          <nav className="no-scrollbar flex gap-1 overflow-x-auto px-3 pb-2.5">
+            {OWNER_NAV.map((item) => (
+              <TabLink key={item.label} item={item} active={isActive(item, pathname)} />
+            ))}
+          </nav>
+        </header>
+
+        <main key={pathname} className="min-w-0 flex-1 animate-fade-in px-4 py-6 md:px-9 md:py-9">
+          {children}
+        </main>
+      </div>
+    </div>
+  );
+}
+
+function SidebarLink({ item, active }: { item: NavItem; active: boolean }) {
+  const Icon = item.icon;
+  return (
+    <Link
+      href={item.href}
+      className={cn(
+        "group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200",
+        active
+          ? "bg-white/[0.07] text-white"
+          : "text-content-secondary hover:bg-white/[0.04] hover:text-content-primary",
+      )}
+    >
+      <span
+        className={cn(
+          "absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full bg-white transition-all duration-200",
+          active ? "opacity-100" : "opacity-0",
+        )}
+      />
+      <Icon className={cn("size-[18px] transition-transform group-hover:scale-110", active && "text-white")} />
+      {item.label}
+    </Link>
+  );
+}
+
+function TabLink({ item, active }: { item: NavItem; active: boolean }) {
+  const Icon = item.icon;
+  return (
+    <Link
+      href={item.href}
+      className={cn(
+        "flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-medium transition-all duration-200",
+        active
+          ? "bg-white text-black"
+          : "text-content-secondary hover:bg-bg-elevated hover:text-content-primary",
+      )}
+    >
+      <Icon className="size-4" />
+      {item.label}
+    </Link>
+  );
+}
+
+function UserChip({ name, role }: { name: string; role: string }) {
+  return (
+    <div className="mt-2 border-t border-border pt-3">
+      <Link
+        href="/profile"
+        className="flex items-center gap-2.5 px-2 py-1.5 rounded-xl transition-all duration-200 hover:bg-white/[0.04] hover:text-content-primary"
+      >
+        <div className="flex size-9 items-center justify-center rounded-full bg-white text-sm font-bold text-black">
+          {initials(name)}
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-semibold">{name}</p>
+          <p className="text-xs text-content-secondary">{role}</p>
+        </div>
+      </Link>
+      <SignOutButton className="mt-1 w-full" />
+    </div>
+  );
+}
+
+/* ─────────────────────────── Staff ─────────────────────────── */
+
+function StaffShell({
+  name,
+  children,
+}: {
+  name: string;
+  children: React.ReactNode;
+}) {
+  const pathname = usePathname();
+  return (
+    <div className="flex min-h-dvh flex-col">
+      <header className="sticky top-0 z-20 border-b border-border bg-bg-primary/80 backdrop-blur-xl">
+        <div className="container-app flex items-center justify-between py-3.5">
+          <BrandLogo height={20} />
+          <div className="flex items-center gap-2.5">
+            <Link
+              href="/profile"
+              className="flex items-center gap-2 hover:opacity-85 transition-all duration-200"
+            >
+              <span className="hidden text-sm text-content-secondary sm:inline">
+                {name}
+              </span>
+              <div className="flex size-8 items-center justify-center rounded-full bg-white text-xs font-bold text-black">
+                {initials(name)}
+              </div>
+            </Link>
+            <SignOutButton label="" className="px-1.5" />
+          </div>
+        </div>
+      </header>
+
+      <main key={pathname} className="container-app flex-1 animate-fade-in pb-24 pt-6">
+        {children}
+      </main>
+
+      {/* Bottom navigation */}
+      <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-bg-card/90 pb-safe backdrop-blur-xl">
+        <div className="mx-auto grid max-w-2xl grid-cols-6">
+          {STAFF_NAV.map((item) => {
+            const active = isActive(item, pathname);
+            const Icon = item.icon;
+            return (
+              <Link
+                key={item.label}
+                href={item.href}
+                className={cn(
+                  "relative flex flex-col items-center gap-1 py-3 text-[0.7rem] font-medium transition-colors duration-200",
+                  active ? "text-white" : "text-content-secondary",
+                )}
+              >
+                <span
+                  className={cn(
+                    "absolute top-0 h-0.5 w-8 rounded-full bg-white transition-all duration-300",
+                    active ? "opacity-100" : "opacity-0",
+                  )}
+                />
+                <Icon
+                  className={cn(
+                    "size-5 transition-transform duration-200",
+                    active && "-translate-y-px scale-105",
+                  )}
+                />
+                {item.label}
+              </Link>
+            );
+          })}
+        </div>
+      </nav>
+    </div>
+  );
+}
