@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>B&C Ops</title>
+    <style>
+      html, body {
+        margin: 0;
+        height: 100%;
+        background: #0f0d0b;
+        color: #e8620a;
+        font-family: -apple-system, system-ui, sans-serif;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .wrap { text-align: center; }
+      .name { font-size: 22px; font-weight: 700; letter-spacing: 0.04em; }
+      .sub { margin-top: 8px; font-size: 13px; color: #8a8580; }
+    </style>
+  </head>
+  <body>
+    <!--
+      Local fallback only. The app loads the live site via Capacitor server.url
+      (capacitor.config.ts). This screen shows only if the device is offline
+      before the first load.
+    -->
+    <div class="wrap">
+      <div class="name">B&amp;C Ops</div>
+      <div class="sub">Loading…</div>
+    </div>
+  </body>
+</html>

@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireProfile } from "@/lib/auth";
 import { getStockItems } from "@/lib/data/stock";
 import { todayIST } from "@/lib/date";
+import { notifyOwner } from "@/lib/push";
 import type { StockLine, StockStatusValue } from "@/lib/database.types";
 
 export type StockFormState = { ok?: boolean; error?: string };
@@ -58,6 +59,10 @@ export async function submitStock(
   });
 
   if (error) return { error: error.message };
+
+  for (const line of lines.filter((l) => l.status === "out")) {
+    await notifyOwner.stockAlert(line.item_name);
+  }
 
   revalidatePath("/stock");
   revalidatePath("/owner");

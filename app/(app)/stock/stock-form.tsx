@@ -13,6 +13,7 @@ import { SubmitButton } from "@/components/ui/submit-button";
 import { EmptyState } from "@/components/empty-state";
 import { STOCK_STATUS_META, type StockStatus } from "@/lib/constants";
 import { formatDateLabel } from "@/lib/date";
+import { hapticError, hapticSuccess } from "@/lib/native";
 import { cn } from "@/lib/utils";
 import type { StockItem, StockLine } from "@/lib/database.types";
 
@@ -107,8 +108,14 @@ export function StockForm({
   const [isAdding, startAdding] = useTransition();
 
   useEffect(() => {
-    if (state.error) toast.error(state.error);
-    if (state.ok) toast.success("Stock status saved ✓");
+    if (state.error) {
+      toast.error(state.error);
+      void hapticError();
+    }
+    if (state.ok) {
+      toast.success("Stock status saved ✓");
+      void hapticSuccess();
+    }
   }, [state]);
 
   // Unique categories for the dropdown select

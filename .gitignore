@@ -5,7 +5,9 @@
 
 # next.js
 /.next/
-/out/
+# out/ is the Capacitor webDir fallback — keep index.html, ignore any build output
+/out/*
+!/out/index.html
 next-env.d.ts
 
 # production
@@ -39,3 +41,12 @@ yarn-error.log*
 
 # typescript
 *.tsbuildinfo
+
+# capacitor / android — keep the android/ project, drop secrets & local artifacts
+android/app/google-services.json
+android/local.properties
+*.keystore
+*.jks
+
+# pre-existing TWA / Play Store bundle (contains a signing keystore — do not commit)
+B&CL OPS - Google Play package/

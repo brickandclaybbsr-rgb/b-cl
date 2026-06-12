@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Poppins, Montserrat } from "next/font/google";
 import { Toaster } from "@/components/ui/toaster";
+import { NativeBootstrap } from "@/components/native-bootstrap";
 import "./globals.css";
 
 // Body / UI — clean geometric sans
@@ -57,6 +58,7 @@ export default function RootLayout({
       <body>
         {children}
         <Toaster />
+        <NativeBootstrap />
       </body>
     </html>
   );

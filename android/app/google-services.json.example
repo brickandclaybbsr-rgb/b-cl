@@ -1,0 +1,36 @@
+{
+  "_README": [
+    "This is a TEMPLATE, not a working config. Gradle ignores *.example files.",
+    "To enable FCM push:",
+    "  1. console.firebase.google.com → create project (e.g. bnc-ops)",
+    "  2. Add Android app → package name: in.brickandclay.ops",
+    "  3. Download the real google-services.json",
+    "  4. Either: place it at android/app/google-services.json (it is gitignored),",
+    "     or paste its contents into the GitHub secret GOOGLE_SERVICES_JSON so CI",
+    "     injects it at build time (see .github/workflows/build-apk.yml).",
+    "  5. Add Vercel env vars FIREBASE_PROJECT_ID / FIREBASE_CLIENT_EMAIL /",
+    "     FIREBASE_PRIVATE_KEY (from a Firebase service account) so the server",
+    "     can send pushes."
+  ],
+  "project_info": {
+    "project_number": "REPLACE_WITH_FIREBASE_PROJECT_NUMBER",
+    "project_id": "bnc-ops",
+    "storage_bucket": "bnc-ops.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "REPLACE_WITH_APP_ID",
+        "android_client_info": {
+          "package_name": "in.brickandclay.ops"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [{ "current_key": "REPLACE_WITH_API_KEY" }],
+      "services": {
+        "appinvite_service": { "other_platform_oauth_client": [] }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -8,6 +8,7 @@ import { getCurrentProfile } from "@/lib/auth";
 import { todayIST } from "@/lib/date";
 import { gatherReportData, formatReportText } from "@/lib/eod-report";
 import { sendReport, isWhatsAppConfigured } from "@/lib/whatsapp";
+import { notifyOwner } from "@/lib/push";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -80,6 +81,8 @@ async function handle(req: NextRequest) {
       { status: 502 },
     );
   }
+
+  await notifyOwner.eodReport();
 
   return NextResponse.json({
     ok: true,
