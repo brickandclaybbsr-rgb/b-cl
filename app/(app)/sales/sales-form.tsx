@@ -20,7 +20,6 @@ export function SalesForm() {
   const [cash, setCash] = useState("");
   const [online, setOnline] = useState("");
   const [agg, setAgg] = useState("");
-  const [bills, setBills] = useState("");
 
   useEffect(() => {
     if (state.error) toast.error(state.error);
@@ -28,7 +27,6 @@ export function SalesForm() {
   }, [state]);
 
   const total = num(cash) + num(online) + num(agg);
-  const avg = num(bills) > 0 ? total / num(bills) : 0;
 
   return (
     <form action={formAction} className="space-y-4">
@@ -66,33 +64,6 @@ export function SalesForm() {
         </div>
       </Card>
 
-      <Card className="space-y-4 p-4">
-        <h2 className="text-xs font-bold uppercase tracking-wider text-warm">
-          Bills
-        </h2>
-        <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-1.5">
-            <Label htmlFor="total_bills">Total bills / covers</Label>
-            <Input
-              id="total_bills"
-              name="total_bills"
-              type="number"
-              inputMode="numeric"
-              min="0"
-              placeholder="0"
-              className="font-mono"
-              value={bills}
-              onChange={(e) => setBills(e.target.value)}
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label>Avg bill value</Label>
-            <div className="flex h-11 items-center rounded-xl border border-border bg-bg-primary px-3.5 font-mono text-sm tabular-nums text-content-secondary">
-              {formatINR(avg)}
-            </div>
-          </div>
-        </div>
-      </Card>
 
       <Card className="space-y-4 p-4">
         <h2 className="text-xs font-bold uppercase tracking-wider text-warm">

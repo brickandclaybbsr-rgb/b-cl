@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+
 import type { Role } from "@/lib/database.types";
 import { BrandLogo } from "@/components/brand-logo";
 import { SignOutButton } from "./sign-out-button";
@@ -49,23 +50,68 @@ function OwnerShell({
         <UserChip name={name} role="Owner" />
       </aside>
 
-      {/* Mobile top bar + tabs */}
+      {/* Mobile: top bar with brand + profile avatar + sign out */}
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-20 border-b border-border bg-bg-primary/80 backdrop-blur-xl md:hidden">
-          <div className="flex items-center justify-between px-4 py-3.5">
+          <div className="flex items-center justify-between px-4 py-3">
             <BrandLogo height={22} />
-            <SignOutButton label="" className="px-2" />
+            <div className="flex items-center gap-2">
+
+              <Link
+                href="/profile"
+                className={cn(
+                  "flex size-8 items-center justify-center rounded-full text-xs font-bold transition-all duration-200",
+                  pathname === "/profile"
+                    ? "bg-white text-black ring-2 ring-white/30"
+                    : "bg-white/10 text-white hover:bg-white/20"
+                )}
+                title={`${name} — Profile`}
+              >
+                {initials(name)}
+              </Link>
+              <SignOutButton label="" className="px-1.5" />
+            </div>
           </div>
-          <nav className="no-scrollbar flex gap-1 overflow-x-auto px-3 pb-2.5">
-            {OWNER_NAV.map((item) => (
-              <TabLink key={item.label} item={item} active={isActive(item, pathname)} />
-            ))}
-          </nav>
         </header>
 
-        <main key={pathname} className="min-w-0 flex-1 animate-fade-in px-4 py-6 md:px-9 md:py-9">
+        {/* pb-24 on mobile so content doesn't hide behind fixed bottom nav */}
+        <main key={pathname} className="min-w-0 flex-1 animate-fade-in px-4 py-6 pb-24 md:px-9 md:py-9 md:pb-9">
           {children}
         </main>
+
+        {/* Mobile fixed bottom nav — icon + label style matching staff shell */}
+        <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-bg-card/90 pb-safe backdrop-blur-xl md:hidden">
+          <div className="mx-auto grid max-w-2xl" style={{ gridTemplateColumns: `repeat(${OWNER_NAV.length}, minmax(0, 1fr))` }}>
+            {OWNER_NAV.map((item) => {
+              const active = isActive(item, pathname);
+              const Icon = item.icon;
+              return (
+                <Link
+                  key={item.label}
+                  href={item.href}
+                  className={cn(
+                    "relative flex flex-col items-center gap-1 py-3 text-[0.65rem] font-medium transition-colors duration-200",
+                    active ? "text-white" : "text-content-secondary",
+                  )}
+                >
+                  <span
+                    className={cn(
+                      "absolute top-0 h-0.5 w-8 rounded-full bg-white transition-all duration-300",
+                      active ? "opacity-100" : "opacity-0",
+                    )}
+                  />
+                  <Icon
+                    className={cn(
+                      "size-5 transition-transform duration-200",
+                      active && "-translate-y-px scale-105",
+                    )}
+                  />
+                  {item.label}
+                </Link>
+              );
+            })}
+          </div>
+        </nav>
       </div>
     </div>
   );

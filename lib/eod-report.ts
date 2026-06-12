@@ -12,8 +12,6 @@ export interface ReportData {
     online: number;
     aggregator: number;
     total: number;
-    bills: number;
-    avg: number;
   } | null;
   openingDone: boolean;
   closingDone: boolean;
@@ -57,8 +55,6 @@ export async function gatherReportData(
           online: Number(s.online_sales),
           aggregator: Number(s.aggregator_sales),
           total,
-          bills: Number(s.total_bills),
-          avg: s.total_bills > 0 ? total / s.total_bills : 0,
         };
       })()
     : null;
@@ -110,7 +106,6 @@ export function formatReportText(d: ReportData): string {
     L.push(`Online: ${formatINR(d.sales.online)}`);
     L.push(`Swiggy/Zomato: ${formatINR(d.sales.aggregator)}`);
     L.push(`*Total: ${formatINR(d.sales.total)}*`);
-    L.push(`Bills: ${formatNumber(d.sales.bills)} | Avg: ${formatINR(d.sales.avg)}`);
   } else {
     L.push("_No sales entered today._");
   }

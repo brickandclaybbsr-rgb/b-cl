@@ -44,7 +44,7 @@ export async function createStaff(
     return { error: e instanceof Error ? e.message : "Failed to create account." };
   }
 
-  revalidatePath("/settings");
+  revalidatePath("/profile");
   return { ok: true, message: `${name} added.` };
 }
 
@@ -56,7 +56,7 @@ export async function setStaffActive(id: string, isActive: boolean): Promise<Act
     .update({ is_active: isActive })
     .eq("id", id);
   if (error) return { error: error.message };
-  revalidatePath("/settings");
+  revalidatePath("/profile");
   return { ok: true };
 }
 
@@ -85,7 +85,7 @@ export async function addStockItem(
 
   const { error } = await supabase.from("stock_items").insert({ name, category });
   if (error) return { error: error.message };
-  revalidatePath("/settings");
+  revalidatePath("/profile");
   revalidatePath("/stock");
   return { ok: true };
 }
@@ -98,7 +98,7 @@ export async function toggleStockItem(id: string, isActive: boolean): Promise<Ac
     .update({ is_active: isActive })
     .eq("id", id);
   if (error) return { error: error.message };
-  revalidatePath("/settings");
+  revalidatePath("/profile");
   revalidatePath("/stock");
   return { ok: true };
 }
@@ -108,7 +108,7 @@ export async function deleteStockItem(id: string): Promise<ActionState> {
   const supabase = createClient();
   const { error } = await supabase.from("stock_items").delete().eq("id", id);
   if (error) return { error: error.message };
-  revalidatePath("/settings");
+  revalidatePath("/profile");
   revalidatePath("/stock");
   return { ok: true };
 }
@@ -131,7 +131,7 @@ export async function addVendor(
     order_days: String(formData.get("order_days") ?? "").trim() || null,
   });
   if (error) return { error: error.message };
-  revalidatePath("/settings");
+  revalidatePath("/profile");
   revalidatePath("/vendors");
   return { ok: true };
 }
@@ -144,7 +144,7 @@ export async function toggleVendor(id: string, isActive: boolean): Promise<Actio
     .update({ is_active: isActive })
     .eq("id", id);
   if (error) return { error: error.message };
-  revalidatePath("/settings");
+  revalidatePath("/profile");
   revalidatePath("/vendors");
   return { ok: true };
 }
@@ -154,7 +154,7 @@ export async function deleteVendor(id: string): Promise<ActionState> {
   const supabase = createClient();
   const { error } = await supabase.from("vendors").delete().eq("id", id);
   if (error) return { error: error.message };
-  revalidatePath("/settings");
+  revalidatePath("/profile");
   revalidatePath("/vendors");
   return { ok: true };
 }
@@ -188,7 +188,7 @@ export async function addChecklistItem(
     sort_order: (last?.sort_order ?? 0) + 1,
   });
   if (error) return { error: error.message };
-  revalidatePath("/settings");
+  revalidatePath("/profile");
   revalidatePath("/checklist/opening");
   revalidatePath("/checklist/closing");
   return { ok: true };
@@ -202,7 +202,7 @@ export async function toggleChecklistItem(id: string, isActive: boolean): Promis
     .update({ is_active: isActive })
     .eq("id", id);
   if (error) return { error: error.message };
-  revalidatePath("/settings");
+  revalidatePath("/profile");
   return { ok: true };
 }
 
@@ -211,7 +211,7 @@ export async function deleteChecklistItem(id: string): Promise<ActionState> {
   const supabase = createClient();
   const { error } = await supabase.from("checklist_items").delete().eq("id", id);
   if (error) return { error: error.message };
-  revalidatePath("/settings");
+  revalidatePath("/profile");
   return { ok: true };
 }
 
@@ -228,7 +228,7 @@ export async function saveOwnerWhatsApp(
     .from("app_settings")
     .upsert({ key: "owner_whatsapp_number", value: number || null, updated_at: new Date().toISOString() });
   if (error) return { error: error.message };
-  revalidatePath("/settings");
+  revalidatePath("/profile");
   return { ok: true, message: "WhatsApp number saved." };
 }
 
@@ -250,7 +250,7 @@ export async function updateStaffBiometrics(
 
   if (error) return { error: error.message };
 
-  revalidatePath("/settings");
+  revalidatePath("/profile");
   revalidatePath("/attendance");
   return { ok: true, message: "Biometrics mapped." };
 }

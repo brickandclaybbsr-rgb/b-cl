@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { submitReimbursementClaim, type ReimbursementFormState } from "./actions";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { FileInput } from "@/components/ui/file-input";
 import { Label } from "@/components/ui/label";
 import { SubmitButton } from "@/components/ui/submit-button";
 
@@ -45,12 +46,10 @@ export function ReimbursementClaimForm() {
 
           <div className="space-y-1.5">
             <Label htmlFor="receipt">Receipt Image / Bill File</Label>
-            <Input
-              type="file"
+            <FileInput
               id="receipt"
               name="receipt"
               accept="image/*,application/pdf"
-              className="file:mr-4 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-white/[0.08] file:text-white hover:file:bg-white/[0.12]"
             />
           </div>
         </div>

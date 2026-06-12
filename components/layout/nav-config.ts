@@ -9,6 +9,7 @@ import {
   Settings,
   Receipt,
   Calendar,
+  Users,
   type LucideIcon,
 } from "lucide-react";
 
@@ -39,9 +40,7 @@ export const OWNER_NAV: NavItem[] = [
   { label: "Reports", href: "/reports", icon: LineChart },
   { label: "Stock", href: "/stock", icon: Package },
   { label: "Vendors", href: "/vendors", icon: ShoppingCart },
-  { label: "Reimburse", href: "/reimbursements", icon: Receipt },
-  { label: "Attendance", href: "/attendance", icon: Calendar },
-  { label: "Settings", href: "/settings", icon: Settings },
+  { label: "Peoples", href: "/attendance", icon: Users, match: ["/attendance", "/reimbursements"] },
 ];
 
 export function isActive(item: NavItem, pathname: string): boolean {

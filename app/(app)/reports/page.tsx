@@ -22,13 +22,12 @@ export default async function ReportsPage() {
 
   const withSales = days.filter((d) => d.total > 0);
   const periodTotal = days.reduce((sum, d) => sum + d.total, 0);
-  const periodBills = days.reduce((sum, d) => sum + d.bills, 0);
 
   return (
     <div className="space-y-6">
       <PageHeader title="Reports" subtitle="Last 14 days" />
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <Card className="p-4">
           <p className="text-xs uppercase tracking-wide text-content-secondary">
             14-day sales
@@ -39,15 +38,7 @@ export default async function ReportsPage() {
         </Card>
         <Card className="p-4">
           <p className="text-xs uppercase tracking-wide text-content-secondary">
-            Total bills
-          </p>
-          <p className="mt-1 font-mono text-2xl font-bold tabular-nums">
-            {formatNumber(periodBills)}
-          </p>
-        </Card>
-        <Card className="col-span-2 p-4 sm:col-span-1">
-          <p className="text-xs uppercase tracking-wide text-content-secondary">
-            Avg / day
+            Avg sales / day
           </p>
           <p className="mt-1 font-mono text-2xl font-bold tabular-nums">
             {formatINR(withSales.length ? periodTotal / withSales.length : 0)}
@@ -73,7 +64,7 @@ export default async function ReportsPage() {
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-medium">{formatDateLabel(d.date)}</p>
                 <p className="text-xs text-content-secondary">
-                  {d.bills > 0 ? `${formatNumber(d.bills)} bills` : "No sales entry"}
+                  {d.hasSales ? "Sales recorded" : "No sales entry"}
                 </p>
               </div>
               <div className="flex items-center gap-1.5">

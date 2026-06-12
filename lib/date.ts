@@ -6,9 +6,17 @@ import { formatInTimeZone, toZonedTime } from "date-fns-tz";
  */
 export const IST_TZ = "Asia/Kolkata";
 
-/** Today's business date in IST as "yyyy-MM-dd". */
+/** Today's business date in IST as "yyyy-MM-dd" (rolls over at 4:00 AM IST). */
 export function todayIST(): string {
-  return formatInTimeZone(new Date(), IST_TZ, "yyyy-MM-dd");
+  const now = new Date();
+  const hoursStr = formatInTimeZone(now, IST_TZ, "H");
+  const hours = parseInt(hoursStr, 10);
+  
+  let dateObj = now;
+  if (hours < 4) {
+    dateObj = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+  }
+  return formatInTimeZone(dateObj, IST_TZ, "yyyy-MM-dd");
 }
 
 /** A Date object representing "now" shifted into IST wall-clock time. */
@@ -16,11 +24,19 @@ export function nowIST(): Date {
   return toZonedTime(new Date(), IST_TZ);
 }
 
-/** "yyyy-MM-dd" for N days before today (IST). */
+/** "yyyy-MM-dd" for N days before today (IST), using the business date. */
 export function daysAgoIST(days: number): string {
-  const d = new Date();
-  d.setUTCDate(d.getUTCDate() - days);
-  return formatInTimeZone(d, IST_TZ, "yyyy-MM-dd");
+  const now = new Date();
+  const hoursStr = formatInTimeZone(now, IST_TZ, "H");
+  const hours = parseInt(hoursStr, 10);
+  
+  let dateObj = now;
+  if (hours < 4) {
+    dateObj = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+  }
+  
+  const targetDate = new Date(dateObj.getTime() - days * 24 * 60 * 60 * 1000);
+  return formatInTimeZone(targetDate, IST_TZ, "yyyy-MM-dd");
 }
 
 /** Human label for a date string, e.g. "Thu, 11 Jun 2026". */

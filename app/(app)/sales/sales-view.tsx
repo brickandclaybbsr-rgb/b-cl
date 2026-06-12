@@ -13,7 +13,6 @@ export function SalesView({
   submitterName: string;
 }) {
   const total = salesTotal(sales);
-  const avg = sales.total_bills > 0 ? total / sales.total_bills : 0;
 
   return (
     <div className="space-y-4">
@@ -33,9 +32,6 @@ export function SalesView({
         </p>
         <p className="mt-1 font-mono text-4xl font-bold tabular-nums text-warm">
           {formatINR(total)}
-        </p>
-        <p className="mt-1 text-sm text-content-secondary">
-          {formatNumber(sales.total_bills)} bills · {formatINR(avg)} avg
         </p>
       </Card>
 

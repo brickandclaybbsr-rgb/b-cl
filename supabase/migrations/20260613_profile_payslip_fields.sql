@@ -1,0 +1,10 @@
+-- Add payslip and basic details columns to profiles table
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS employee_code text;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS dob date;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS aadhar_number text;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS pan_number text;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS basic_pay numeric;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS paid_through text;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS personal_email text;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS phone_number text;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS address text;

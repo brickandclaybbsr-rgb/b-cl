@@ -39,3 +39,14 @@ yarn-error.log*
 
 # typescript
 *.tsbuildinfo
+
+# runtime user uploads / generated payslips (contains PII — never commit)
+/public/uploads/
+
+# capacitor native project lives on the capacitor branch; ignore any local copy
+/android/
+
+# pre-existing TWA / Play Store bundle (contains a signing keystore)
+B&CL OPS - Google Play package/
+*.keystore
+*.jks

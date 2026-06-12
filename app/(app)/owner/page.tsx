@@ -39,9 +39,6 @@ export default async function OwnerDashboard() {
   ]);
 
   const alerts = snap.lowItems.length + snap.outItems.length;
-  const avg = snap.sales && snap.sales.total_bills > 0
-    ? snap.salesTotal / snap.sales.total_bills
-    : 0;
 
   const cash = Number(snap.sales?.cash_sales ?? 0);
   const online = Number(snap.sales?.online_sales ?? 0);
@@ -60,7 +57,7 @@ export default async function OwnerDashboard() {
       />
 
       {/* Overview cards */}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <StatCard
           label="Today's sales"
           value={formatINR(snap.salesTotal)}
@@ -68,15 +65,9 @@ export default async function OwnerDashboard() {
           tone="fire"
           hint={
             snap.sales
-              ? `${formatNumber(snap.sales.total_bills)} bills · By ${salesSubmitter} at ${formatTimeIST(snap.sales.submitted_at)}`
+              ? `By ${salesSubmitter} at ${formatTimeIST(snap.sales.submitted_at)}`
               : "Not entered yet"
           }
-        />
-        <StatCard
-          label="Avg bill"
-          value={formatINR(avg)}
-          icon={Receipt}
-          hint={snap.sales ? "per cover" : "—"}
         />
         <StatCard
           label="Stock alerts"

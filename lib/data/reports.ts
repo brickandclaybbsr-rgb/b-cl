@@ -9,7 +9,7 @@ export interface DaySummary {
   cash: number;
   online: number;
   aggregator: number;
-  bills: number;
+  hasSales: boolean;
   openingDone: boolean;
   closingDone: boolean;
 }
@@ -40,7 +40,7 @@ export async function getRecentDays(days = 14): Promise<DaySummary[]> {
       cash: Number(s?.cash_sales ?? 0),
       online: Number(s?.online_sales ?? 0),
       aggregator: Number(s?.aggregator_sales ?? 0),
-      bills: Number(s?.total_bills ?? 0),
+      hasSales: !!s,
       openingDone: openSet.has(date),
       closingDone: closeSet.has(date),
     });

@@ -22,7 +22,6 @@ export async function submitSales(
     cash_sales: toNumber(formData.get("cash_sales")),
     online_sales: toNumber(formData.get("online_sales")),
     aggregator_sales: toNumber(formData.get("aggregator_sales")),
-    total_bills: toInt(formData.get("total_bills")),
     discount_amount: toNumber(formData.get("discount_amount")),
     complimentary_count: toInt(formData.get("complimentary_count")),
     complimentary_value: toNumber(formData.get("complimentary_value")),

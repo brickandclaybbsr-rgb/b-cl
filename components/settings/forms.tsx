@@ -3,7 +3,8 @@
 import { useEffect, useRef } from "react";
 import { useFormState } from "react-dom";
 import { toast } from "sonner";
-import { Plus } from "lucide-react";
+import { Plus, Upload } from "lucide-react";
+import { uploadOwnerSignature } from "@/app/(app)/attendance/actions-hr";
 import {
   createStaff,
   addStockItem,
@@ -13,6 +14,7 @@ import {
   type ActionState,
 } from "@/app/(app)/settings/actions";
 import { Input } from "@/components/ui/input";
+import { FileInput } from "@/components/ui/file-input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { SubmitButton } from "@/components/ui/submit-button";
@@ -155,3 +157,47 @@ export function WhatsAppForm({ current }: { current: string }) {
     </form>
   );
 }
+
+export function OwnerSignatureForm({ initialSignature }: { initialSignature: string | null }) {
+  const [state, formAction] = useFormState(uploadOwnerSignature, {});
+  const ref = useRef<HTMLFormElement>(null);
+
+  useEffect(() => {
+    if (state.error) toast.error(state.error);
+    if (state.ok) {
+      toast.success(state.message || "Signature uploaded successfully!");
+      ref.current?.reset();
+      window.location.reload();
+    }
+  }, [state]);
+
+  return (
+    <form ref={ref} action={formAction} className="space-y-4 text-xs max-w-md">
+      <div className="space-y-1.5">
+        <Label htmlFor="owner-sig-file">Upload Signature Image</Label>
+        <FileInput 
+          id="owner-sig-file" 
+          name="signatureFile" 
+          required 
+          accept="image/*" 
+        />
+        <p className="text-[10px] text-content-secondary font-mono">Accepts JPG, PNG, WEBP (transparent background recommended)</p>
+      </div>
+
+      {initialSignature && (
+        <div className="space-y-1.5 bg-bg-elevated/40 border border-border/40 p-2.5 rounded-lg">
+          <p className="text-[10px] font-semibold text-content-secondary uppercase tracking-wider">Current Signature</p>
+          <div className="bg-white p-2 rounded border border-border/40 inline-block">
+            <img src={initialSignature} className="max-h-12 object-contain" alt="Current Signature" />
+          </div>
+        </div>
+      )}
+
+      <SubmitButton pendingText="Uploading..." className="w-full sm:w-auto">
+        <Upload className="size-4" />
+        Upload Signature
+      </SubmitButton>
+    </form>
+  );
+}
+

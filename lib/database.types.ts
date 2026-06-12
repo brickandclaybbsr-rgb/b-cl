@@ -45,6 +45,23 @@ export type Profile = {
   biometric_pin: string | null;
   biometric_name: string | null;
   created_at: string;
+  employee_code?: string | null;
+  dob?: string | null;
+  aadhar_number?: string | null;
+  pan_number?: string | null;
+  basic_pay?: number | null;
+  paid_through?: string | null;
+  personal_email?: string | null;
+  phone_number?: string | null;
+  address?: string | null;
+  designation?: string | null;
+  date_of_joining?: string | null;
+  work_location?: string | null;
+  working_hours?: string | null;
+  employment_type?: string | null;
+  reporting_authority?: string | null;
+  signature_url?: string | null;
+  fcm_token?: string | null;
 };
 
 export type OpeningChecklist = {
@@ -184,6 +201,31 @@ export type AttendancePunch = {
   uploaded_at: string;
 };
 
+export type StaffLeave = {
+  id: string;
+  profile_id: string;
+  leave_type: "cl" | "sl" | "lwp";
+  start_date: string;
+  end_date: string;
+  reason: string;
+  status: "pending" | "approved" | "rejected";
+  notes: string | null;
+  submitted_at: string;
+  processed_by: string | null;
+  processed_at: string | null;
+};
+
+export type StaffDocument = {
+  id: string;
+  profile_id: string;
+  type: "appointment_letter" | "salary_slip" | "aadhar_card" | "pan_card";
+  month: string | null;
+  file_url: string;
+  file_name: string;
+  uploaded_by: string | null;
+  uploaded_at: string;
+};
+
 /** A table definition in the shape supabase-js expects (incl. Relationships). */
 type Table<Row> = {
   Row: Row;
@@ -210,6 +252,8 @@ export interface Database {
       purchases: Table<Purchase>;
       reimbursements: Table<Reimbursement>;
       attendance_punches: Table<AttendancePunch>;
+      leaves: Table<StaffLeave>;
+      staff_documents: Table<StaffDocument>;
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;

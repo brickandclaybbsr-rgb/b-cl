@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { recordPurchase, type PurchaseFormState } from "./purchase-actions";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { FileInput } from "@/components/ui/file-input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
@@ -85,12 +86,10 @@ export function RecordPurchaseForm({ vendors }: { vendors: Vendor[] }) {
 
           <div className="space-y-1.5">
             <Label htmlFor="bill">Invoice Bill / Receipt File</Label>
-            <Input
-              type="file"
+            <FileInput
               id="bill"
               name="bill"
               accept="image/*,application/pdf"
-              className="file:mr-4 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-white/[0.08] file:text-white hover:file:bg-white/[0.12]"
             />
           </div>
         </div>
