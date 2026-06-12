@@ -1,10 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import fs from "fs/promises";
-import path from "path";
 import { createClient } from "@/lib/supabase/server";
 import { requireProfile, requireOwner } from "@/lib/auth";
+import { uploadPublicFile } from "@/lib/storage";
 
 export type ReimbursementFormState = { ok?: boolean; error?: string };
 
@@ -26,19 +25,19 @@ export async function submitReimbursementClaim(
     return { error: "Please enter a valid expense amount." };
   }
 
-  // Handle local receipt upload
+  // Upload receipt to Supabase Storage (works on serverless/Vercel)
   const file = formData.get("receipt") as File;
   let receiptUrl = "";
   if (file && file.size > 0) {
     try {
-      const bytes = await file.arrayBuffer();
-      const buffer = Buffer.from(bytes);
+      const buffer = Buffer.from(await file.arrayBuffer());
       const filename = `${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.-]/g, "_")}`;
-      const publicDir = path.join(process.cwd(), "public", "uploads");
-      await fs.mkdir(publicDir, { recursive: true });
-      const filePath = path.join(publicDir, filename);
-      await fs.writeFile(filePath, buffer);
-      receiptUrl = `/uploads/${filename}`;
+      receiptUrl = await uploadPublicFile(
+        "receipts",
+        filename,
+        buffer,
+        file.type || "application/octet-stream",
+      );
     } catch (err: any) {
       console.error("Receipt upload failed:", err);
       return { error: "Failed to upload receipt: " + err.message };

@@ -1,10 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import fs from "fs/promises";
-import path from "path";
 import { createClient } from "@/lib/supabase/server";
 import { requireProfile } from "@/lib/auth";
+import { uploadPublicFile } from "@/lib/storage";
 
 export type PurchaseFormState = { ok?: boolean; error?: string };
 
@@ -29,19 +28,19 @@ export async function recordPurchase(
     return { error: "Invalid purchase amount." };
   }
 
-  // Handle local file upload
+  // Upload invoice bill to Supabase Storage (works on serverless/Vercel)
   const file = formData.get("bill") as File;
   let billUrl = "";
   if (file && file.size > 0) {
     try {
-      const bytes = await file.arrayBuffer();
-      const buffer = Buffer.from(bytes);
+      const buffer = Buffer.from(await file.arrayBuffer());
       const filename = `${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.-]/g, "_")}`;
-      const publicDir = path.join(process.cwd(), "public", "uploads");
-      await fs.mkdir(publicDir, { recursive: true });
-      const filePath = path.join(publicDir, filename);
-      await fs.writeFile(filePath, buffer);
-      billUrl = `/uploads/${filename}`;
+      billUrl = await uploadPublicFile(
+        "bills",
+        filename,
+        buffer,
+        file.type || "application/octet-stream",
+      );
     } catch (err: any) {
       console.error("File upload failed:", err);
       return { error: "Failed to upload invoice bill: " + err.message };

@@ -1,11 +1,11 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import fs from "fs/promises";
-import path from "path";
+import { headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { requireProfile, requireOwner } from "@/lib/auth";
 import { todayIST } from "@/lib/date";
+import { uploadPublicFile, deletePublicFile } from "@/lib/storage";
 
 export type HRActionState = { ok?: boolean; error?: string; message?: string };
 
@@ -197,19 +197,18 @@ export async function uploadStaffDocument(
       return { error: "Please select a document file to upload." };
     }
 
-    // Save file locally to public/uploads/documents
+    // Upload to Supabase Storage (works on serverless/Vercel)
     let fileUrl = "";
     try {
-      const bytes = await file.arrayBuffer();
-      const buffer = Buffer.from(bytes);
+      const buffer = Buffer.from(await file.arrayBuffer());
       const cleanName = file.name.replace(/[^a-zA-Z0-9.-]/g, "_");
       const filename = `${Date.now()}-${type}-${cleanName}`;
-      const docDir = path.join(process.cwd(), "public", "uploads", "documents");
-      
-      await fs.mkdir(docDir, { recursive: true });
-      const filePath = path.join(docDir, filename);
-      await fs.writeFile(filePath, buffer);
-      fileUrl = `/uploads/documents/${filename}`;
+      fileUrl = await uploadPublicFile(
+        "staff-docs",
+        filename,
+        buffer,
+        file.type || "application/octet-stream",
+      );
     } catch (uploadErr: any) {
       console.error("Document file upload failed:", uploadErr);
       return { error: "File upload failed: " + uploadErr.message };
@@ -227,12 +226,7 @@ export async function uploadStaffDocument(
     if (error) {
       console.error("uploadStaffDocument database error:", error);
       // Clean up the uploaded file if DB insert fails
-      try {
-        const filePath = path.join(process.cwd(), "public", fileUrl);
-        await fs.unlink(filePath);
-      } catch (cleanupErr) {
-        console.error("Cleanup uploaded file failed:", cleanupErr);
-      }
+      await deletePublicFile(fileUrl);
 
       if (error.code === "P0001" || error.message.includes("relation")) {
         return {
@@ -279,14 +273,8 @@ export async function deleteStaffDocument(documentId: string): Promise<HRActionS
       return { error: deleteErr.message };
     }
 
-    // Attempt to delete file from local storage
-    try {
-      const filePath = path.join(process.cwd(), "public", doc.file_url);
-      await fs.unlink(filePath);
-    } catch (fsErr: any) {
-      // Log error but don't fail the action if file was already missing
-      console.warn("Could not delete file from disk:", fsErr.message);
-    }
+    // Remove the file from storage (best-effort)
+    await deletePublicFile(doc.file_url);
 
     revalidatePath("/profile");
     revalidatePath("/attendance");
@@ -366,14 +354,21 @@ export async function generatePayslip(
     const date = new Date(parseInt(yearStr), parseInt(monthStr) - 1, 1);
     const monthLabel = date.toLocaleDateString("en-IN", { month: "long", year: "numeric" });
 
-    // Load corporate logo as base64
+    // Load corporate logo as base64 (fetch the deployed static asset)
     let logoBase64 = "";
     try {
-      const logoPath = path.join(process.cwd(), "public", "brand", "logo-full.png");
-      const logoBuffer = await fs.readFile(logoPath);
-      logoBase64 = `data:image/png;base64,${logoBuffer.toString("base64")}`;
+      const h = headers();
+      const host = h.get("host");
+      const proto = h.get("x-forwarded-proto") ?? "https";
+      if (host) {
+        const res = await fetch(`${proto}://${host}/brand/logo-full.png`);
+        if (res.ok) {
+          const logoBuffer = Buffer.from(await res.arrayBuffer());
+          logoBase64 = `data:image/png;base64,${logoBuffer.toString("base64")}`;
+        }
+      }
     } catch (logoErr) {
-      console.warn("Logo file not found:", logoErr);
+      console.warn("Logo fetch failed:", logoErr);
     }
 
     // Fetch owner profile to retrieve their signature
@@ -384,13 +379,15 @@ export async function generatePayslip(
       .single();
 
     let signatureBase64 = "";
-    if (ownerProfile?.signature_url) {
+    if (ownerProfile?.signature_url?.startsWith("http")) {
       try {
-        const sigPath = path.join(process.cwd(), "public", ownerProfile.signature_url);
-        const sigBuffer = await fs.readFile(sigPath);
-        signatureBase64 = `data:image/png;base64,${sigBuffer.toString("base64")}`;
+        const res = await fetch(ownerProfile.signature_url);
+        if (res.ok) {
+          const sigBuffer = Buffer.from(await res.arrayBuffer());
+          signatureBase64 = `data:image/png;base64,${sigBuffer.toString("base64")}`;
+        }
       } catch (sigErr) {
-        console.warn("Signature file not found on disk:", sigErr);
+        console.warn("Signature fetch failed:", sigErr);
       }
     }
 
@@ -735,13 +732,14 @@ export async function generatePayslip(
 </body>
 </html>`;
 
-    // Save payslip locally to public/uploads/documents/
+    // Save payslip to Supabase Storage (overwrites any existing one for the month)
     const filename = `payslip-${profileId}-${month}.html`;
-    const docDir = path.join(process.cwd(), "public", "uploads", "documents");
-    await fs.mkdir(docDir, { recursive: true });
-    const filePath = path.join(docDir, filename);
-    await fs.writeFile(filePath, htmlContent, "utf-8");
-    const fileUrl = `/uploads/documents/${filename}`;
+    const fileUrl = await uploadPublicFile(
+      "payslips",
+      filename,
+      Buffer.from(htmlContent, "utf-8"),
+      "text/html; charset=utf-8",
+    );
 
     // Upsert or insert document record
     const { data: existingDoc } = await supabase
@@ -865,16 +863,15 @@ export async function updateStaffProfile(
     // Helper to upload document files
     const handleDocumentUpload = async (file: File, type: "aadhar_card" | "pan_card") => {
       try {
-        const bytes = await file.arrayBuffer();
-        const buffer = Buffer.from(bytes);
+        const buffer = Buffer.from(await file.arrayBuffer());
         const cleanName = file.name.replace(/[^a-zA-Z0-9.-]/g, "_");
         const filename = `${Date.now()}-${type}-${cleanName}`;
-        const docDir = path.join(process.cwd(), "public", "uploads", "documents");
-        
-        await fs.mkdir(docDir, { recursive: true });
-        const filePath = path.join(docDir, filename);
-        await fs.writeFile(filePath, buffer);
-        const fileUrl = `/uploads/documents/${filename}`;
+        const fileUrl = await uploadPublicFile(
+          "staff-docs",
+          filename,
+          buffer,
+          file.type || "application/octet-stream",
+        );
 
         // Upsert logic in staff_documents
         const { data: existingDoc } = await supabase
@@ -885,13 +882,8 @@ export async function updateStaffProfile(
           .maybeSingle();
 
         if (existingDoc) {
-          // Delete old file
-          try {
-            const oldFilePath = path.join(process.cwd(), "public", existingDoc.file_url);
-            await fs.unlink(oldFilePath);
-          } catch (e) {
-            console.warn("Could not delete old file:", e);
-          }
+          // Delete old file (best-effort)
+          await deletePublicFile(existingDoc.file_url);
 
           await supabase
             .from("staff_documents")
@@ -946,19 +938,18 @@ export async function uploadOwnerSignature(
       return { error: "Please select a signature image file to upload." };
     }
 
-    // Save file locally to public/uploads/signatures
+    // Upload signature to Supabase Storage
     let fileUrl = "";
     try {
-      const bytes = await file.arrayBuffer();
-      const buffer = Buffer.from(bytes);
+      const buffer = Buffer.from(await file.arrayBuffer());
       const cleanName = file.name.replace(/[^a-zA-Z0-9.-]/g, "_");
       const filename = `${owner.id}-sig-${Date.now()}-${cleanName}`;
-      const sigDir = path.join(process.cwd(), "public", "uploads", "signatures");
-      
-      await fs.mkdir(sigDir, { recursive: true });
-      const filePath = path.join(sigDir, filename);
-      await fs.writeFile(filePath, buffer);
-      fileUrl = `/uploads/signatures/${filename}`;
+      fileUrl = await uploadPublicFile(
+        "signatures",
+        filename,
+        buffer,
+        file.type || "application/octet-stream",
+      );
     } catch (uploadErr: any) {
       console.error("Signature file upload failed:", uploadErr);
       return { error: "File upload failed: " + uploadErr.message };
