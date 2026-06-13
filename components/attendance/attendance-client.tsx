@@ -93,6 +93,11 @@ export function AttendanceClient({ staffList, currentProfile, initialPunches }: 
 
   const staffStats = useMemo(() => {
     const maxDay = new Date(selectedYear, selectedMonth, 0).getDate();
+    // For the current month only count days that have actually passed
+    const isCurrentMonth =
+      selectedYear === now.getFullYear() && selectedMonth === now.getMonth() + 1;
+    const elapsedDays = isCurrentMonth ? now.getDate() : maxDay;
+
     return staffList
       .filter((s) => s.role !== "owner")
       .map((staff) => {
@@ -100,7 +105,14 @@ export function AttendanceClient({ staffList, currentProfile, initialPunches }: 
           .filter((p) => p.profile_id === staff.id)
           .sort((a, b) => `${a.date}T${a.time}`.localeCompare(`${b.date}T${b.time}`));
         const daysPresent = new Set(punches.map((p) => p.date)).size;
-        return { staff, present: daysPresent, absent: Math.max(0, maxDay - daysPresent), total: maxDay, punches };
+        return {
+          staff,
+          present: daysPresent,
+          absent: Math.max(0, elapsedDays - daysPresent),
+          total: elapsedDays,
+          fullMonthDays: maxDay,
+          punches,
+        };
       });
   }, [staffList, filteredPunches, selectedYear, selectedMonth]);
 
