@@ -45,6 +45,9 @@ yarn-error.log*
 
 # capacitor native project lives on the capacitor branch; ignore any local copy
 /android/
+!/android/app/src/main/res/values/
+!/android/app/src/main/res/mipmap-*/
+!/android/app/src/main/assets/capacitor.config.json
 
 # pre-existing TWA / Play Store bundle (contains a signing keystore)
 B&CL OPS - Google Play package/
