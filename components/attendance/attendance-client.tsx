@@ -474,6 +474,7 @@ export function AttendanceClient({ staffList, currentProfile, initialPunches }: 
   const myPresent = myStats?.present ?? 0;
   const myAbsent = myStats?.absent ?? 0;
   const myTotal = myStats?.total ?? 0;
+  const myFullMonth = myStats?.fullMonthDays ?? new Date(selectedYear, selectedMonth, 0).getDate();
   const myPct = myTotal > 0 ? Math.round((myPresent / myTotal) * 100) : 0;
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -515,7 +516,7 @@ export function AttendanceClient({ staffList, currentProfile, initialPunches }: 
       {!isOwner && (
         <div className="space-y-4">
           {/* Summary chips */}
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 gap-3">
             <div className="rounded-xl border border-success/20 bg-success/5 p-4 text-center">
               <p className="text-3xl font-extrabold text-success">{myPresent}</p>
               <p className="mt-1 text-[11px] font-semibold text-content-secondary">Days Present</p>
@@ -526,7 +527,13 @@ export function AttendanceClient({ staffList, currentProfile, initialPunches }: 
             </div>
             <div className="rounded-xl border border-border bg-white/[0.02] p-4 text-center">
               <p className="text-3xl font-extrabold text-content-primary">{myTotal}</p>
-              <p className="mt-1 text-[11px] font-semibold text-content-secondary">Total Days</p>
+              <p className="mt-1 text-[11px] font-semibold text-content-secondary">Days So Far</p>
+              <p className="mt-0.5 text-[10px] text-content-secondary/60">this month to date</p>
+            </div>
+            <div className="rounded-xl border border-border bg-white/[0.02] p-4 text-center">
+              <p className="text-3xl font-extrabold text-content-primary">{myFullMonth}</p>
+              <p className="mt-1 text-[11px] font-semibold text-content-secondary">Full Month</p>
+              <p className="mt-0.5 text-[10px] text-content-secondary/60">total calendar days</p>
             </div>
           </div>
 
