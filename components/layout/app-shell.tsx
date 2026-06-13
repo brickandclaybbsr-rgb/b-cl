@@ -81,6 +81,7 @@ function OwnerShell({
               >
                 {initials(name)}
               </Link>
+              <SignOutButton label="" className="px-1.5" />
             </div>
           </div>
         </header>
