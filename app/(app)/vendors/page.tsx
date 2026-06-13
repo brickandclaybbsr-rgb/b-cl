@@ -1,4 +1,4 @@
-import { ShoppingCart, Store, Receipt, FileText, Download } from "lucide-react";
+import { ShoppingCart, Store, Receipt, FileText, Download, Package } from "lucide-react";
 import Link from "next/link";
 import { requireProfile } from "@/lib/auth";
 import { getVendors, getAllVendors, getOrders } from "@/lib/data/vendors";
@@ -46,6 +46,22 @@ export default async function VendorsPage({ searchParams }: Props) {
             : "Raise order requests and log vendor purchase invoices"
         }
       />
+
+      {/* Store section switcher */}
+      <div className="mb-4 flex gap-1 border-b border-border pb-px">
+        <Link
+          href="/stock"
+          className="flex items-center gap-1.5 pb-3 px-3 text-sm font-semibold text-content-secondary hover:text-content-primary transition-colors"
+        >
+          <Package className="size-4" /> Stock
+        </Link>
+        <Link
+          href="/vendors"
+          className="relative flex items-center gap-1.5 pb-3 text-sm font-semibold text-white after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-full after:bg-white"
+        >
+          <ShoppingCart className="size-4" /> Vendors
+        </Link>
+      </div>
 
       {/* Modern Tabs */}
       <div className="mb-6 flex gap-4 border-b border-border pb-px">
