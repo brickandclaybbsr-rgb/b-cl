@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireProfile } from "@/lib/auth";
 import { getStockItems } from "@/lib/data/stock";
 import { todayIST } from "@/lib/date";
+import { whatsappNotify } from "@/lib/whatsapp-notify";
 import type { StockLine, StockStatusValue } from "@/lib/database.types";
 
 export type StockFormState = { ok?: boolean; error?: string };
@@ -58,6 +59,10 @@ export async function submitStock(
   });
 
   if (error) return { error: error.message };
+
+  await whatsappNotify.stockOut(
+    lines.filter((l) => l.status === "out").map((l) => l.item_name),
+  );
 
   revalidatePath("/stock");
   revalidatePath("/owner");

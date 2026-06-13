@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireProfile, requireOwner } from "@/lib/auth";
+import { whatsappNotify } from "@/lib/whatsapp-notify";
 import type { OrderStatus, Urgency } from "@/lib/database.types";
 
 export type OrderFormState = { ok?: boolean; error?: string };
@@ -31,6 +32,8 @@ export async function raiseOrder(
   });
 
   if (error) return { error: error.message };
+
+  await whatsappNotify.vendorOrder(profile.name);
 
   revalidatePath("/vendors");
   revalidatePath("/owner");

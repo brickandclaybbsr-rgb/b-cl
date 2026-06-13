@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireProfile } from "@/lib/auth";
 import { uploadPublicFile } from "@/lib/storage";
+import { whatsappNotify } from "@/lib/whatsapp-notify";
 
 export type PurchaseFormState = { ok?: boolean; error?: string };
 
@@ -58,6 +59,8 @@ export async function recordPurchase(
   });
 
   if (error) return { error: error.message };
+
+  await whatsappNotify.vendorPurchase(profile.name, amount);
 
   revalidatePath("/vendors");
   revalidatePath("/owner");

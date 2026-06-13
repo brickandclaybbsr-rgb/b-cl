@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireProfile, requireOwner } from "@/lib/auth";
 import { uploadPublicFile } from "@/lib/storage";
+import { whatsappNotify } from "@/lib/whatsapp-notify";
 
 export type ReimbursementFormState = { ok?: boolean; error?: string };
 
@@ -54,6 +55,8 @@ export async function submitReimbursementClaim(
   });
 
   if (error) return { error: error.message };
+
+  await whatsappNotify.reimbursement(profile.name, amount);
 
   revalidatePath("/reimbursements");
   return { ok: true };
