@@ -217,7 +217,7 @@ function StaffShell({
 
       {/* Bottom navigation */}
       <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-bg-card/90 pb-safe backdrop-blur-xl">
-        <div className="mx-auto grid max-w-2xl grid-cols-6">
+        <div className="mx-auto grid max-w-2xl" style={{ gridTemplateColumns: `repeat(${STAFF_NAV.length}, minmax(0, 1fr))` }}>
           {STAFF_NAV.map((item) => {
             const active = isActive(item, pathname);
             const Icon = item.icon;
