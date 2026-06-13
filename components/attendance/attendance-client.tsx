@@ -366,30 +366,45 @@ export function AttendanceClient({ staffList, currentProfile, initialPunches }: 
 
     const filename = `attendance-${monthString}.png`;
 
-    const triggerDownload = (url: string) => {
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = filename;
-      a.style.display = "none";
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-    };
+    // Use toDataURL (synchronous) so we stay in the user-gesture stack.
+    // canvas.toBlob() is async and breaks navigator.share() on Android WebView.
+    const dataUrl = canvas.toDataURL("image/png");
 
-    canvas.toBlob((blob) => {
-      if (!blob) {
-        triggerDownload(canvas.toDataURL("image/png"));
-        return;
-      }
-      const file = new File([blob], filename, { type: "image/png" });
-      if (typeof navigator !== "undefined" && typeof navigator.canShare === "function" && navigator.canShare({ files: [file] })) {
-        navigator.share({ files: [file], title: `Attendance Report — ${title}` }).catch(() => {
-          triggerDownload(URL.createObjectURL(blob));
-        });
-      } else {
-        triggerDownload(URL.createObjectURL(blob));
-      }
-    }, "image/png");
+    // Convert data URL → Blob synchronously
+    const byteStr = atob(dataUrl.split(",")[1]);
+    const buf = new Uint8Array(byteStr.length);
+    for (let i = 0; i < byteStr.length; i++) buf[i] = byteStr.charCodeAt(i);
+    const blob = new Blob([buf], { type: "image/png" });
+    const file = new File([blob], filename, { type: "image/png" });
+
+    // Try Web Share API with file (Android 10+ WebView / Safari iOS)
+    if (
+      typeof navigator !== "undefined" &&
+      typeof navigator.share === "function" &&
+      typeof navigator.canShare === "function" &&
+      navigator.canShare({ files: [file] })
+    ) {
+      navigator
+        .share({ files: [file], title: `Attendance Report — ${title}` })
+        .catch(() => {/* user cancelled – no-op */});
+      return;
+    }
+
+    // Fallback: open image in new tab so user can long-press save on Android
+    // or the browser triggers a download on desktop
+    const objectUrl = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = objectUrl;
+    a.download = filename;
+    a.style.display = "none";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    // If anchor download silently fails (Android WebView), open in new tab
+    setTimeout(() => {
+      URL.revokeObjectURL(objectUrl);
+    }, 10000);
+    window.open(objectUrl, "_blank");
   }, [staffStats, selectedMonth, selectedYear, monthString]);
 
   // ── Month / Year picker ───────────────────────────────────────────────────
