@@ -45,6 +45,8 @@ export async function login(
 
 export async function signOut() {
   const supabase = createClient();
-  await supabase.auth.signOut();
+  // scope: 'local' clears only this device's session.
+  // Default 'global' would revoke all sessions on every device.
+  await supabase.auth.signOut({ scope: "local" });
   redirect("/login");
 }
