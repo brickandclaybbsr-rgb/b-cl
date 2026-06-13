@@ -10,6 +10,7 @@ import {
   Receipt,
   Calendar,
   Users,
+  Bell,
   type LucideIcon,
 } from "lucide-react";
 
@@ -41,6 +42,7 @@ export const OWNER_NAV: NavItem[] = [
   { label: "Stock", href: "/stock", icon: Package },
   { label: "Vendors", href: "/vendors", icon: ShoppingCart },
   { label: "Peoples", href: "/attendance", icon: Users, match: ["/attendance", "/reimbursements"] },
+  { label: "Notify", href: "/notifications", icon: Bell },
 ];
 
 export function isActive(item: NavItem, pathname: string): boolean {
