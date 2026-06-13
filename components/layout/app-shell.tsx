@@ -6,7 +6,8 @@ import { usePathname } from "next/navigation";
 import type { Role } from "@/lib/database.types";
 import { BrandLogo } from "@/components/brand-logo";
 import { SignOutButton } from "./sign-out-button";
-import { OWNER_NAV, STAFF_NAV, isActive, type NavItem } from "./nav-config";
+import { Settings } from "lucide-react";
+import { OWNER_NAV, OWNER_MOBILE_NAV, STAFF_NAV, isActive, type NavItem } from "./nav-config";
 import { initials, cn } from "@/lib/utils";
 
 export function AppShell({
@@ -50,13 +51,24 @@ function OwnerShell({
         <UserChip name={name} role="Owner" />
       </aside>
 
-      {/* Mobile: top bar with brand + profile avatar + sign out */}
+      {/* Mobile: top bar with brand + settings icon + profile avatar */}
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-20 border-b border-border bg-bg-primary/80 backdrop-blur-xl md:hidden">
           <div className="flex items-center justify-between px-4 py-3">
             <BrandLogo height={22} />
-            <div className="flex items-center gap-2">
-
+            <div className="flex items-center gap-1.5">
+              <Link
+                href="/profile"
+                className={cn(
+                  "flex size-8 items-center justify-center rounded-lg transition-all duration-200",
+                  pathname === "/profile" || pathname.startsWith("/notifications")
+                    ? "bg-white/15 text-white"
+                    : "text-content-secondary hover:bg-white/10 hover:text-white"
+                )}
+                title="Settings"
+              >
+                <Settings className="size-4" />
+              </Link>
               <Link
                 href="/profile"
                 className={cn(
@@ -69,7 +81,6 @@ function OwnerShell({
               >
                 {initials(name)}
               </Link>
-              <SignOutButton label="" className="px-1.5" />
             </div>
           </div>
         </header>
@@ -79,10 +90,10 @@ function OwnerShell({
           {children}
         </main>
 
-        {/* Mobile fixed bottom nav — icon + label style matching staff shell */}
+        {/* Mobile fixed bottom nav — 5 items: Dashboard, Reports, Checklist, Store, Peoples */}
         <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-bg-card/90 pb-safe backdrop-blur-xl md:hidden">
-          <div className="mx-auto grid max-w-2xl" style={{ gridTemplateColumns: `repeat(${OWNER_NAV.length}, minmax(0, 1fr))` }}>
-            {OWNER_NAV.map((item) => {
+          <div className="mx-auto grid max-w-2xl" style={{ gridTemplateColumns: `repeat(${OWNER_MOBILE_NAV.length}, minmax(0, 1fr))` }}>
+            {OWNER_MOBILE_NAV.map((item) => {
               const active = isActive(item, pathname);
               const Icon = item.icon;
               return (
