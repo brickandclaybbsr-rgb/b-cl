@@ -364,29 +364,32 @@ export function AttendanceClient({ staffList, currentProfile, initialPunches }: 
     ctx.font = "10px system-ui, sans-serif";
     ctx.fillText("Brick & Clay Operations · Internal Report", 24, footerY + 22);
 
-    const dataUrl = canvas.toDataURL("image/png");
+    const filename = `attendance-${monthString}.png`;
 
-    if (typeof navigator !== "undefined" && navigator.share) {
-      canvas.toBlob(async (blob) => {
-        if (!blob) return;
-        try {
-          await navigator.share({
-            files: [new File([blob], `attendance-${monthString}.png`, { type: "image/png" })],
-            title: `Attendance Report — ${title}`,
-          });
-        } catch {
-          const a = document.createElement("a");
-          a.download = `attendance-${monthString}.png`;
-          a.href = dataUrl;
-          a.click();
-        }
-      }, "image/png");
-    } else {
+    const triggerDownload = (url: string) => {
       const a = document.createElement("a");
-      a.download = `attendance-${monthString}.png`;
-      a.href = dataUrl;
+      a.href = url;
+      a.download = filename;
+      a.style.display = "none";
+      document.body.appendChild(a);
       a.click();
-    }
+      document.body.removeChild(a);
+    };
+
+    canvas.toBlob((blob) => {
+      if (!blob) {
+        triggerDownload(canvas.toDataURL("image/png"));
+        return;
+      }
+      const file = new File([blob], filename, { type: "image/png" });
+      if (typeof navigator !== "undefined" && typeof navigator.canShare === "function" && navigator.canShare({ files: [file] })) {
+        navigator.share({ files: [file], title: `Attendance Report — ${title}` }).catch(() => {
+          triggerDownload(URL.createObjectURL(blob));
+        });
+      } else {
+        triggerDownload(URL.createObjectURL(blob));
+      }
+    }, "image/png");
   }, [staffStats, selectedMonth, selectedYear, monthString]);
 
   // ── Month / Year picker ───────────────────────────────────────────────────
