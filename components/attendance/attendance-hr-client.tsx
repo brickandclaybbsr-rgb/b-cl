@@ -406,7 +406,7 @@ export function AttendanceHRClient({ staffList, initialLeaves, initialDocuments,
                             </span>
                             <div className="flex items-center gap-2 mt-1">
                               <Badge variant="default" className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0 bg-bg-elevated text-content-primary border border-border/30">
-                                {leave.leave_type === "cl" ? "Casual Leave (CL)" : leave.leave_type === "sl" ? "Sick Leave (SL)" : "Leave Without Pay (LWP)"}
+                                {leave.leave_type === "cl" ? "Weekly Leave / CL" : leave.leave_type === "sl" ? "Sick Leave (SL)" : "Leave Without Pay (LWP)"}
                               </Badge>
                             </div>
                             <p className="text-xs text-content-secondary mt-1.5">
@@ -511,7 +511,7 @@ export function AttendanceHRClient({ staffList, initialLeaves, initialDocuments,
                         </div>
                         <div className="flex items-center gap-1.5">
                           <Badge variant="default" className="text-[8px] font-bold uppercase tracking-wider px-1 py-0 bg-bg-elevated text-content-primary border border-border/30">
-                            {leave.leave_type === "cl" ? "CL" : leave.leave_type === "sl" ? "SL" : "LWP"}
+                            {leave.leave_type === "cl" ? "WL/CL" : leave.leave_type === "sl" ? "SL" : "LWP"}
                           </Badge>
                           <span className="text-content-secondary text-[10px]">
                             {from} - {to}

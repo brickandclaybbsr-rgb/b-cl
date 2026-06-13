@@ -347,9 +347,9 @@ export function ProfileClient({ initialLeaves, initialDocuments, attendanceChild
                 </h4>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1 bg-white/[0.01] border border-border/20 p-2.5 rounded-xl text-center">
-                    <span className="text-[10px] uppercase font-bold text-content-secondary text-left block">Casual Leave (CL)</span>
+                    <span className="text-[10px] uppercase font-bold text-content-secondary text-left block">Weekly Leave / CL</span>
                     <p className="text-xl font-bold text-warm font-mono text-left">{clRemaining} <span className="text-xs font-normal text-content-secondary">/ 48</span></p>
-                    <span className="text-[9px] text-content-secondary block text-left">Days Remaining</span>
+                    <span className="text-[9px] text-content-secondary block text-left">Days Remaining (4/month)</span>
                   </div>
                   <div className="space-y-1 bg-white/[0.01] border border-border/20 p-2.5 rounded-xl text-center">
                     <span className="text-[10px] uppercase font-bold text-content-secondary text-left block">Sick Leave (SL)</span>
@@ -380,7 +380,7 @@ export function ProfileClient({ initialLeaves, initialDocuments, attendanceChild
                         setAgreeNotice(false);
                       }}
                     >
-                      <option value="cl">Casual Leave (CL) — 48 days/yr</option>
+                      <option value="cl">Weekly Leave / CL — 48 days/yr (4 per month)</option>
                       <option value="sl">Sick Leave (SL) — 6 days/yr</option>
                       <option value="lwp">Leave Without Pay (LWP)</option>
                     </Select>
@@ -432,7 +432,7 @@ export function ProfileClient({ initialLeaves, initialDocuments, attendanceChild
                         <div className="text-content-primary leading-relaxed">
                           <p className="font-semibold text-warning">Notice Policy Warning</p>
                           <p className="text-content-secondary mt-0.5">
-                            Casual Leave (CL) should be applied 2 days in advance.
+                            Weekly Leave (CL) must be applied at least 2 days in advance.
                           </p>
                         </div>
                       </div>
@@ -493,11 +493,11 @@ export function ProfileClient({ initialLeaves, initialDocuments, attendanceChild
                 <div className={cn("space-y-3.5 mt-3 pt-3 border-t border-border/40 sm:border-t-0 sm:pt-0 sm:mt-0", showPolicy ? "block animate-fade-in" : "hidden sm:block")}>
                   <div className="space-y-2">
                     <div className="flex justify-between border-b border-border/30 pb-1">
-                      <span className="font-semibold text-content-primary">Casual Leave (CL)</span>
+                      <span className="font-semibold text-content-primary">Weekly Leave / CL</span>
                       <span className="text-content-secondary font-mono">48 days/yr (4/mo)</span>
                     </div>
                     <p className="text-[10px] text-content-secondary leading-relaxed">
-                      Prior approval required. **Not allowed on Fridays, Saturdays, or Sundays** unless it's a medical emergency (requires Sick Leave / certificate).
+                      Also called Weekly Leave by staff. Prior approval required. Not allowed on Fridays, Saturdays, or Sundays unless medical emergency (requires SL + certificate).
                     </p>
                   </div>
 
@@ -559,7 +559,7 @@ export function ProfileClient({ initialLeaves, initialDocuments, attendanceChild
                             </span>
                             <div className="flex flex-wrap items-center gap-1.5 mt-1">
                               <Badge variant="default" className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0 bg-bg-elevated text-content-primary border border-border/30">
-                                {leave.leave_type === "cl" ? "Casual Leave (CL)" : leave.leave_type === "sl" ? "Sick Leave (SL)" : "Leave Without Pay (LWP)"}
+                                {leave.leave_type === "cl" ? "Weekly Leave / CL" : leave.leave_type === "sl" ? "Sick Leave (SL)" : "Leave Without Pay (LWP)"}
                               </Badge>
                             </div>
                             <p className="text-[10px] text-content-secondary mt-1">
