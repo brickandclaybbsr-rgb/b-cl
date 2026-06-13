@@ -11,11 +11,13 @@ import {
   Users,
   Activity,
   ChevronRight,
+  Wallet,
 } from "lucide-react";
 import { requireOwner } from "@/lib/auth";
 import { getTodaySnapshot } from "@/lib/data/dashboard";
 import { getSalesTrend } from "@/lib/data/sales";
 import { getTodayActivity } from "@/lib/data/activity";
+import { getTodayCashExpenses } from "@/lib/data/expenses";
 import { formatDateLabel, formatTimeIST } from "@/lib/date";
 import { getProfileNameMap } from "@/lib/data/profiles";
 import { formatINR, formatNumber } from "@/lib/utils";
@@ -31,11 +33,12 @@ export const metadata = { title: "Dashboard" };
 
 export default async function OwnerDashboard() {
   await requireOwner();
-  const [snap, trend, activity, nameMap] = await Promise.all([
+  const [snap, trend, activity, nameMap, cashExpenses] = await Promise.all([
     getTodaySnapshot(),
     getSalesTrend(7),
     getTodayActivity(),
     getProfileNameMap(),
+    getTodayCashExpenses(),
   ]);
 
   const alerts = snap.lowItems.length + snap.outItems.length;
@@ -174,6 +177,37 @@ export default async function OwnerDashboard() {
           <Attendance opening={snap.opening} />
         </Card>
       </div>
+
+      {/* Cash Expenses */}
+      <Card className="p-4">
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-content-secondary">
+            <Wallet className="size-4" /> Cash Out Today
+          </h2>
+          {cashExpenses.length > 0 && (
+            <span className="font-mono text-sm font-bold text-danger">
+              -{formatINR(cashExpenses.reduce((s, e) => s + Number(e.amount), 0))}
+            </span>
+          )}
+        </div>
+        {cashExpenses.length === 0 ? (
+          <p className="py-2 text-sm text-content-secondary">No cash expenses logged today.</p>
+        ) : (
+          <ul className="divide-y divide-border">
+            {cashExpenses.map((e) => (
+              <li key={e.id} className="flex items-center justify-between gap-3 py-2.5 text-sm">
+                <div className="min-w-0 flex-1">
+                  <span className="font-medium">{e.person_name}</span>
+                  {e.notes && <span className="ml-1.5 text-xs text-content-secondary">· {e.notes}</span>}
+                </div>
+                <span className="shrink-0 font-mono font-semibold tabular-nums text-danger">
+                  -{formatINR(Number(e.amount))}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
 
       {/* Quick actions */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">

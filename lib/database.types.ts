@@ -236,6 +236,17 @@ export type StaffDocument = {
   uploaded_at: string;
 };
 
+export type CashExpense = {
+  id: string;
+  date: string;
+  person_name: string;
+  amount: number;
+  category: "withdrawal" | "advance" | "expense" | "other";
+  notes: string | null;
+  submitted_by: string | null;
+  submitted_at: string;
+};
+
 /** A table definition in the shape supabase-js expects (incl. Relationships). */
 type Table<Row> = {
   Row: Row;
@@ -264,6 +275,7 @@ export interface Database {
       attendance_punches: Table<AttendancePunch>;
       leaves: Table<StaffLeave>;
       staff_documents: Table<StaffDocument>;
+      cash_expenses: Table<CashExpense>;
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;

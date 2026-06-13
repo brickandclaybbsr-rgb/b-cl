@@ -106,9 +106,9 @@ BEGIN
   INSERT INTO attendance_punches (profile_id, pin, name, date, time, uploaded_by)
   SELECT
     sandeep_id,
-    p.biometric_pin,
+    COALESCE(p.biometric_pin, 'TEST01'),
     p.name,
-    ist_today::text,
+    ist_today,
     '09:07',
     owner_id
   FROM profiles p WHERE p.id = sandeep_id
@@ -117,9 +117,9 @@ BEGIN
   INSERT INTO attendance_punches (profile_id, pin, name, date, time, uploaded_by)
   SELECT
     sandeep_id,
-    p.biometric_pin,
+    COALESCE(p.biometric_pin, 'TEST01'),
     p.name,
-    ist_today::text,
+    ist_today,
     '22:48',
     owner_id
   FROM profiles p WHERE p.id = sandeep_id
@@ -146,6 +146,6 @@ DELETE FROM reimbursements      WHERE notes LIKE '%[TEST]%';
 -- Attendance punches don't have notes — delete by time range (test times)
 DELETE FROM attendance_punches
 WHERE time IN ('09:07', '22:48')
-  AND date = (NOW() AT TIME ZONE 'Asia/Kolkata')::date::text;
+  AND date = (NOW() AT TIME ZONE 'Asia/Kolkata')::date;
 
 */
