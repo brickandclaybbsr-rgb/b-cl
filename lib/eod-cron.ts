@@ -2,12 +2,24 @@ import { createAdminClient } from "./supabase/admin";
 import { todayIST } from "./date";
 import { notifyStaff } from "./push";
 
+async function isEnabled(key: string): Promise<boolean> {
+  try {
+    const supabase = createAdminClient();
+    const { data } = await supabase.from("app_settings").select("value").eq("key", key).maybeSingle();
+    return data?.value !== "false";
+  } catch {
+    return true;
+  }
+}
+
 export async function sendPunchoutReminder() {
+  if (!(await isEnabled("notify_punchout_enabled"))) return;
   await notifyStaff.punchoutReminder();
 }
 
 /** Check remaining EOD tasks and notify only for incomplete ones. */
 export async function sendEodTaskReminders() {
+  if (!(await isEnabled("notify_eod_tasks_enabled"))) return;
   const supabase = createAdminClient();
   const today = todayIST();
 

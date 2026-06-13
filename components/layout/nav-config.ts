@@ -38,6 +38,7 @@ export const STAFF_NAV: NavItem[] = [
 export const OWNER_NAV: NavItem[] = [
   { label: "Dashboard", href: "/owner", icon: LayoutDashboard },
   { label: "Reports", href: "/reports", icon: LineChart },
+  { label: "Checklist", href: "/checklist/opening", icon: ClipboardCheck, match: ["/checklist"] },
   { label: "Stock", href: "/stock", icon: Package },
   { label: "Vendors", href: "/vendors", icon: ShoppingCart },
   { label: "Peoples", href: "/attendance", icon: Users, match: ["/attendance", "/reimbursements"] },
