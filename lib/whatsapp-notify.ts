@@ -46,17 +46,6 @@ export const whatsappNotify = {
   salesSubmitted: (staff: string, total: number) =>
     notifyOwnerWhatsApp(`Sales submitted by ${staff} — today's total ${inr(total)}.`),
 
-  stockOut: (items: string[]) =>
-    items.length
-      ? notifyOwnerWhatsApp(`Stock alert — out of stock: ${items.join(", ")}.`)
-      : Promise.resolve(),
-
-  vendorOrder: (staff: string) =>
-    notifyOwnerWhatsApp(`New vendor order raised by ${staff}.`),
-
-  vendorPurchase: (staff: string, amount: number) =>
-    notifyOwnerWhatsApp(`Purchase recorded by ${staff} — ${inr(amount)}.`),
-
   reimbursement: (staff: string, amount: number) =>
     notifyOwnerWhatsApp(`Reimbursement claim of ${inr(amount)} submitted by ${staff}.`),
 
