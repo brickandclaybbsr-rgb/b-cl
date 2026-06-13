@@ -18,16 +18,35 @@ export async function submitSales(
   const supabase = createClient();
   const date = todayIST();
 
-  const cash_sales = toNumber(formData.get("cash_sales"));
-  const online_sales = toNumber(formData.get("online_sales"));
-  const aggregator_sales = toNumber(formData.get("aggregator_sales"));
+  const opening_cash        = toNumber(formData.get("opening_cash"));
+  const cash_sales          = toNumber(formData.get("cash_sales"));
+  const card_sales          = toNumber(formData.get("card_sales"));
+  const upi_sales           = toNumber(formData.get("upi_sales"));
+  const zomato_gold_sales   = toNumber(formData.get("zomato_gold_sales"));
+  const zomato_sales        = toNumber(formData.get("zomato_sales"));
+  const swiggy_sales        = toNumber(formData.get("swiggy_sales"));
+  const swiggy_dineout_sales = toNumber(formData.get("swiggy_dineout_sales"));
+  const eazy_diner_sales    = toNumber(formData.get("eazy_diner_sales"));
+  const closing_balance     = toNumber(formData.get("closing_balance"));
+
+  const online_sales     = card_sales + upi_sales;
+  const aggregator_sales = zomato_gold_sales + zomato_sales + swiggy_sales + swiggy_dineout_sales + eazy_diner_sales;
 
   const { error } = await supabase.from("daily_sales").insert({
     date,
     submitted_by: profile.id,
+    opening_cash,
     cash_sales,
+    card_sales,
+    upi_sales,
     online_sales,
+    zomato_gold_sales,
+    zomato_sales,
+    swiggy_sales,
+    swiggy_dineout_sales,
+    eazy_diner_sales,
     aggregator_sales,
+    closing_balance,
     discount_amount: toNumber(formData.get("discount_amount")),
     complimentary_count: toInt(formData.get("complimentary_count")),
     complimentary_value: toNumber(formData.get("complimentary_value")),

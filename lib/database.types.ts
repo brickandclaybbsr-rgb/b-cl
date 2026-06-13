@@ -93,9 +93,18 @@ export type DailySales = {
   id: string;
   date: string;
   submitted_by: string | null;
+  opening_cash: number;
   cash_sales: number;
+  card_sales: number;
+  upi_sales: number;
   online_sales: number;
+  zomato_gold_sales: number;
+  zomato_sales: number;
+  swiggy_sales: number;
+  swiggy_dineout_sales: number;
+  eazy_diner_sales: number;
   aggregator_sales: number;
+  closing_balance: number;
   total_bills: number;
   discount_amount: number;
   complimentary_count: number;
