@@ -42,7 +42,7 @@ export const OWNER_NAV: NavItem[] = [
   { label: "Stock", href: "/stock", icon: Package },
   { label: "Vendors", href: "/vendors", icon: ShoppingCart },
   { label: "Peoples", href: "/attendance", icon: Users, match: ["/attendance", "/reimbursements"] },
-  { label: "Settings", href: "/notifications", icon: Bell },
+  { label: "Settings", href: "/profile", icon: Settings, match: ["/profile", "/notifications"] },
 ];
 
 export function isActive(item: NavItem, pathname: string): boolean {

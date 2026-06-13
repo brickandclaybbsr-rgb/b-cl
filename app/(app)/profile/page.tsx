@@ -1,4 +1,4 @@
-import { AlertTriangle, MessageCircle, Settings, Shield, User } from "lucide-react";
+import { AlertTriangle, MessageCircle, Settings, Shield, User, Bell, CalendarClock } from "lucide-react";
 import { requireProfile } from "@/lib/auth";
 import { getStaff } from "@/lib/data/profiles";
 import { getAllStockItems } from "@/lib/data/stock";
@@ -14,6 +14,8 @@ import { Badge } from "@/components/ui/badge";
 import { initials, cn } from "@/lib/utils";
 import Link from "next/link";
 import { SettingsTabs } from "@/components/settings/tabs";
+import { ScheduleClient } from "@/app/(app)/notifications/schedule-client";
+import { SendNotificationForm } from "@/app/(app)/notifications/send-form";
 import {
   AddStaffForm,
   AddStockItemForm,
@@ -60,6 +62,8 @@ export default async function ProfilePage() {
   let opening: any[] = [];
   let closing: any[] = [];
   let ownerWa: string | null = null;
+  let punchoutEnabled = true;
+  let tasksEnabled = true;
 
   if (!isOwner) {
     const { data: punchesData } = await supabase
@@ -97,13 +101,15 @@ export default async function ProfilePage() {
     }
   } else {
     // Fetch all configuration settings for Owner
-    const [staffData, stockData, vendorsData, openingData, closingData, ownerWaData] = await Promise.all([
+    const [staffData, stockData, vendorsData, openingData, closingData, ownerWaData, punchoutData, tasksData] = await Promise.all([
       getStaff(),
       getAllStockItems(),
       getAllVendors(),
       getAllChecklistItems("opening"),
       getAllChecklistItems("closing"),
       getAppSetting("owner_whatsapp_number"),
+      getAppSetting("notify_punchout_enabled"),
+      getAppSetting("notify_eod_tasks_enabled"),
     ]);
     staff = staffData;
     stock = stockData;
@@ -111,6 +117,8 @@ export default async function ProfilePage() {
     opening = openingData;
     closing = closingData;
     ownerWa = ownerWaData;
+    punchoutEnabled = punchoutData !== "false";
+    tasksEnabled = tasksData !== "false";
   }
 
   return (
@@ -345,6 +353,55 @@ export default async function ProfilePage() {
                       </p>
                       <OwnerSignatureForm initialSignature={currentProfile.signature_url ?? null} />
                     </Card>
+                  </div>
+                ),
+              },
+              {
+                id: "notifications",
+                label: "Notifications",
+                content: (
+                  <div className="space-y-6 animate-fade-in">
+                    <section className="space-y-3">
+                      <h2 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-content-secondary">
+                        <CalendarClock className="size-4" /> Scheduled notifications
+                      </h2>
+                      <ScheduleClient
+                        groups={[
+                          {
+                            key: "notify_punchout_enabled",
+                            title: "Attendance Punch-Out Reminders",
+                            description: "Sent to all staff — reminding them to punch out before leaving",
+                            triggerType: "punchout",
+                            enabled: punchoutEnabled,
+                            rounds: [
+                              { label: "Round 1", time: "11:00 PM" },
+                              { label: "Round 2", time: "11:15 PM" },
+                              { label: "Round 3", time: "11:30 PM" },
+                            ],
+                          },
+                          {
+                            key: "notify_eod_tasks_enabled",
+                            title: "EOD Task Reminders",
+                            description: "Smart reminders for closing checklist, sales entry & closing balance — skipped if already done",
+                            triggerType: "tasks",
+                            enabled: tasksEnabled,
+                            rounds: [
+                              { label: "Check 1", time: "11:05 PM" },
+                              { label: "Check 2", time: "11:18 PM" },
+                              { label: "Check 3", time: "11:25 PM" },
+                            ],
+                          },
+                        ]}
+                      />
+                    </section>
+                    <section className="space-y-3">
+                      <h2 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-content-secondary">
+                        <Bell className="size-4" /> Send custom notification
+                      </h2>
+                      <div className="max-w-lg">
+                        <SendNotificationForm />
+                      </div>
+                    </section>
                   </div>
                 ),
               },
