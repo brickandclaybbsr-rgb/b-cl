@@ -94,10 +94,24 @@ export function AttendanceClient({ staffList, currentProfile, initialPunches }: 
 
   const staffStats = useMemo(() => {
     const maxDay = new Date(selectedYear, selectedMonth, 0).getDate();
-    // For the current month only count days that have actually passed
     const isCurrentMonth =
       selectedYear === now.getFullYear() && selectedMonth === now.getMonth() + 1;
-    const elapsedDays = isCurrentMonth ? now.getDate() : maxDay;
+    // For the current month: use the latest punch day in the uploaded data as the
+    // denominator so that "absent" means absent in the biometric report, not
+    // "not yet uploaded for today". Falls back to today if no data exists.
+    let elapsedDays: number;
+    if (isCurrentMonth) {
+      if (filteredPunches.length > 0) {
+        const maxPunchDay = Math.max(
+          ...filteredPunches.map((p) => parseInt(p.date.split("-")[2], 10))
+        );
+        elapsedDays = Math.min(maxPunchDay, now.getDate());
+      } else {
+        elapsedDays = now.getDate();
+      }
+    } else {
+      elapsedDays = maxDay;
+    }
 
     return staffList
       .filter((s) => s.role !== "owner")
