@@ -45,11 +45,10 @@ export const OWNER_NAV: NavItem[] = [
   { label: "Settings", href: "/profile", icon: Settings, match: ["/profile", "/notifications"] },
 ];
 
-/** Condensed nav for the mobile bottom bar — merges Stock+Vendors, drops Settings (moved to header). */
+/** Condensed nav for the mobile bottom bar — 4 items only. */
 export const OWNER_MOBILE_NAV: NavItem[] = [
   { label: "Dashboard", href: "/owner", icon: LayoutDashboard },
-  { label: "Reports", href: "/reports", icon: LineChart },
-  { label: "Checklist", href: "/checklist/opening", icon: ClipboardCheck, match: ["/checklist"] },
+  { label: "Reports", href: "/reports", icon: LineChart, match: ["/reports", "/checklist"] },
   { label: "Store", href: "/vendors", icon: ShoppingCart, match: ["/vendors", "/stock"] },
   { label: "Peoples", href: "/attendance", icon: Users, match: ["/attendance", "/reimbursements"] },
 ];
