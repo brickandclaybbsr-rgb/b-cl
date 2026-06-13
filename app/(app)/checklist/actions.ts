@@ -7,6 +7,7 @@ import { getChecklistConfig } from "@/lib/data/checklists";
 import { todayIST } from "@/lib/date";
 import { toNumber } from "@/lib/utils";
 import { whatsappNotify } from "@/lib/whatsapp-notify";
+import { notifyOwner } from "@/lib/push";
 import type { ChecklistLine } from "@/lib/database.types";
 
 export type ChecklistFormState = { ok?: boolean; error?: string };
@@ -55,6 +56,7 @@ export async function submitOpeningChecklist(
   }
 
   await whatsappNotify.checklistSubmitted(profile.name, "opening");
+  await notifyOwner.checklistPending("opening");
 
   revalidatePath("/checklist/opening");
   revalidatePath("/dashboard");
@@ -96,6 +98,7 @@ export async function submitClosingChecklist(
   }
 
   await whatsappNotify.checklistSubmitted(profile.name, "closing");
+  await notifyOwner.checklistPending("closing");
 
   revalidatePath("/checklist/closing");
   revalidatePath("/dashboard");

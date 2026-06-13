@@ -7,6 +7,7 @@ import { requireProfile, requireOwner } from "@/lib/auth";
 import { todayIST } from "@/lib/date";
 import { uploadPublicFile, deletePublicFile } from "@/lib/storage";
 import { whatsappNotify } from "@/lib/whatsapp-notify";
+import { notifyOwner } from "@/lib/push";
 
 export type HRActionState = { ok?: boolean; error?: string; message?: string };
 
@@ -87,6 +88,7 @@ export async function applyLeave(
     }
 
     await whatsappNotify.leaveRequest(profile.name, leaveType, startDateStr, endDateStr);
+    await notifyOwner.leaveRequest(profile.name, leaveType);
 
     revalidatePath("/profile");
     revalidatePath("/attendance");

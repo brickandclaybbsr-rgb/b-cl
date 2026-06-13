@@ -6,6 +6,7 @@ import { requireProfile } from "@/lib/auth";
 import { todayIST } from "@/lib/date";
 import { toNumber, toInt } from "@/lib/utils";
 import { whatsappNotify } from "@/lib/whatsapp-notify";
+import { notifyOwner } from "@/lib/push";
 
 export type SalesFormState = { ok?: boolean; error?: string };
 
@@ -41,6 +42,7 @@ export async function submitSales(
   }
 
   await whatsappNotify.salesSubmitted(profile.name, cash_sales, online_sales, aggregator_sales);
+  await notifyOwner.salesSubmitted(cash_sales + online_sales + aggregator_sales);
 
   revalidatePath("/sales");
   revalidatePath("/dashboard");
