@@ -840,6 +840,8 @@ export async function updateStaffProfile(
     const workingHours = String(formData.get("workingHours") ?? "").trim();
     const employmentType = String(formData.get("employmentType") ?? "").trim();
     const reportingAuthority = String(formData.get("reportingAuthority") ?? "").trim();
+    const teamRaw = String(formData.get("team") ?? "").trim();
+    const team = teamRaw === "kitchen" || teamRaw === "front_desk" ? teamRaw : null;
 
     const aadharFile = formData.get("aadharFile") as File | null;
     const panFile = formData.get("panFile") as File | null;
@@ -871,6 +873,7 @@ export async function updateStaffProfile(
         working_hours: workingHours || null,
         employment_type: employmentType || null,
         reporting_authority: reportingAuthority || null,
+        team,
       })
       .eq("id", profileId);
 

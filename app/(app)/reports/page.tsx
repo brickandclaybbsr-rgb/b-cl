@@ -1,14 +1,15 @@
-import { Check, MessageCircle, CalendarDays } from "lucide-react";
+import { MessageCircle, CalendarDays } from "lucide-react";
 import { requireOwner } from "@/lib/auth";
 import { getRecentDays, getEodLog } from "@/lib/data/reports";
 import { getSalesTrend } from "@/lib/data/sales";
 import { formatDateLabel, formatTimestampIST } from "@/lib/date";
-import { formatINR, formatNumber } from "@/lib/utils";
+import { formatINR } from "@/lib/utils";
 import { PageHeader } from "@/components/page-header";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/empty-state";
 import { SalesTrendChart } from "@/components/charts/sales-trend-chart";
+import { DailyList } from "@/components/reports/daily-list";
 
 export const metadata = { title: "Reports" };
 
@@ -57,26 +58,9 @@ export default async function ReportsPage() {
       <div>
         <h2 className="mb-3 flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-content-secondary">
           <CalendarDays className="size-4" /> Daily breakdown
+          <span className="text-[10px] font-normal text-content-secondary normal-case tracking-normal">— tap a day for full platform detail</span>
         </h2>
-        <Card className="divide-y divide-border">
-          {days.map((d) => (
-            <div key={d.date} className="flex items-center gap-3 px-4 py-3">
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium">{formatDateLabel(d.date)}</p>
-                <p className="text-xs text-content-secondary">
-                  {d.hasSales ? "Sales recorded" : "No sales entry"}
-                </p>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <Tick ok={d.openingDone} title="Opening" letter="O" />
-                <Tick ok={d.closingDone} title="Closing" letter="C" />
-              </div>
-              <span className="w-24 text-right font-mono text-sm font-semibold tabular-nums">
-                {formatINR(d.total)}
-              </span>
-            </div>
-          ))}
-        </Card>
+        <DailyList days={days} />
       </div>
 
       {/* EOD WhatsApp log */}
@@ -113,23 +97,3 @@ export default async function ReportsPage() {
   );
 }
 
-function Tick({
-  ok,
-  title,
-  letter,
-}: {
-  ok: boolean;
-  title: string;
-  letter: string;
-}) {
-  return (
-    <span
-      title={`${title}: ${ok ? "done" : "missing"}`}
-      className={`flex size-6 items-center justify-center rounded-md text-[0.65rem] font-bold ${
-        ok ? "bg-success/15 text-success" : "bg-bg-elevated text-content-secondary"
-      }`}
-    >
-      {ok ? <Check className="size-3.5" strokeWidth={3} /> : letter}
-    </span>
-  );
-}

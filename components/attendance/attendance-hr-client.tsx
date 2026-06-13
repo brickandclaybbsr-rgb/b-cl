@@ -34,6 +34,7 @@ interface StaffProfile {
   name: string;
   email?: string | null;
   role: string;
+  team?: "kitchen" | "front_desk" | null;
   employee_code?: string | null;
   dob?: string | null;
   aadhar_number?: string | null;
@@ -918,16 +919,23 @@ export function AttendanceHRClient({ staffList, initialLeaves, initialDocuments,
                       setEditingStaffId(staff.id);
                     }}
                   >
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-sm text-content-primary flex items-center gap-1.5">
-                        <User className="size-4 text-warm" />
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-bold text-sm text-content-primary flex items-center gap-1.5 min-w-0 truncate">
+                        <User className="size-4 text-warm shrink-0" />
                         {staff.name}
                       </span>
-                      {staff.employee_code && (
-                        <Badge variant="default" className="text-[9px] font-mono px-1.5 py-0">
-                          {staff.employee_code}
-                        </Badge>
-                      )}
+                      <div className="flex items-center gap-1 shrink-0">
+                        {staff.team && (
+                          <Badge variant="default" className="text-[9px] px-1.5 py-0 capitalize">
+                            {staff.team === "front_desk" ? "Front Desk" : "Kitchen"}
+                          </Badge>
+                        )}
+                        {staff.employee_code && (
+                          <Badge variant="default" className="text-[9px] font-mono px-1.5 py-0">
+                            {staff.employee_code}
+                          </Badge>
+                        )}
+                      </div>
                     </div>
                     
                     <div className="space-y-1 text-content-secondary">
@@ -1101,18 +1109,26 @@ export function AttendanceHRClient({ staffList, initialLeaves, initialDocuments,
                               </Select>
                             </div>
                             <div className="space-y-1.5">
-                              <Label htmlFor="edit-authority">Reporting Authority</Label>
-                              <Select id="edit-authority" name="reportingAuthority" defaultValue={staff.reporting_authority || ""}>
-                                <option value="">-- None / Self --</option>
-                                {staffList
-                                  .filter((s) => s.role === "owner" || s.role === "admin")
-                                  .map((admin) => (
-                                    <option key={admin.id} value={admin.id}>
-                                      {admin.name} ({admin.role})
-                                    </option>
-                                  ))}
+                              <Label htmlFor="edit-team">Checklist Team</Label>
+                              <Select id="edit-team" name="team" defaultValue={staff.team || ""}>
+                                <option value="">All items (no filter)</option>
+                                <option value="kitchen">Kitchen</option>
+                                <option value="front_desk">Front Desk</option>
                               </Select>
                             </div>
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label htmlFor="edit-authority">Reporting Authority</Label>
+                            <Select id="edit-authority" name="reportingAuthority" defaultValue={staff.reporting_authority || ""}>
+                              <option value="">-- None / Self --</option>
+                              {staffList
+                                .filter((s) => s.role === "owner" || s.role === "admin")
+                                .map((admin) => (
+                                  <option key={admin.id} value={admin.id}>
+                                    {admin.name} ({admin.role})
+                                  </option>
+                                ))}
+                            </Select>
                           </div>
                         </div>
 

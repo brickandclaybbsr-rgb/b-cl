@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { daysAgoIST, todayIST } from "@/lib/date";
 import { getSalesRange, salesTotal } from "@/lib/data/sales";
-import type { EodReport } from "@/lib/database.types";
+import type { EodReport, DailySales } from "@/lib/database.types";
 
 export interface DaySummary {
   date: string;
@@ -12,6 +12,7 @@ export interface DaySummary {
   hasSales: boolean;
   openingDone: boolean;
   closingDone: boolean;
+  sales: DailySales | null;
 }
 
 /** Per-day operational summary for the last `days` days, newest first. */
@@ -43,6 +44,7 @@ export async function getRecentDays(days = 14): Promise<DaySummary[]> {
       hasSales: !!s,
       openingDone: openSet.has(date),
       closingDone: closeSet.has(date),
+      sales: s ?? null,
     });
   }
   return out;
