@@ -387,30 +387,41 @@ export function ProfileClient({ initialLeaves, initialDocuments, attendanceChild
                   </div>
 
                   <div className="space-y-3.5">
-                    <div className="space-y-1.5">
-                      <Label htmlFor="startDate">From Date</Label>
-                      <Input 
-                        id="startDate" 
-                        name="startDate" 
-                        type="date" 
-                        required 
-                        style={{ colorScheme: "dark" }}
-                        value={startDate}
-                        onChange={(e) => setStartDate(e.target.value)}
-                      />
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1.5">
+                        <Label htmlFor="startDate">From Date</Label>
+                        <Input
+                          id="startDate"
+                          name="startDate"
+                          type="date"
+                          required
+                          style={{ colorScheme: "dark" }}
+                          value={startDate}
+                          onChange={(e) => setStartDate(e.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label htmlFor="endDate">To Date</Label>
+                        <Input
+                          id="endDate"
+                          name="endDate"
+                          type="date"
+                          required
+                          style={{ colorScheme: "dark" }}
+                          value={endDate}
+                          onChange={(e) => setEndDate(e.target.value)}
+                        />
+                      </div>
                     </div>
-                    <div className="space-y-1.5">
-                      <Label htmlFor="endDate">To Date</Label>
-                      <Input 
-                        id="endDate" 
-                        name="endDate" 
-                        type="date" 
-                        required 
-                        style={{ colorScheme: "dark" }}
-                        value={endDate}
-                        onChange={(e) => setEndDate(e.target.value)}
-                      />
-                    </div>
+                    {startDate && endDate && getDurationInDays(startDate, endDate) > 0 && (
+                      <div className="flex items-center justify-center gap-2 rounded-lg border border-fire/20 bg-fire/8 px-3 py-2.5">
+                        <CalendarDays className="size-3.5 text-warm shrink-0" />
+                        <span className="text-sm font-bold text-warm">
+                          {getDurationInDays(startDate, endDate)} day{getDurationInDays(startDate, endDate) !== 1 ? "s" : ""}
+                        </span>
+                        <span className="text-xs text-content-secondary">leave requested</span>
+                      </div>
+                    )}
                   </div>
 
                   <div className="space-y-1.5">
