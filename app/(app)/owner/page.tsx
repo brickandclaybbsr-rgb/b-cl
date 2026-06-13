@@ -88,7 +88,7 @@ export default async function OwnerDashboard() {
         />
       </div>
 
-      {/* Checklist status + cash split */}
+      {/* Checklist status + attendance */}
       <div className="grid gap-3 lg:grid-cols-2">
         <Card className="p-4">
           <h2 className="mb-3 text-sm font-bold uppercase tracking-wider text-content-secondary">
@@ -121,6 +121,16 @@ export default async function OwnerDashboard() {
         </Card>
 
         <Card className="p-4">
+          <h2 className="mb-3 flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-content-secondary">
+            <Users className="size-4" /> Attendance
+          </h2>
+          <Attendance opening={snap.opening} />
+        </Card>
+      </div>
+
+      {/* Cash vs Online + 7-day trend */}
+      <div className="grid gap-3 lg:grid-cols-2">
+        <Card className="p-4">
           <h2 className="mb-3 text-sm font-bold uppercase tracking-wider text-content-secondary">
             Cash vs Online (today)
           </h2>
@@ -134,49 +144,39 @@ export default async function OwnerDashboard() {
             <p className="py-4 text-sm text-content-secondary">No sales recorded yet.</p>
           )}
         </Card>
+
+        <Card className="p-4">
+          <h2 className="mb-1 text-sm font-bold uppercase tracking-wider text-content-secondary">
+            Last 7 days
+          </h2>
+          <SalesTrendChart data={trend} />
+        </Card>
       </div>
 
-      {/* 7-day trend */}
+      {/* Activity */}
       <Card className="p-4">
-        <h2 className="mb-1 text-sm font-bold uppercase tracking-wider text-content-secondary">
-          Last 7 days
+        <h2 className="mb-3 flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-content-secondary">
+          <Activity className="size-4" /> Today&apos;s activity
         </h2>
-        <SalesTrendChart data={trend} />
+        {activity.length === 0 ? (
+          <p className="py-4 text-sm text-content-secondary">No activity yet today.</p>
+        ) : (
+          <ul className="space-y-3">
+            {activity.map((e, i) => (
+              <li key={i} className="flex gap-3 text-sm">
+                <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-fire" />
+                <div className="flex-1">
+                  <span className="font-medium">{e.actor}</span>{" "}
+                  <span className="text-content-secondary">{e.action}</span>
+                </div>
+                <span className="shrink-0 text-xs text-content-secondary">
+                  {formatTimeIST(e.at)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
       </Card>
-
-      {/* Activity + attendance */}
-      <div className="grid gap-3 lg:grid-cols-2">
-        <Card className="p-4">
-          <h2 className="mb-3 flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-content-secondary">
-            <Activity className="size-4" /> Today&apos;s activity
-          </h2>
-          {activity.length === 0 ? (
-            <p className="py-4 text-sm text-content-secondary">No activity yet today.</p>
-          ) : (
-            <ul className="space-y-3">
-              {activity.map((e, i) => (
-                <li key={i} className="flex gap-3 text-sm">
-                  <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-fire" />
-                  <div className="flex-1">
-                    <span className="font-medium">{e.actor}</span>{" "}
-                    <span className="text-content-secondary">{e.action}</span>
-                  </div>
-                  <span className="shrink-0 text-xs text-content-secondary">
-                    {formatTimeIST(e.at)}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Card>
-
-        <Card className="p-4">
-          <h2 className="mb-3 flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-content-secondary">
-            <Users className="size-4" /> Attendance
-          </h2>
-          <Attendance opening={snap.opening} />
-        </Card>
-      </div>
 
       {/* Cash Expenses */}
       <Card className="p-4">
