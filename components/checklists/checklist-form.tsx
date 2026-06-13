@@ -24,12 +24,10 @@ export function ChecklistForm({
   variant,
   config,
   action,
-  isStockUpdated = false,
 }: {
   variant: "opening" | "closing";
   config: ChecklistItemDef[];
   action: Action;
-  isStockUpdated?: boolean;
 }) {
   const [state, formAction] = useFormState<ChecklistFormState, FormData>(
     action,
@@ -134,45 +132,6 @@ export function ChecklistForm({
             />
           </div>
           
-          <div className="border-t border-border pt-3.5 space-y-3">
-            <div className="flex items-start gap-2.5">
-              <input
-                type="checkbox"
-                id="closing_stock_updated"
-                name="closing_stock_updated"
-                required
-                className="mt-1 size-4 rounded border-border text-fire focus:ring-fire bg-bg-elevated accent-fire"
-              />
-              <div className="space-y-0.5">
-                <Label htmlFor="closing_stock_updated" className="text-sm font-semibold cursor-pointer">
-                  Closing stock updated for the day
-                </Label>
-                <p className="text-xs text-content-secondary">
-                  I confirm that today's closing stock has been recorded.
-                </p>
-              </div>
-            </div>
-            
-            {isStockUpdated ? (
-              <div className="rounded-xl bg-success/10 border border-success/20 px-3 py-2.5 text-xs text-success flex items-center gap-2">
-                <Check className="size-4 shrink-0" strokeWidth={3} />
-                <span>Today's closing stock snapshot has been submitted.</span>
-              </div>
-            ) : (
-              <div className="rounded-xl bg-warning/10 border border-warning/20 px-3 py-2.5 text-xs text-warning space-y-1.5">
-                <p className="font-semibold flex items-center gap-1.5">
-                  ⚠️ Closing stock snapshot not submitted yet!
-                </p>
-                <p>
-                  Please submit the stock status for today first so the inventory is accurate.
-                  <a href="/stock" className="ml-1.5 text-warm font-semibold underline hover:text-warm/80">
-                    Go to Stock Page →
-                  </a>
-                </p>
-              </div>
-            )}
-          </div>
-
           <NotesField />
         </Card>
       )}

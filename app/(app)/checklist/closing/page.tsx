@@ -7,7 +7,6 @@ import {
   isOtherTeamAbsentToday,
 } from "@/lib/data/checklists";
 import { getProfileNameMap } from "@/lib/data/profiles";
-import { getStockSnapshotForDate } from "@/lib/data/stock";
 import { PageHeader } from "@/components/page-header";
 import { ChecklistTabs } from "@/components/checklists/checklist-tabs";
 import { ChecklistForm } from "@/components/checklists/checklist-form";
@@ -22,7 +21,6 @@ export default async function ClosingChecklistPage() {
   const profile = await requireProfile();
   const date = todayIST();
   const existing = await getClosingChecklist(date);
-  const stockSnapshot = await getStockSnapshotForDate(date);
 
   const isOwner = profile.role === "owner";
   const isSubmitter = existing && existing.submitted_by === profile.id;
@@ -91,7 +89,6 @@ export default async function ClosingChecklistPage() {
           variant="closing"
           config={config}
           action={submitClosingChecklist}
-          isStockUpdated={Boolean(stockSnapshot)}
         />
       )}
     </div>

@@ -77,7 +77,6 @@ export async function submitClosingChecklist(
 
   const closingCashRaw = formData.get("closing_cash");
   const depositedRaw = formData.get("cash_deposited");
-  const closingStockUpdated = formData.get("closing_stock_updated") === "on";
 
   const { error } = await supabase.from("closing_checklists").insert({
     date,
@@ -86,7 +85,7 @@ export async function submitClosingChecklist(
     closing_cash: closingCashRaw === null || closingCashRaw === "" ? null : toNumber(closingCashRaw),
     cash_deposited: depositedRaw === null || depositedRaw === "" ? null : toNumber(depositedRaw),
     discrepancy_notes: String(formData.get("discrepancy_notes") ?? "").trim() || null,
-    closing_stock_updated: closingStockUpdated,
+    closing_stock_updated: false,
     notes: String(formData.get("notes") ?? "").trim() || null,
   });
 
