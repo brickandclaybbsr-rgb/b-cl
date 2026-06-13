@@ -5,7 +5,7 @@ import { dirname, join } from "node:path";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = join(__dirname, "..");
-const src = join(root, "Assets/BRICK & CLAY (1).png");
+const src = join(root, "Assets/Brick & Clay White Emblem Logo.jpg");
 const resDir = join(root, "android/app/src/main/res");
 
 const ICON_SIZE = 1024;
