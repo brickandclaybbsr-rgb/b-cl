@@ -97,12 +97,8 @@ export function AttendanceClient({ staffList, currentProfile, initialPunches }: 
 
   // Calculate stats per staff
   const staffStats = useMemo(() => {
-    // Get year & month calendar days
-    const totalDaysInMonth = new Date(selectedYear, selectedMonth, 0).getDate();
-    // If current month, only calculate up to today
-    const maxDay = (selectedYear === now.getFullYear() && selectedMonth === now.getMonth() + 1)
-      ? Math.min(now.getDate(), totalDaysInMonth)
-      : totalDaysInMonth;
+    // Total calendar days in the selected month
+    const maxDay = new Date(selectedYear, selectedMonth, 0).getDate();
 
     return staffList
       .filter((s) => s.role !== "owner")
