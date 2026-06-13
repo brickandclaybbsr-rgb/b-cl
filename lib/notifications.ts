@@ -23,7 +23,7 @@ export async function initPushNotifications() {
         description: "Sales, stock, vendor and report alerts",
         importance: 5,
         visibility: 1,
-        sound: "default",
+        sound: "bnc_alert",
         vibration: true,
       });
     } catch {

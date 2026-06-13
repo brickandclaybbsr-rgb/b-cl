@@ -2,6 +2,18 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "crons": [
     {
+      "path": "/api/cron/opening-reminder",
+      "schedule": "30 3 * * *"
+    },
+    {
+      "path": "/api/cron/sales-reminder",
+      "schedule": "30 7 * * *"
+    },
+    {
+      "path": "/api/cron/closing-reminder",
+      "schedule": "0 12 * * *"
+    },
+    {
       "path": "/api/send-eod-report",
       "schedule": "30 17 * * *"
     }

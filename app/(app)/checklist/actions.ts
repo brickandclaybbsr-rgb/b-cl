@@ -56,7 +56,7 @@ export async function submitOpeningChecklist(
   }
 
   await whatsappNotify.checklistSubmitted(profile.name, "opening");
-  await notifyOwner.checklistPending("opening");
+  await notifyOwner.checklistSubmitted(profile.name, "opening");
 
   revalidatePath("/checklist/opening");
   revalidatePath("/dashboard");
@@ -98,7 +98,7 @@ export async function submitClosingChecklist(
   }
 
   await whatsappNotify.checklistSubmitted(profile.name, "closing");
-  await notifyOwner.checklistPending("closing");
+  await notifyOwner.checklistSubmitted(profile.name, "closing");
 
   revalidatePath("/checklist/closing");
   revalidatePath("/dashboard");

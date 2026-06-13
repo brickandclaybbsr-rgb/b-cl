@@ -1,90 +1,125 @@
-﻿import type { SupabaseClient } from "@supabase/supabase-js";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { getMessaging } from "firebase-admin/messaging";
 import { isFirebaseConfigured } from "./firebase-admin";
 import { createAdminClient } from "./supabase/admin";
 import { hasServiceRole } from "./supabase/env";
 
-type OwnerToken = { fcm_token: string | null };
+type ProfileToken = { fcm_token: string | null };
 
-/**
- * Send a push notification to every owner that has a registered FCM token.
- *
- * Reads tokens with the service-role client (staff sessions can't see owner
- * rows under RLS). Safe to call from any server action — it silently no-ops
- * until Firebase + the service-role key are configured, and never throws.
- */
-export async function sendPushToOwner(
-  title: string,
-  body: string,
-  route?: string,
-) {
+const ANDROID_CONFIG = {
+  priority: "high" as const,
+  notification: {
+    sound: "bnc_alert",
+    channelId: "bnc_ops_alerts",
+    color: "#E8620A",
+    vibrateTimingsMillis: [0, 1000, 300, 1000, 300, 1000, 300, 1000, 300, 1000],
+    defaultVibrateTimings: false,
+  },
+};
+
+async function getTokensByRole(role: "owner" | "staff" | "all"): Promise<string[]> {
+  if (!isFirebaseConfigured() || !hasServiceRole()) return [];
+  const supabase = createAdminClient() as unknown as SupabaseClient;
+  let query = supabase.from("profiles").select("fcm_token").not("fcm_token", "is", null);
+  if (role !== "all") query = query.eq("role", role);
+  const { data } = await query;
+  return ((data ?? []) as ProfileToken[])
+    .map((p) => p.fcm_token)
+    .filter((t): t is string => Boolean(t));
+}
+
+async function sendPush(tokens: string[], title: string, body: string, route?: string) {
+  if (tokens.length === 0) return;
   try {
-    if (!isFirebaseConfigured() || !hasServiceRole()) return;
-
-    // `fcm_token` is added by a migration that may land separately from this
-    // branch, so we read it through an untyped client view to stay independent
-    // of whether the column is present in the generated Database types yet.
-    const supabase = createAdminClient() as unknown as SupabaseClient;
-    const { data: owners } = await supabase
-      .from("profiles")
-      .select("fcm_token")
-      .eq("role", "owner")
-      .not("fcm_token", "is", null);
-
-    const tokens = ((owners ?? []) as OwnerToken[])
-      .map((o) => o.fcm_token)
-      .filter((t): t is string => Boolean(t));
-    if (tokens.length === 0) return;
-
     await getMessaging().sendEachForMulticast({
       tokens,
       notification: { title, body },
       data: route ? { route } : {},
-      android: {
-        priority: "high",
-        notification: {
-          sound: "default",
-          channelId: "bnc_ops_alerts",
-          color: "#E8620A",
-          vibrateTimingsMillis: [0, 1000, 300, 1000, 300, 1000, 300, 1000, 300, 1000],
-          defaultVibrateTimings: false,
-        },
-      },
+      android: ANDROID_CONFIG,
     });
   } catch (err) {
     console.error("Push notification failed:", err);
   }
 }
 
-// Convenience wrappers — use these throughout the app.
+export async function sendPushToOwner(title: string, body: string, route?: string) {
+  try {
+    const tokens = await getTokensByRole("owner");
+    await sendPush(tokens, title, body, route);
+  } catch (err) {
+    console.error("sendPushToOwner failed:", err);
+  }
+}
+
+export async function sendPushToStaff(title: string, body: string, route?: string) {
+  try {
+    const tokens = await getTokensByRole("staff");
+    await sendPush(tokens, title, body, route);
+  } catch (err) {
+    console.error("sendPushToStaff failed:", err);
+  }
+}
+
+export async function sendPushToAll(title: string, body: string, route?: string) {
+  try {
+    const tokens = await getTokensByRole("all");
+    await sendPush(tokens, title, body, route);
+  } catch (err) {
+    console.error("sendPushToAll failed:", err);
+  }
+}
+
+export async function sendPushToProfile(profileId: string, title: string, body: string, route?: string) {
+  try {
+    if (!isFirebaseConfigured() || !hasServiceRole()) return;
+    const supabase = createAdminClient() as unknown as SupabaseClient;
+    const { data } = await supabase.from("profiles").select("fcm_token").eq("id", profileId).maybeSingle();
+    const token = (data as ProfileToken | null)?.fcm_token;
+    if (!token) return;
+    await sendPush([token], title, body, route);
+  } catch (err) {
+    console.error("sendPushToProfile failed:", err);
+  }
+}
+
+// Owner receives — triggered by staff actions
 export const notifyOwner = {
-  stockAlert: (itemName: string) =>
-    sendPushToOwner("📦 Stock Alert", `${itemName} is out of stock`, "/owner"),
-
   salesSubmitted: (amount: number) =>
-    sendPushToOwner(
-      "💰 Sales Submitted",
-      `Today's total: ₹${amount.toLocaleString("en-IN")}`,
-      "/owner",
-    ),
+    sendPushToOwner("💰 Sales Submitted", `Today's total: ₹${amount.toLocaleString("en-IN")}`, "/owner"),
 
-  eodReport: () =>
-    sendPushToOwner("✅ EOD Report Ready", "Daily report has been generated", "/owner"),
+  checklistSubmitted: (staff: string, type: "opening" | "closing") =>
+    sendPushToOwner(`✅ ${type === "opening" ? "Opening" : "Closing"} Checklist`, `${staff} submitted the checklist`, `/owner`),
 
-  checklistPending: (type: "opening" | "closing") =>
-    sendPushToOwner(
-      "⚠️ Checklist Pending",
-      `${type === "opening" ? "Opening" : "Closing"} checklist not submitted yet`,
-      `/checklist/${type}`,
-    ),
+  leaveRequest: (staffName: string, type: string) =>
+    sendPushToOwner("🗓️ Leave Request", `${staffName} submitted a ${type.toUpperCase()} leave request`, "/attendance"),
+
+  reimbursement: (staffName: string, amount: number) =>
+    sendPushToOwner("💸 Reimbursement", `${staffName} claimed ₹${amount.toLocaleString("en-IN")}`, "/owner"),
 
   vendorOrder: (staffName: string) =>
     sendPushToOwner("🛒 New Order Request", `${staffName} raised a vendor order`, "/vendors"),
 
-  leaveRequest: (staffName: string, type: string) =>
-    sendPushToOwner(
-      "🗓️ Leave Request",
-      `${staffName} submitted a ${type.toUpperCase()} leave request`,
-      "/attendance",
-    ),
+  eodReport: () =>
+    sendPushToOwner("✅ EOD Report Ready", "Daily report has been generated", "/owner"),
+};
+
+// Staff receives — reminders and alerts
+export const notifyStaff = {
+  openingChecklistReminder: () =>
+    sendPushToStaff("🌅 Opening Checklist", "Please submit the opening checklist now", "/checklist/opening"),
+
+  closingChecklistReminder: () =>
+    sendPushToStaff("🌆 Closing Checklist", "Please submit the closing checklist now", "/checklist/closing"),
+
+  salesReminder: () =>
+    sendPushToStaff("💰 Sales Entry", "Don't forget to submit today's sales", "/sales"),
+
+  attendanceReminder: () =>
+    sendPushToStaff("🕐 Mark Attendance", "Please mark your attendance for today", "/profile"),
+
+  leaveApproved: (profileId: string, type: string) =>
+    sendPushToProfile(profileId, "✅ Leave Approved", `Your ${type.toUpperCase()} leave has been approved`, "/profile"),
+
+  leaveRejected: (profileId: string, type: string) =>
+    sendPushToProfile(profileId, "❌ Leave Rejected", `Your ${type.toUpperCase()} leave request was not approved`, "/profile"),
 };

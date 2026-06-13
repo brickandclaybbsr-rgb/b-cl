@@ -7,7 +7,7 @@ import { requireProfile, requireOwner } from "@/lib/auth";
 import { todayIST } from "@/lib/date";
 import { uploadPublicFile, deletePublicFile } from "@/lib/storage";
 import { whatsappNotify } from "@/lib/whatsapp-notify";
-import { notifyOwner } from "@/lib/push";
+import { notifyOwner, notifyStaff } from "@/lib/push";
 
 export type HRActionState = { ok?: boolean; error?: string; message?: string };
 
@@ -109,6 +109,12 @@ export async function updateLeaveStatus(
     const owner = await requireOwner();
     const supabase = createClient();
 
+    const { data: leaveData } = await supabase
+      .from("leaves")
+      .select("profile_id, leave_type")
+      .eq("id", leaveId)
+      .maybeSingle();
+
     const { error } = await supabase
       .from("leaves")
       .update({
@@ -122,6 +128,14 @@ export async function updateLeaveStatus(
     if (error) {
       console.error("updateLeaveStatus database error:", error);
       return { error: error.message };
+    }
+
+    if (leaveData?.profile_id && leaveData?.leave_type) {
+      if (status === "approved") {
+        await notifyStaff.leaveApproved(leaveData.profile_id, leaveData.leave_type);
+      } else {
+        await notifyStaff.leaveRejected(leaveData.profile_id, leaveData.leave_type);
+      }
     }
 
     revalidatePath("/profile");
