@@ -39,7 +39,7 @@ export async function addCashExpense(
 
   if (error) return { error: error.message };
 
-  revalidatePath("/expenses");
+  revalidatePath("/sales");
   revalidatePath("/owner");
   return { ok: true };
 }
@@ -53,7 +53,7 @@ export async function deleteCashExpense(
   const supabase = createClient();
   const { error } = await supabase.from("cash_expenses").delete().eq("id", id);
   if (error) return { error: error.message };
-  revalidatePath("/expenses");
+  revalidatePath("/sales");
   revalidatePath("/owner");
   return { ok: true };
 }

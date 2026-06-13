@@ -2,15 +2,14 @@ import { requireProfile } from "@/lib/auth";
 import { todayIST, formatDateLabel, formatTimeIST } from "@/lib/date";
 import { getSales } from "@/lib/data/sales";
 import { getProfileNameMap } from "@/lib/data/profiles";
-import { createClient } from "@/lib/supabase/server";
+import { getTodayCashExpenses } from "@/lib/data/expenses";
 import { PageHeader } from "@/components/page-header";
 import { SalesTabs } from "./sales-tabs";
 import { SalesForm } from "./sales-form";
 import { SalesView } from "./sales-view";
-import { ReimbursementClaimForm } from "@/app/(app)/reimbursements/claim-form";
-import { ReimbursementsList, type ReimbursementView } from "@/app/(app)/reimbursements/claims-list";
+import { ExpenseClient } from "@/components/expenses/expense-client";
 import { Card } from "@/components/ui/card";
-import { CheckCircle2, Clock, Wallet } from "lucide-react";
+import { CheckCircle2 } from "lucide-react";
 
 export const metadata = { title: "Daily sales" };
 
@@ -23,81 +22,17 @@ export default async function SalesPage({
   const isExpenses = searchParams.tab === "expenses";
 
   if (isExpenses) {
-    const supabase = createClient();
     const isOwner = profile.role === "owner";
-
-    let query = supabase
-      .from("reimbursements")
-      .select("*")
-      .order("submitted_at", { ascending: false });
-
-    if (!isOwner) query = query.eq("submitted_by", profile.id);
-
-    const { data: claimsData } = await query;
-    const rawClaims = claimsData ?? [];
-    const nameMap = await getProfileNameMap();
-
-    const claims: ReimbursementView[] = rawClaims.map((c) => ({
-      ...c,
-      submitted_by_name: nameMap[c.submitted_by] ?? "Staff member",
-      processed_by_name: c.processed_by ? nameMap[c.processed_by] ?? "Owner" : undefined,
-    }));
-
-    const pendingAmount = claims
-      .filter((c) => c.status === "pending")
-      .reduce((sum, c) => sum + Number(c.amount), 0);
+    const todayEntries = await getTodayCashExpenses();
 
     return (
       <div className="space-y-5">
         <PageHeader
           title="Daily Sales"
-          subtitle={isOwner
-            ? "Review and reconcile store cash expenses"
-            : "Record store cash expenses from the drawer"}
+          subtitle={isOwner ? "Today's cash out" : "Log cash withdrawals & expenses"}
         />
         <SalesTabs />
-
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Card className="flex items-center gap-4 p-4">
-            <div className="flex size-11 items-center justify-center rounded-xl bg-warning/10 text-warning">
-              <Clock className="size-5" />
-            </div>
-            <div>
-              <p className="text-xs font-medium uppercase tracking-wider text-content-secondary">
-                Needs Reconciliation
-              </p>
-              <p className="mt-0.5 text-lg font-bold text-content-primary">
-                ₹{pendingAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-              </p>
-            </div>
-          </Card>
-          <Card className="flex items-center gap-4 p-4">
-            <div className="flex size-11 items-center justify-center rounded-xl bg-fire/10 text-fire">
-              <Wallet className="size-5" />
-            </div>
-            <div>
-              <p className="text-xs font-medium uppercase tracking-wider text-content-secondary">
-                Total Cash Spent
-              </p>
-              <p className="mt-0.5 text-lg font-bold text-content-primary">
-                ₹{claims.reduce((s, c) => s + Number(c.amount), 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-              </p>
-            </div>
-          </Card>
-        </div>
-
-        {isOwner ? (
-          <ReimbursementsList claims={claims} isOwner />
-        ) : (
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-            <div className="lg:col-span-1">
-              <ReimbursementClaimForm />
-            </div>
-            <div className="lg:col-span-2">
-              <ReimbursementsList claims={claims} isOwner={false} />
-            </div>
-          </div>
-        )}
+        <ExpenseClient todayEntries={todayEntries} isOwner={isOwner} />
       </div>
     );
   }

@@ -2,12 +2,12 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { IndianRupee, Receipt } from "lucide-react";
+import { IndianRupee, Wallet } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const tabs = [
   { tab: "",         href: "/sales",             label: "Sales",    icon: IndianRupee },
-  { tab: "expenses", href: "/sales?tab=expenses", label: "Expenses", icon: Receipt },
+  { tab: "expenses", href: "/sales?tab=expenses", label: "Cash Out", icon: Wallet },
 ];
 
 export function SalesTabs() {
