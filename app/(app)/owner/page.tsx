@@ -184,11 +184,16 @@ export default async function OwnerDashboard() {
           <h2 className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-content-secondary">
             <Wallet className="size-4" /> Cash Out Today
           </h2>
-          {cashExpenses.length > 0 && (
-            <span className="font-mono text-sm font-bold text-danger">
-              -{formatINR(cashExpenses.reduce((s, e) => s + Number(e.amount), 0))}
-            </span>
-          )}
+          <div className="flex items-center gap-3">
+            {cashExpenses.length > 0 && (
+              <span className="font-mono text-sm font-bold text-danger">
+                -{formatINR(cashExpenses.reduce((s, e) => s + Number(e.amount), 0))}
+              </span>
+            )}
+            <Link href="/owner/cashout" className="text-xs font-semibold text-warm hover:underline">
+              View all
+            </Link>
+          </div>
         </div>
         {cashExpenses.length === 0 ? (
           <p className="py-2 text-sm text-content-secondary">No cash expenses logged today.</p>

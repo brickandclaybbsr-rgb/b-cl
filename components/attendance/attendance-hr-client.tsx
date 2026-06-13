@@ -14,11 +14,9 @@ import {
   Eye, 
   MessageSquare, 
   User,
-  Plus,
-  IndianRupee
+  Plus
 } from "lucide-react";
 import { updateLeaveStatus, uploadStaffDocument, deleteStaffDocument, generatePayslip, updateStaffProfile, uploadOwnerSignature } from "@/app/(app)/attendance/actions-hr";
-import { ReimbursementsList } from "@/app/(app)/reimbursements/claims-list";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -81,7 +79,6 @@ interface Props {
   staffList: StaffProfile[];
   initialLeaves: LeaveRequest[];
   initialDocuments: StaffDocument[];
-  initialReimbursements?: any[];
   ownerProfile: StaffProfile | null;
   attendanceChild: React.ReactNode;
 }
@@ -118,8 +115,8 @@ function calculateUsedLeaves(leaves: LeaveRequest[], profileId: string) {
   };
 }
 
-export function AttendanceHRClient({ staffList, initialLeaves, initialDocuments, initialReimbursements, ownerProfile, attendanceChild }: Props) {
-  const [activeTab, setActiveTab] = useState<"attendance" | "leaves" | "reimbursements" | "documents" | "people">("people");
+export function AttendanceHRClient({ staffList, initialLeaves, initialDocuments, ownerProfile, attendanceChild }: Props) {
+  const [activeTab, setActiveTab] = useState<"attendance" | "leaves" | "documents" | "people">("people");
   const [reviewingLeaveId, setReviewingLeaveId] = useState<string | null>(null);
   const [managerNotes, setManagerNotes] = useState<string>("");
   const [pending, startTransition] = useTransition();
@@ -332,19 +329,6 @@ export function AttendanceHRClient({ staffList, initialLeaves, initialDocuments,
         </button>
         <button
           type="button"
-          onClick={() => setActiveTab("reimbursements")}
-          className={cn(
-            "flex shrink-0 items-center gap-1.5 rounded-full px-4 py-2 text-sm font-semibold transition-colors",
-            activeTab === "reimbursements"
-              ? "bg-fire/15 text-warm"
-              : "text-content-secondary hover:bg-bg-elevated"
-          )}
-        >
-          <IndianRupee className="size-4" />
-          Reimbursements
-        </button>
-        <button
-          type="button"
           onClick={() => setActiveTab("documents")}
           className={cn(
             "flex shrink-0 items-center gap-1.5 rounded-full px-4 py-2 text-sm font-semibold transition-colors",
@@ -366,13 +350,6 @@ export function AttendanceHRClient({ staffList, initialLeaves, initialDocuments,
         {activeTab === "attendance" && (
           <div className="animate-fade-in">
             {attendanceChild}
-          </div>
-        )}
-
-        {/* 1.5. REIMBURSEMENTS */}
-        {activeTab === "reimbursements" && (
-          <div className="animate-fade-in">
-            <ReimbursementsList claims={initialReimbursements ?? []} isOwner={true} />
           </div>
         )}
 
