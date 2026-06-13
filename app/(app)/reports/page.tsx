@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { MessageCircle, CalendarDays, Wallet, TrendingDown, UserCheck, ShoppingBag, ChevronRight } from "lucide-react";
+import { MessageCircle, CalendarDays, Wallet, TrendingDown, UserCheck, ShoppingBag, ChevronRight, LineChart, ClipboardCheck } from "lucide-react";
 import { requireOwner } from "@/lib/auth";
 import { getRecentDays, getEodLog } from "@/lib/data/reports";
 import { getSalesTrend } from "@/lib/data/sales";
@@ -39,6 +39,22 @@ export default async function ReportsPage() {
   return (
     <div className="space-y-6">
       <PageHeader title="Reports" subtitle="Last 14 days" />
+
+      {/* Section switcher */}
+      <div className="flex gap-1 border-b border-border pb-px">
+        <Link
+          href="/reports"
+          className="relative flex items-center gap-1.5 pb-3 text-sm font-semibold text-white after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-full after:bg-white"
+        >
+          <LineChart className="size-4" /> Reports
+        </Link>
+        <Link
+          href="/checklist/opening"
+          className="flex items-center gap-1.5 pb-3 px-3 text-sm font-semibold text-content-secondary hover:text-content-primary transition-colors"
+        >
+          <ClipboardCheck className="size-4" /> Checklist
+        </Link>
+      </div>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <Card className="p-4">
