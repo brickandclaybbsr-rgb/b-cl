@@ -86,7 +86,7 @@ export async function applyLeave(
       return { error: error.message };
     }
 
-    await whatsappNotify.leaveRequest(profile.name, leaveType);
+    await whatsappNotify.leaveRequest(profile.name, leaveType, startDateStr, endDateStr);
 
     revalidatePath("/profile");
     revalidatePath("/attendance");

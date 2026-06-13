@@ -40,10 +40,7 @@ export async function submitSales(
     return { error: error.message };
   }
 
-  await whatsappNotify.salesSubmitted(
-    profile.name,
-    cash_sales + online_sales + aggregator_sales,
-  );
+  await whatsappNotify.salesSubmitted(profile.name, cash_sales, online_sales, aggregator_sales);
 
   revalidatePath("/sales");
   revalidatePath("/dashboard");

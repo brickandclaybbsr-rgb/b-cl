@@ -21,18 +21,37 @@ async function getOwnerNumber(): Promise<string> {
   return (process.env.OWNER_WHATSAPP_NUMBER || "").replace(/[^\d]/g, "");
 }
 
+/** Resolve the owner's first name from profiles (role=owner) or fall back to "there". */
+async function getOwnerName(): Promise<string> {
+  if (hasServiceRole()) {
+    try {
+      const supabase = createAdminClient();
+      const { data } = await supabase
+        .from("profiles")
+        .select("name")
+        .eq("role", "owner")
+        .maybeSingle();
+      if (data?.name) return data.name.split(" ")[0];
+    } catch (err) {
+      console.warn("Could not fetch owner name:", err);
+    }
+  }
+  return "there";
+}
+
 /**
- * Send the owner a WhatsApp alert (via the approved template if
- * WHATSAPP_TEMPLATE_NAME is set, else plain text within the 24h window).
- *
- * Safe to call from any server action — it silently no-ops when WhatsApp isn't
+ * Send the owner a WhatsApp alert.
+ * Prepends "Hey [Owner]," and appends "Brick and Clay Operations" automatically.
+ * Safe to call from any server action — silently no-ops when WhatsApp isn't
  * configured or no owner number is set, and never throws.
  */
-export async function notifyOwnerWhatsApp(message: string) {
+export async function notifyOwnerWhatsApp(body: string) {
   try {
     if (!isWhatsAppConfigured()) return;
     const to = await getOwnerNumber();
     if (!to) return;
+    const ownerName = await getOwnerName();
+    const message = `Hey ${ownerName},\n\n${body}\n\nBrick and Clay Operations`;
     await sendReport(to, message);
   } catch (err) {
     console.error("WhatsApp owner notification failed:", err);
@@ -41,16 +60,40 @@ export async function notifyOwnerWhatsApp(message: string) {
 
 const inr = (n: number) => `₹${n.toLocaleString("en-IN")}`;
 
-// Convenience wrappers — one approved template ("🔔 {{1}}") carries each line.
+const LEAVE_LABELS: Record<string, string> = {
+  cl: "Casual Leave (CL)",
+  sl: "Sick Leave (SL)",
+  lwp: "Leave Without Pay (LWP)",
+};
+
+function fmtDate(dateStr: string): string {
+  const dt = new Date(dateStr + "T00:00:00");
+  if (isNaN(dt.getTime())) return dateStr;
+  return dt.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+}
+
 export const whatsappNotify = {
-  salesSubmitted: (staff: string, total: number) =>
-    notifyOwnerWhatsApp(`Sales submitted by ${staff} — today's total ${inr(total)}.`),
+  salesSubmitted: (staff: string, cash: number, online: number, aggregator: number) => {
+    const total = cash + online + aggregator;
+    return notifyOwnerWhatsApp(
+      `Sales submitted by ${staff}:\n` +
+      `  Cash: ${inr(cash)}\n` +
+      `  Online: ${inr(online)}\n` +
+      `  Aggregator: ${inr(aggregator)}\n` +
+      `  Total: ${inr(total)}`,
+    );
+  },
 
   reimbursement: (staff: string, amount: number) =>
     notifyOwnerWhatsApp(`Reimbursement claim of ${inr(amount)} submitted by ${staff}.`),
 
-  leaveRequest: (staff: string, type: string) =>
-    notifyOwnerWhatsApp(`Leave request (${type.toUpperCase()}) submitted by ${staff}.`),
+  leaveRequest: (staff: string, type: string, startDate: string, endDate: string) =>
+    notifyOwnerWhatsApp(
+      `Leave request by ${staff}:\n` +
+      `  Type: ${LEAVE_LABELS[type] ?? type.toUpperCase()}\n` +
+      `  From: ${fmtDate(startDate)}\n` +
+      `  To: ${fmtDate(endDate)}`,
+    ),
 
   checklistSubmitted: (staff: string, kind: "opening" | "closing") =>
     notifyOwnerWhatsApp(
