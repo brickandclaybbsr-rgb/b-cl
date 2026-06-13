@@ -8,8 +8,8 @@
     { "path": "/api/cron/eod/punchout-1",     "schedule": "30 17 * * *" },
     { "path": "/api/cron/eod/punchout-2",     "schedule": "45 17 * * *" },
     { "path": "/api/cron/eod/punchout-3",     "schedule": "0 18 * * *"  },
-    { "path": "/api/cron/eod/tasks-1",        "schedule": "0 18 * * *"  },
-    { "path": "/api/cron/eod/tasks-2",        "schedule": "15 18 * * *" },
-    { "path": "/api/cron/eod/tasks-3",        "schedule": "25 18 * * *" }
+    { "path": "/api/cron/eod/tasks-1",        "schedule": "35 17 * * *" },
+    { "path": "/api/cron/eod/tasks-2",        "schedule": "48 17 * * *" },
+    { "path": "/api/cron/eod/tasks-3",        "schedule": "55 17 * * *" }
   ]
 }
