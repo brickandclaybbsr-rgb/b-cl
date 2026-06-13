@@ -8,7 +8,6 @@ import {
   Sunset,
   CheckCircle2,
   XCircle,
-  Users,
   Activity,
   ChevronRight,
   Wallet,
@@ -24,7 +23,6 @@ import { formatINR, formatNumber } from "@/lib/utils";
 import { PageHeader } from "@/components/page-header";
 import { StatCard } from "@/components/stat-card";
 import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/empty-state";
 import { SalesTrendChart } from "@/components/charts/sales-trend-chart";
 import { SendReportButton } from "@/components/send-report-button";
@@ -88,45 +86,36 @@ export default async function OwnerDashboard() {
         />
       </div>
 
-      {/* Checklist status + attendance */}
-      <div className="grid gap-3 lg:grid-cols-2">
-        <Card className="p-4">
-          <h2 className="mb-3 text-sm font-bold uppercase tracking-wider text-content-secondary">
-            Checklists
-          </h2>
-          <div className="grid grid-cols-2 gap-3">
-            <ChecklistStatus
-              icon={Sunrise}
-              label="Opening"
-              done={Boolean(snap.opening)}
-              time={snap.opening ? formatTimeIST(snap.opening.submitted_at) : null}
-              submitterName={
-                snap.opening?.submitted_by
-                  ? nameMap[snap.opening.submitted_by] ?? "Staff"
-                  : null
-              }
-            />
-            <ChecklistStatus
-              icon={Sunset}
-              label="Closing"
-              done={Boolean(snap.closing)}
-              time={snap.closing ? formatTimeIST(snap.closing.submitted_at) : null}
-              submitterName={
-                snap.closing?.submitted_by
-                  ? nameMap[snap.closing.submitted_by] ?? "Staff"
-                  : null
-              }
-            />
-          </div>
-        </Card>
-
-        <Card className="p-4">
-          <h2 className="mb-3 flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-content-secondary">
-            <Users className="size-4" /> Attendance
-          </h2>
-          <Attendance opening={snap.opening} />
-        </Card>
-      </div>
+      {/* Checklist status */}
+      <Card className="p-4">
+        <h2 className="mb-3 text-sm font-bold uppercase tracking-wider text-content-secondary">
+          Checklists
+        </h2>
+        <div className="grid grid-cols-2 gap-3">
+          <ChecklistStatus
+            icon={Sunrise}
+            label="Opening"
+            done={Boolean(snap.opening)}
+            time={snap.opening ? formatTimeIST(snap.opening.submitted_at) : null}
+            submitterName={
+              snap.opening?.submitted_by
+                ? nameMap[snap.opening.submitted_by] ?? "Staff"
+                : null
+            }
+          />
+          <ChecklistStatus
+            icon={Sunset}
+            label="Closing"
+            done={Boolean(snap.closing)}
+            time={snap.closing ? formatTimeIST(snap.closing.submitted_at) : null}
+            submitterName={
+              snap.closing?.submitted_by
+                ? nameMap[snap.closing.submitted_by] ?? "Staff"
+                : null
+            }
+          />
+        </div>
+      </Card>
 
       {/* Cash vs Online + 7-day trend */}
       <div className="grid gap-3 lg:grid-cols-2">
@@ -285,48 +274,6 @@ function SplitBar({
   );
 }
 
-function Attendance({
-  opening,
-}: {
-  opening: Awaited<ReturnType<typeof getTodaySnapshot>>["opening"];
-}) {
-  if (!opening) {
-    return (
-      <p className="py-4 text-sm text-content-secondary">
-        Opening checklist not submitted yet.
-      </p>
-    );
-  }
-  const presentItem = opening.items.find((i) =>
-    i.label.toLowerCase().includes("present"),
-  );
-  const allPresent = presentItem?.checked ?? false;
-  const absent = opening.absent_staff?.trim();
-
-  return (
-    <div className="space-y-3">
-      <div className="flex items-center gap-2">
-        {allPresent ? (
-          <Badge variant="success">
-            <CheckCircle2 className="size-3" /> All scheduled staff present
-          </Badge>
-        ) : (
-          <Badge variant="warning">Some staff absent</Badge>
-        )}
-      </div>
-      {absent ? (
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-content-secondary">
-            Absent
-          </p>
-          <p className="mt-0.5 text-sm">{absent}</p>
-        </div>
-      ) : (
-        <p className="text-sm text-content-secondary">No absences recorded.</p>
-      )}
-    </div>
-  );
-}
 
 function QuickAction({
   href,
