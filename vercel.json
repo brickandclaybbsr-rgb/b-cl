@@ -1,21 +1,15 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "crons": [
-    {
-      "path": "/api/cron/opening-reminder",
-      "schedule": "30 3 * * *"
-    },
-    {
-      "path": "/api/cron/sales-reminder",
-      "schedule": "30 7 * * *"
-    },
-    {
-      "path": "/api/cron/closing-reminder",
-      "schedule": "0 12 * * *"
-    },
-    {
-      "path": "/api/send-eod-report",
-      "schedule": "30 17 * * *"
-    }
+    { "path": "/api/cron/opening-reminder",   "schedule": "30 3 * * *"  },
+    { "path": "/api/cron/sales-reminder",     "schedule": "30 7 * * *"  },
+    { "path": "/api/cron/closing-reminder",   "schedule": "0 12 * * *"  },
+    { "path": "/api/send-eod-report",         "schedule": "30 17 * * *" },
+    { "path": "/api/cron/eod/punchout-1",     "schedule": "30 17 * * *" },
+    { "path": "/api/cron/eod/punchout-2",     "schedule": "45 17 * * *" },
+    { "path": "/api/cron/eod/punchout-3",     "schedule": "0 18 * * *"  },
+    { "path": "/api/cron/eod/tasks-1",        "schedule": "0 18 * * *"  },
+    { "path": "/api/cron/eod/tasks-2",        "schedule": "15 18 * * *" },
+    { "path": "/api/cron/eod/tasks-3",        "schedule": "25 18 * * *" }
   ]
 }

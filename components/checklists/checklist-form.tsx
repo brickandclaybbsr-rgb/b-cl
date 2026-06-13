@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { SubmitButton } from "@/components/ui/submit-button";
+import { Confetti } from "@/components/ui/confetti";
 import { cn } from "@/lib/utils";
 
 type Action = (
@@ -33,10 +34,14 @@ export function ChecklistForm({
     action,
     {},
   );
+  const [showConfetti, setShowConfetti] = useState(false);
 
   useEffect(() => {
     if (state.error) toast.error(state.error);
-    if (state.ok) toast.success("Checklist submitted ✓");
+    if (state.ok) {
+      toast.success("Checklist submitted ✓");
+      setShowConfetti(true);
+    }
   }, [state]);
 
   // group items while preserving the flat index used for field names
@@ -52,6 +57,8 @@ export function ChecklistForm({
   });
 
   return (
+    <>
+    <Confetti active={showConfetti} />
     <form action={formAction} className="space-y-4">
       {grouped.map((group) => (
         <Card key={group.section} className="overflow-hidden">
@@ -143,6 +150,7 @@ export function ChecklistForm({
         Once submitted, today&apos;s checklist can&apos;t be edited.
       </p>
     </form>
+    </>
   );
 }
 

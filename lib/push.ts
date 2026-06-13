@@ -28,6 +28,29 @@ async function getTokensByRole(role: "owner" | "staff" | "all"): Promise<string[
     .filter((t): t is string => Boolean(t));
 }
 
+async function getTokensByTeam(team: "kitchen" | "front_desk"): Promise<string[]> {
+  if (!isFirebaseConfigured() || !hasServiceRole()) return [];
+  const supabase = createAdminClient() as unknown as SupabaseClient;
+  const { data } = await supabase
+    .from("profiles")
+    .select("fcm_token")
+    .eq("team", team)
+    .eq("is_active", true)
+    .not("fcm_token", "is", null);
+  return ((data ?? []) as ProfileToken[])
+    .map((p) => p.fcm_token)
+    .filter((t): t is string => Boolean(t));
+}
+
+export async function sendPushToTeam(team: "kitchen" | "front_desk", title: string, body: string, route?: string) {
+  try {
+    const tokens = await getTokensByTeam(team);
+    await sendPush(tokens, title, body, route);
+  } catch (err) {
+    console.error("sendPushToTeam failed:", err);
+  }
+}
+
 async function sendPush(tokens: string[], title: string, body: string, route?: string) {
   if (tokens.length === 0) return;
   try {
@@ -116,6 +139,18 @@ export const notifyStaff = {
 
   attendanceReminder: () =>
     sendPushToStaff("🕐 Mark Attendance", "Please mark your attendance for today", "/profile"),
+
+  punchoutReminder: () =>
+    sendPushToStaff("👆 Punch Out", "Please punch out on the biometric before leaving", "/profile"),
+
+  eodClosingChecklistReminder: () =>
+    sendPushToStaff("🌆 Closing Checklist Pending", "Closing checklist hasn't been submitted yet — please complete it", "/checklist/closing"),
+
+  eodSalesReminder: () =>
+    sendPushToStaff("💰 Sales Not Entered", "Today's sales entry is missing — please submit now", "/sales"),
+
+  eodClosingBalanceReminder: () =>
+    sendPushToTeam("front_desk", "💵 Closing Balance", "Please enter today's closing balance in the sales form", "/sales"),
 
   leaveApproved: (profileId: string, type: string) =>
     sendPushToProfile(profileId, "✅ Leave Approved", `Your ${type.toUpperCase()} leave has been approved`, "/profile"),

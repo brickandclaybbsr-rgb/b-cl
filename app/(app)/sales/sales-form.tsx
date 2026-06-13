@@ -10,10 +10,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { SubmitButton } from "@/components/ui/submit-button";
+import { Confetti } from "@/components/ui/confetti";
 import { formatINR } from "@/lib/utils";
 
 export function SalesForm() {
   const [state, formAction] = useFormState<SalesFormState, FormData>(submitSales, {});
+  const [showConfetti, setShowConfetti] = useState(false);
 
   const [openingCash, setOpeningCash]         = useState("");
   const [cash, setCash]                       = useState("");
@@ -28,7 +30,10 @@ export function SalesForm() {
 
   useEffect(() => {
     if (state.error) toast.error(state.error);
-    if (state.ok) toast.success("Sales saved ✓");
+    if (state.ok) {
+      toast.success("Sales saved ✓");
+      setShowConfetti(true);
+    }
   }, [state]);
 
   const totalSale =
@@ -36,6 +41,8 @@ export function SalesForm() {
     num(zomatoGold) + num(zomato) + num(swiggy) + num(swiggyDineout) + num(eazyDiner);
 
   return (
+    <>
+    <Confetti active={showConfetti} />
     <form action={formAction} className="space-y-4">
 
       {/* Opening Cash */}
@@ -156,6 +163,7 @@ export function SalesForm() {
         One sales entry per day. This can&apos;t be edited after saving.
       </p>
     </form>
+    </>
   );
 }
 
