@@ -15,9 +15,9 @@ const STATUS_META: Record<
   OrderStatus,
   { label: string; variant: "warning" | "fire" | "success"; icon: typeof Clock }
 > = {
-  pending: { label: "Pending", variant: "warning", icon: Clock },
-  placed: { label: "Placed", variant: "fire", icon: Truck },
-  received: { label: "Received", variant: "success", icon: PackageCheck },
+  pending:  { label: "Purchase Requested", variant: "warning", icon: Clock },
+  placed:   { label: "Sent to Vendor",     variant: "fire",    icon: Truck },
+  received: { label: "Delivered",          variant: "success", icon: PackageCheck },
 };
 
 export function OrderCard({
@@ -68,26 +68,28 @@ export function OrderCard({
         <p className="mt-1 text-xs text-content-secondary">Note: {order.notes}</p>
       )}
 
-      {isOwner && order.status !== "received" && (
-        <div className="mt-3 flex gap-2 border-t border-border pt-3">
-          {order.status === "pending" && (
+      {order.status !== "received" && (
+        <div className="mt-3 flex flex-wrap gap-2 border-t border-border pt-3">
+          {order.status === "pending" && isOwner && (
             <Button
               size="sm"
               variant="secondary"
               disabled={pending}
               onClick={() => update("placed")}
             >
-              <Truck className="size-3.5" /> Mark placed
+              <Truck className="size-3.5" /> Sent to Vendor
             </Button>
           )}
-          <Button
-            size="sm"
-            variant="success"
-            disabled={pending}
-            onClick={() => update("received")}
-          >
-            <PackageCheck className="size-3.5" /> Mark received
-          </Button>
+          {isOwner && (
+            <Button
+              size="sm"
+              variant="success"
+              disabled={pending}
+              onClick={() => update("received")}
+            >
+              <PackageCheck className="size-3.5" /> Mark Delivered
+            </Button>
+          )}
         </div>
       )}
     </Card>

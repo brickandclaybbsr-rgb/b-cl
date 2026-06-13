@@ -2,7 +2,7 @@
 
 import { useTransition } from "react";
 import { toast } from "sonner";
-import { Check, X, Download, Clock, CheckCircle2, XCircle, CheckSquare } from "lucide-react";
+import { Check, Flag, Download, Clock, CheckCircle2, AlertTriangle, CheckSquare } from "lucide-react";
 import { approveClaim, rejectClaim, markClaimPaid } from "./actions";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -30,283 +30,144 @@ interface Props {
 }
 
 const STATUS_META = {
-  pending: { label: "Pending", variant: "warning", icon: Clock },
-  approved: { label: "Approved (Unpaid)", variant: "fire", icon: CheckCircle2 },
-  rejected: { label: "Rejected", variant: "danger", icon: XCircle },
-  paid: { label: "Paid", variant: "success", icon: CheckSquare },
-} as const;
+  pending:  { label: "Logged — Unreconciled", variant: "warning"  as const, icon: Clock },
+  approved: { label: "Reconciled",            variant: "success"  as const, icon: CheckCircle2 },
+  rejected: { label: "Flagged",               variant: "danger"   as const, icon: AlertTriangle },
+  paid:     { label: "Reconciled",            variant: "success"  as const, icon: CheckSquare },
+};
 
 export function ReimbursementsList({ claims, isOwner }: Props) {
-  const [pending, startTransition] = useTransition();
+  const [busy, startTransition] = useTransition();
 
-  function handleApprove(id: string) {
-    if (confirm("Are you sure you want to APPROVE this claim?")) {
-      startTransition(async () => {
-        try {
-          const res = await approveClaim(id);
-          if (res?.error) toast.error(res.error);
-          else toast.success("Claim approved ✓");
-        } catch (err: any) {
-          console.error("Failed to approve claim:", err);
-          toast.error("Error: " + (err?.message || "Failed to approve claim"));
-        }
-      });
-    }
+  function handleReconcile(id: string) {
+    startTransition(async () => {
+      const res = await approveClaim(id);
+      if (res?.error) toast.error(res.error);
+      else toast.success("Expense reconciled ✓");
+    });
   }
 
-  function handleReject(id: string) {
-    if (confirm("Are you sure you want to REJECT this claim?")) {
-      startTransition(async () => {
-        try {
-          const res = await rejectClaim(id);
-          if (res?.error) toast.error(res.error);
-          else toast.error("Claim rejected ❌");
-        } catch (err: any) {
-          console.error("Failed to reject claim:", err);
-          toast.error("Error: " + (err?.message || "Failed to reject claim"));
-        }
-      });
-    }
+  function handleFlag(id: string) {
+    startTransition(async () => {
+      const res = await rejectClaim(id);
+      if (res?.error) toast.error(res.error);
+      else toast.warning("Expense flagged for review");
+    });
   }
 
-  function handleMarkPaid(id: string) {
-    if (confirm("Mark this claim as PAID? This will complete the reimbursement.")) {
-      startTransition(async () => {
-        try {
-          const res = await markClaimPaid(id);
-          if (res?.error) toast.error(res.error);
-          else toast.success("Reimbursement marked as Paid ✓");
-        } catch (err: any) {
-          console.error("Failed to mark claim paid:", err);
-          toast.error("Error: " + (err?.message || "Failed to mark claim as paid"));
-        }
-      });
-    }
-  }
+  const unreconciled = claims.filter((c) => c.status === "pending");
+  const reconciled   = claims.filter((c) => c.status === "approved" || c.status === "paid");
+  const flagged      = claims.filter((c) => c.status === "rejected");
 
-  const pendingClaims = claims.filter((c) => c.status === "pending");
-  const approvedClaims = claims.filter((c) => c.status === "approved");
-  const historyClaims = claims.filter((c) => c.status === "paid" || c.status === "rejected");
+  function ClaimCard({ c, showActions }: { c: ReimbursementView; showActions?: boolean }) {
+    const meta = STATUS_META[c.status];
+    const Icon = meta.icon;
+    return (
+      <Card className="p-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              {isOwner && (
+                <span className="font-semibold text-content-primary">{c.submitted_by_name}</span>
+              )}
+              <span className="font-bold text-fire">
+                ₹{Number(c.amount).toLocaleString("en-IN")}
+              </span>
+              <Badge variant={meta.variant} className="gap-1 text-xs">
+                <Icon className="size-3" />
+                {meta.label}
+              </Badge>
+            </div>
+            <p className="mt-0.5 text-[11px] text-content-secondary">
+              {formatDateLabel(c.submitted_at)}
+              {c.processed_by_name && ` · ${c.processed_by_name}`}
+            </p>
+            <p className="mt-1.5 text-sm font-medium text-content-primary">{c.purpose}</p>
+            {c.notes && (
+              <p className="mt-0.5 text-xs text-content-secondary italic">{c.notes}</p>
+            )}
+          </div>
+
+          <div className="flex shrink-0 flex-wrap gap-2 self-start">
+            {c.receipt_url && (
+              <Button asChild size="sm" variant="secondary" className="gap-1">
+                <a href={c.receipt_url} target="_blank" rel="noreferrer">
+                  <Download className="size-3.5" />
+                  Bill
+                </a>
+              </Button>
+            )}
+            {isOwner && showActions && (
+              <>
+                <Button
+                  size="sm"
+                  variant="success"
+                  disabled={busy}
+                  onClick={() => handleReconcile(c.id)}
+                  className="gap-1"
+                >
+                  <Check className="size-3.5" />
+                  Reconcile
+                </Button>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  disabled={busy}
+                  onClick={() => handleFlag(c.id)}
+                  className="gap-1 hover:border-danger/30 hover:text-danger"
+                >
+                  <Flag className="size-3.5" />
+                  Flag
+                </Button>
+              </>
+            )}
+          </div>
+        </div>
+      </Card>
+    );
+  }
 
   return (
     <div className="space-y-6">
-      {/* 1. Pending Claims Section */}
-      <section className="space-y-3">
+      <section className="space-y-2">
         <h2 className="text-xs font-bold uppercase tracking-wider text-content-secondary">
-          Pending Approval ({pendingClaims.length})
+          Needs Reconciliation ({unreconciled.length})
         </h2>
-        {pendingClaims.length === 0 ? (
-          <p className="text-sm text-content-secondary italic p-4 bg-bg-card/45 rounded-xl border border-border">
-            No claims pending approval.
+        {unreconciled.length === 0 ? (
+          <p className="rounded-xl border border-border bg-bg-card/45 p-4 text-sm italic text-content-secondary">
+            All expenses reconciled.
           </p>
         ) : (
-          <div className="space-y-3">
-            {pendingClaims.map((c) => {
-              const meta = STATUS_META[c.status];
-              const Icon = meta.icon;
-              return (
-                <Card key={c.id} className="p-4 border-l-2 border-l-warning">
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                    <div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-semibold text-content-primary">
-                          {c.submitted_by_name}
-                        </span>
-                        <span className="font-bold text-success">
-                          ₹{c.amount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-                        </span>
-                        <Badge variant={meta.variant} className="gap-1 text-xs">
-                          <Icon className="size-3" />
-                          {meta.label}
-                        </Badge>
-                      </div>
-                      <p className="mt-1 text-xs text-content-secondary">
-                        Submitted: {formatDateLabel(c.submitted_at)}
-                      </p>
-                      <p className="mt-2 text-sm font-medium text-content-primary">
-                        {c.purpose}
-                      </p>
-                      {c.notes && (
-                        <p className="mt-1 text-xs text-content-secondary italic">
-                          Note: {c.notes}
-                        </p>
-                      )}
-                    </div>
-
-                    <div className="flex flex-wrap gap-2 self-start sm:self-auto">
-                      {c.receipt_url && (
-                        <Button asChild size="sm" variant="secondary" className="gap-1">
-                          <a href={c.receipt_url} target="_blank" rel="noreferrer">
-                            <Download className="size-3.5" />
-                            Receipt
-                          </a>
-                        </Button>
-                      )}
-                      
-                      {isOwner && (
-                        <>
-                          <Button
-                            size="sm"
-                            variant="success"
-                            disabled={pending}
-                            onClick={() => handleApprove(c.id)}
-                            className="gap-1"
-                          >
-                            <Check className="size-3.5" />
-                            Approve
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="secondary"
-                            disabled={pending}
-                            onClick={() => handleReject(c.id)}
-                            className="gap-1 hover:bg-danger/10 hover:text-danger hover:border-danger/20"
-                          >
-                            <X className="size-3.5" />
-                            Reject
-                          </Button>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                </Card>
-              );
-            })}
-          </div>
+          unreconciled.map((c) => (
+            <ClaimCard key={c.id} c={c} showActions />
+          ))
         )}
       </section>
 
-      {/* 2. Approved (Unpaid) Section */}
-      <section className="space-y-3">
+      {flagged.length > 0 && (
+        <section className="space-y-2">
+          <h2 className="text-xs font-bold uppercase tracking-wider text-danger">
+            Flagged ({flagged.length})
+          </h2>
+          {flagged.map((c) => (
+            <ClaimCard key={c.id} c={c} showActions />
+          ))}
+        </section>
+      )}
+
+      <section className="space-y-2">
         <h2 className="text-xs font-bold uppercase tracking-wider text-content-secondary">
-          Approved & Awaiting Payment ({approvedClaims.length})
+          Reconciled History ({reconciled.length})
         </h2>
-        {approvedClaims.length === 0 ? (
-          <p className="text-sm text-content-secondary italic p-4 bg-bg-card/45 rounded-xl border border-border">
-            No approved claims awaiting payment.
+        {reconciled.length === 0 ? (
+          <p className="rounded-xl border border-border bg-bg-card/45 p-4 text-sm italic text-content-secondary">
+            No history yet.
           </p>
         ) : (
-          <div className="space-y-3">
-            {approvedClaims.map((c) => {
-              const meta = STATUS_META[c.status];
-              const Icon = meta.icon;
-              return (
-                <Card key={c.id} className="p-4 border-l-2 border-l-fire bg-fire/5">
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                    <div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-semibold text-content-primary">
-                          {c.submitted_by_name}
-                        </span>
-                        <span className="font-bold text-success">
-                          ₹{c.amount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-                        </span>
-                        <Badge variant={meta.variant} className="gap-1 text-xs">
-                          <Icon className="size-3" />
-                          {meta.label}
-                        </Badge>
-                      </div>
-                      <p className="mt-1 text-xs text-content-secondary">
-                        Approved: {c.processed_at ? formatDateLabel(c.processed_at) : formatDateLabel(c.submitted_at)}
-                      </p>
-                      <p className="mt-2 text-sm font-medium text-content-primary">
-                        {c.purpose}
-                      </p>
-                      {c.notes && (
-                        <p className="mt-1 text-xs text-content-secondary italic">
-                          Note: {c.notes}
-                        </p>
-                      )}
-                    </div>
-
-                    <div className="flex flex-wrap gap-2 self-start sm:self-auto">
-                      {c.receipt_url && (
-                        <Button asChild size="sm" variant="secondary" className="gap-1">
-                          <a href={c.receipt_url} target="_blank" rel="noreferrer">
-                            <Download className="size-3.5" />
-                            Receipt
-                          </a>
-                        </Button>
-                      )}
-                      
-                      {isOwner && (
-                        <Button
-                          size="sm"
-                          variant="success"
-                          disabled={pending}
-                          onClick={() => handleMarkPaid(c.id)}
-                          className="gap-1 bg-success text-white hover:bg-success/80 border-0"
-                        >
-                          <CheckSquare className="size-3.5" />
-                          Mark as Paid
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                </Card>
-              );
-            })}
-          </div>
-        )}
-      </section>
-
-      {/* 3. History Section */}
-      <section className="space-y-3">
-        <h2 className="text-xs font-bold uppercase tracking-wider text-content-secondary">
-          Claim History ({historyClaims.length})
-        </h2>
-        {historyClaims.length === 0 ? (
-          <p className="text-sm text-content-secondary italic p-4 bg-bg-card/45 rounded-xl border border-border">
-            No history available.
-          </p>
-        ) : (
-          <div className="space-y-3">
-            {historyClaims.map((c) => {
-              const meta = STATUS_META[c.status];
-              const Icon = meta.icon;
-              return (
-                <Card key={c.id} className="p-4 opacity-85">
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                    <div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-semibold text-content-primary">
-                          {c.submitted_by_name}
-                        </span>
-                        <span className="font-bold text-content-secondary">
-                          ₹{c.amount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-                        </span>
-                        <Badge variant={meta.variant} className="gap-1 text-xs">
-                          <Icon className="size-3" />
-                          {meta.label}
-                        </Badge>
-                      </div>
-                      <p className="mt-1 text-[11px] text-content-secondary">
-                        Submitted: {formatDateLabel(c.submitted_at)}
-                        {c.processed_by_name && ` · Resolved by: ${c.processed_by_name}`}
-                        {c.processed_at && ` on ${formatDateLabel(c.processed_at)}`}
-                      </p>
-                      <p className="mt-2 text-sm text-content-primary">
-                        {c.purpose}
-                      </p>
-                      {c.notes && (
-                        <p className="mt-1 text-xs text-content-secondary italic">
-                          Note: {c.notes}
-                        </p>
-                      )}
-                    </div>
-
-                    {c.receipt_url && (
-                      <Button asChild size="sm" variant="secondary" className="gap-1 self-start sm:self-auto">
-                        <a href={c.receipt_url} target="_blank" rel="noreferrer">
-                          <Download className="size-3.5" />
-                          Receipt
-                        </a>
-                      </Button>
-                    )}
-                  </div>
-                </Card>
-              );
-            })}
+          <div className="space-y-2 opacity-75">
+            {reconciled.map((c) => (
+              <ClaimCard key={c.id} c={c} />
+            ))}
           </div>
         )}
       </section>

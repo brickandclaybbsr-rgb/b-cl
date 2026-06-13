@@ -62,6 +62,7 @@ export type Profile = {
   reporting_authority?: string | null;
   signature_url?: string | null;
   fcm_token?: string | null;
+  team?: "kitchen" | "front_desk" | null;
 };
 
 export type OpeningChecklist = {

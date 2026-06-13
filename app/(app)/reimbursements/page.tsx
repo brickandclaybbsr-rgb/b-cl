@@ -5,7 +5,7 @@ import { PageHeader } from "@/components/page-header";
 import { ReimbursementClaimForm } from "./claim-form";
 import { ReimbursementsList, type ReimbursementView } from "./claims-list";
 import { Card } from "@/components/ui/card";
-import { Clock, CheckCircle2, CheckSquare, Users } from "lucide-react";
+import { Clock, CheckCircle2, Wallet, Users } from "lucide-react";
 
 export const metadata = { title: "Reimbursements" };
 
@@ -41,11 +41,10 @@ export default async function ReimbursementsPage() {
     .reduce((sum, c) => sum + Number(c.amount), 0);
 
   const approvedAmount = claims
-    .filter((c) => c.status === "approved")
+    .filter((c) => c.status === "approved" || c.status === "paid")
     .reduce((sum, c) => sum + Number(c.amount), 0);
 
-  const paidAmount = claims
-    .filter((c) => c.status === "paid")
+  const totalAmount = claims
     .reduce((sum, c) => sum + Number(c.amount), 0);
 
   // Group by profile for Owner dashboard summary
@@ -80,11 +79,11 @@ export default async function ReimbursementsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Reimbursements"
+        title="Cash Expenses"
         subtitle={
           isOwner
-            ? "Audit and manage staff expense claims, approvals, and payouts"
-            : "Submit business expense claims and track approval status"
+            ? "Review and reconcile store cash expenses recorded by staff"
+            : "Record store cash expenses — for purchases already made from the drawer"
         }
       />
 
@@ -96,7 +95,7 @@ export default async function ReimbursementsPage() {
           </div>
           <div>
             <p className="text-xs font-medium uppercase tracking-wider text-content-secondary">
-              Pending Approval
+              Needs Reconciliation
             </p>
             <p className="mt-0.5 text-lg font-bold text-content-primary">
               ₹{pendingAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
@@ -110,7 +109,7 @@ export default async function ReimbursementsPage() {
           </div>
           <div>
             <p className="text-xs font-medium uppercase tracking-wider text-content-secondary">
-              Approved (Unpaid)
+              Reconciled
             </p>
             <p className="mt-0.5 text-lg font-bold text-content-primary">
               ₹{approvedAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
@@ -120,14 +119,14 @@ export default async function ReimbursementsPage() {
 
         <Card className="flex items-center gap-4 p-4">
           <div className="flex size-12 items-center justify-center rounded-xl bg-fire/10 text-fire">
-            <CheckSquare className="size-6" />
+            <Wallet className="size-6" />
           </div>
           <div>
             <p className="text-xs font-medium uppercase tracking-wider text-content-secondary">
-              Paid Reimbursements
+              Total Cash Spent
             </p>
             <p className="mt-0.5 text-lg font-bold text-content-primary">
-              ₹{paidAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+              ₹{totalAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
             </p>
           </div>
         </Card>

@@ -1,6 +1,11 @@
 import { requireProfile } from "@/lib/auth";
 import { todayIST, formatDateLabel, formatTimeIST } from "@/lib/date";
-import { getChecklistConfig, getOpeningChecklist } from "@/lib/data/checklists";
+import {
+  getChecklistConfig,
+  getOtherTeamConfig,
+  getOpeningChecklist,
+  isOtherTeamAbsentToday,
+} from "@/lib/data/checklists";
 import { getProfileNameMap } from "@/lib/data/profiles";
 import { PageHeader } from "@/components/page-header";
 import { ChecklistTabs } from "@/components/checklists/checklist-tabs";
@@ -8,7 +13,7 @@ import { ChecklistForm } from "@/components/checklists/checklist-form";
 import { ChecklistView } from "@/components/checklists/checklist-view";
 import { submitOpeningChecklist } from "../actions";
 import { Card } from "@/components/ui/card";
-import { CheckCircle2 } from "lucide-react";
+import { CheckCircle2, AlertTriangle } from "lucide-react";
 
 export const metadata = { title: "Opening checklist" };
 
@@ -45,10 +50,30 @@ export default async function OpeningChecklistPage() {
     );
   }
 
+  const team = (profile.team as "kitchen" | "front_desk" | null | undefined) ?? null;
+
+  let config = await getChecklistConfig("opening", isOwner ? null : team);
+  let coveringOtherTeam = false;
+
+  if (!isOwner && team) {
+    const otherAbsent = await isOtherTeamAbsentToday(team);
+    if (otherAbsent) {
+      const otherItems = await getOtherTeamConfig("opening", team);
+      config = [...config, ...otherItems];
+      coveringOtherTeam = true;
+    }
+  }
+
   return (
     <div>
       <PageHeader title="Opening Checklist" subtitle={formatDateLabel(date)} />
       <ChecklistTabs />
+      {coveringOtherTeam && (
+        <div className="mb-4 flex items-start gap-2 rounded-xl border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning">
+          <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+          <span>Other team member is on leave today — their checklist tasks are included below.</span>
+        </div>
+      )}
       {existing ? (
         <ChecklistView
           record={existing}
@@ -62,7 +87,7 @@ export default async function OpeningChecklistPage() {
       ) : (
         <ChecklistForm
           variant="opening"
-          config={await getChecklistConfig("opening")}
+          config={config}
           action={submitOpeningChecklist}
         />
       )}

@@ -29,6 +29,14 @@ export function RaiseOrderForm({ vendors }: { vendors: Vendor[] }) {
 
   return (
     <Card className="p-4">
+      <div className="mb-3">
+        <h2 className="text-sm font-bold uppercase tracking-wider text-warm">
+          Raise Purchase Request
+        </h2>
+        <p className="mt-1 text-xs text-content-secondary">
+          Procurement will coordinate with the vendor on WhatsApp and update the status below.
+        </p>
+      </div>
       <form ref={formRef} action={formAction} className="space-y-4">
         <div className="space-y-1.5">
           <Label htmlFor="vendor_id">Vendor</Label>

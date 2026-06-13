@@ -33,7 +33,7 @@ export const STAFF_NAV: NavItem[] = [
   { label: "Sales", href: "/sales", icon: IndianRupee },
   { label: "Stock", href: "/stock", icon: Package },
   { label: "Orders", href: "/vendors", icon: ShoppingCart },
-  { label: "Reimburse", href: "/reimbursements", icon: Receipt },
+  { label: "Expenses", href: "/reimbursements", icon: Receipt },
 ];
 
 export const OWNER_NAV: NavItem[] = [
