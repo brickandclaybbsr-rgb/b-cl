@@ -31,7 +31,6 @@ export const STAFF_NAV: NavItem[] = [
     match: ["/checklist"],
   },
   { label: "Sales", href: "/sales", icon: IndianRupee },
-  { label: "Expenses", href: "/expenses", icon: Wallet },
   { label: "Stock", href: "/stock", icon: Package },
   { label: "Orders", href: "/vendors", icon: ShoppingCart },
 ];
