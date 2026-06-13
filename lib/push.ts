@@ -46,6 +46,8 @@ export async function sendPushToOwner(
           sound: "default",
           channelId: "bnc_ops_alerts",
           color: "#E8620A",
+          vibrateTimingsMillis: [0, 500, 200, 500, 200, 500],
+          defaultVibrateTimings: false,
         },
       },
     });

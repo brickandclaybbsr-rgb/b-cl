@@ -24,6 +24,7 @@ export async function initPushNotifications() {
         importance: 5,
         visibility: 1,
         sound: "default",
+        vibration: true,
       });
     } catch {
       /* channel API unavailable — ignore */
