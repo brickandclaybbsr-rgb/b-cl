@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import {
   OPENING_CHECKLIST,
   CLOSING_CHECKLIST,
@@ -92,7 +93,7 @@ export async function isOtherTeamAbsentToday(
 export async function getOpeningChecklist(
   date: string,
 ): Promise<OpeningChecklist | null> {
-  const supabase = createClient();
+  const supabase = createAdminClient();
   const { data } = await supabase
     .from("opening_checklists")
     .select("*")
@@ -104,7 +105,7 @@ export async function getOpeningChecklist(
 export async function getClosingChecklist(
   date: string,
 ): Promise<ClosingChecklist | null> {
-  const supabase = createClient();
+  const supabase = createAdminClient();
   const { data } = await supabase
     .from("closing_checklists")
     .select("*")
