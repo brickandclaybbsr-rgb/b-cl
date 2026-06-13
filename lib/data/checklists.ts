@@ -93,25 +93,48 @@ export async function isOtherTeamAbsentToday(
 export async function getOpeningChecklist(
   date: string,
 ): Promise<OpeningChecklist | null> {
-  const supabase = createAdminClient();
-  const { data } = await supabase
-    .from("opening_checklists")
-    .select("*")
-    .eq("date", date)
-    .maybeSingle();
-  return data ?? null;
+  // Use admin client to bypass RLS so any staff member can see if a checklist
+  // was already submitted by someone else today. Falls back to user client
+  // (works once the SELECT policy allows authenticated reads).
+  try {
+    const supabase = createAdminClient();
+    const { data } = await supabase
+      .from("opening_checklists")
+      .select("*")
+      .eq("date", date)
+      .maybeSingle();
+    return data ?? null;
+  } catch {
+    const supabase = createClient();
+    const { data } = await supabase
+      .from("opening_checklists")
+      .select("*")
+      .eq("date", date)
+      .maybeSingle();
+    return data ?? null;
+  }
 }
 
 export async function getClosingChecklist(
   date: string,
 ): Promise<ClosingChecklist | null> {
-  const supabase = createAdminClient();
-  const { data } = await supabase
-    .from("closing_checklists")
-    .select("*")
-    .eq("date", date)
-    .maybeSingle();
-  return data ?? null;
+  try {
+    const supabase = createAdminClient();
+    const { data } = await supabase
+      .from("closing_checklists")
+      .select("*")
+      .eq("date", date)
+      .maybeSingle();
+    return data ?? null;
+  } catch {
+    const supabase = createClient();
+    const { data } = await supabase
+      .from("closing_checklists")
+      .select("*")
+      .eq("date", date)
+      .maybeSingle();
+    return data ?? null;
+  }
 }
 
 /** Group flat checklist lines by section, preserving order. */
