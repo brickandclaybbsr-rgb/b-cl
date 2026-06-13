@@ -7,7 +7,6 @@ import {
   LayoutDashboard,
   LineChart,
   Settings,
-  Receipt,
   Calendar,
   Users,
   Bell,
@@ -33,7 +32,6 @@ export const STAFF_NAV: NavItem[] = [
   { label: "Sales", href: "/sales", icon: IndianRupee },
   { label: "Stock", href: "/stock", icon: Package },
   { label: "Orders", href: "/vendors", icon: ShoppingCart },
-  { label: "Expenses", href: "/reimbursements", icon: Receipt },
 ];
 
 export const OWNER_NAV: NavItem[] = [
