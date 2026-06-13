@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, useMemo } from "react";
+import { useState, useTransition, useMemo, useCallback } from "react";
 import { toast } from "sonner";
 import {
   Upload,
@@ -15,6 +15,7 @@ import {
   Info,
   CalendarDays,
   User,
+  ImageDown,
 } from "lucide-react";
 import { parseBiometricCSV, type BiometricRow } from "./csv-parser";
 import { saveAttendancePunches, clearAttendanceForMonth } from "@/app/(app)/attendance/actions";
@@ -259,6 +260,135 @@ export function AttendanceClient({ staffList, currentProfile, initialPunches }: 
     );
   };
 
+  // ── Download attendance report as PNG ─────────────────────────────────────
+
+  const downloadReport = useCallback(() => {
+    const monthLabel = MONTHS.find((m) => m.value === selectedMonth)?.label ?? "";
+    const title = `${monthLabel} ${selectedYear}`;
+
+    const CANVAS_W = 620;
+    const HEADER_H = 110;
+    const COL_H = 38;
+    const ROW_H = 40;
+    const FOOTER_H = 36;
+    const rows = staffStats.length;
+    const CANVAS_H = HEADER_H + COL_H + rows * ROW_H + FOOTER_H;
+
+    const canvas = document.createElement("canvas");
+    canvas.width = CANVAS_W;
+    canvas.height = CANVAS_H;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    // Background
+    ctx.fillStyle = "#0c0c0c";
+    ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+
+    // Top accent bar
+    ctx.fillStyle = "#c2440f";
+    ctx.fillRect(0, 0, CANVAS_W, 4);
+
+    // Brand title
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "bold 22px system-ui, sans-serif";
+    ctx.fillText("Brick & Clay", 24, 38);
+
+    // Subtitle
+    ctx.fillStyle = "#aaaaaa";
+    ctx.font = "13px system-ui, sans-serif";
+    ctx.fillText(`Attendance Report — ${title}`, 24, 60);
+
+    const generatedDate = new Date().toLocaleDateString("en-IN", {
+      day: "numeric", month: "long", year: "numeric",
+    });
+    ctx.fillStyle = "#666666";
+    ctx.font = "11px system-ui, sans-serif";
+    ctx.fillText(`Generated: ${generatedDate}`, 24, 78);
+
+    // Divider
+    ctx.fillStyle = "#222222";
+    ctx.fillRect(0, HEADER_H - 10, CANVAS_W, 1);
+
+    // Column header bg
+    ctx.fillStyle = "#161616";
+    ctx.fillRect(0, HEADER_H, CANVAS_W, COL_H);
+
+    // Column headers
+    const colX = [24, 260, 340, 420, 500, 560];
+    const colLabels = ["Staff Name", "Present", "Absent", "Total", "%"];
+    ctx.fillStyle = "#888888";
+    ctx.font = "bold 11px system-ui, sans-serif";
+    colLabels.forEach((label, i) => {
+      ctx.fillText(label, colX[i], HEADER_H + 24);
+    });
+
+    // Rows
+    staffStats.forEach(({ staff, present, absent, total }, i) => {
+      const pct = total > 0 ? Math.round((present / total) * 100) : 0;
+      const y = HEADER_H + COL_H + i * ROW_H;
+
+      ctx.fillStyle = i % 2 === 0 ? "#111111" : "#0e0e0e";
+      ctx.fillRect(0, y, CANVAS_W, ROW_H);
+
+      // Name
+      ctx.fillStyle = "#f0f0f0";
+      ctx.font = "13px system-ui, sans-serif";
+      ctx.fillText(staff.name, colX[0], y + 25);
+
+      // Present (green)
+      ctx.fillStyle = "#4ade80";
+      ctx.font = "bold 13px system-ui, sans-serif";
+      ctx.fillText(String(present), colX[1], y + 25);
+
+      // Absent (red)
+      ctx.fillStyle = "#f87171";
+      ctx.fillText(String(absent), colX[2], y + 25);
+
+      // Total (muted)
+      ctx.fillStyle = "#888888";
+      ctx.font = "13px system-ui, sans-serif";
+      ctx.fillText(String(total), colX[3], y + 25);
+
+      // Percentage (color-coded)
+      const pctColor = pct >= 90 ? "#4ade80" : pct >= 75 ? "#fbbf24" : "#f87171";
+      ctx.fillStyle = pctColor;
+      ctx.font = "bold 13px system-ui, sans-serif";
+      ctx.fillText(`${pct}%`, colX[4], y + 25);
+    });
+
+    // Footer
+    const footerY = HEADER_H + COL_H + rows * ROW_H;
+    ctx.fillStyle = "#0a0a0a";
+    ctx.fillRect(0, footerY, CANVAS_W, FOOTER_H);
+    ctx.fillStyle = "#444444";
+    ctx.font = "10px system-ui, sans-serif";
+    ctx.fillText("Brick & Clay Operations · Internal Report", 24, footerY + 22);
+
+    const dataUrl = canvas.toDataURL("image/png");
+
+    if (typeof navigator !== "undefined" && navigator.share) {
+      canvas.toBlob(async (blob) => {
+        if (!blob) return;
+        try {
+          await navigator.share({
+            files: [new File([blob], `attendance-${monthString}.png`, { type: "image/png" })],
+            title: `Attendance Report — ${title}`,
+          });
+        } catch {
+          const a = document.createElement("a");
+          a.download = `attendance-${monthString}.png`;
+          a.href = dataUrl;
+          a.click();
+        }
+      }, "image/png");
+    } else {
+      const a = document.createElement("a");
+      a.download = `attendance-${monthString}.png`;
+      a.href = dataUrl;
+      a.click();
+    }
+  }, [staffStats, selectedMonth, selectedYear, monthString]);
+
   // ── Month / Year picker ───────────────────────────────────────────────────
 
   const MonthPicker = () => (
@@ -386,7 +516,18 @@ export function AttendanceClient({ staffList, currentProfile, initialPunches }: 
           <CalendarDays className="size-3.5 text-warm" />
           {MONTHS.find((m) => m.value === selectedMonth)?.label} {selectedYear}
         </p>
-        <span className="text-[10px] text-content-secondary">{staffStats.length} staff</span>
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] text-content-secondary">{staffStats.length} staff</span>
+          <button
+            type="button"
+            onClick={downloadReport}
+            className="flex items-center gap-1.5 rounded-lg border border-border bg-bg-elevated px-2.5 py-1.5 text-xs font-semibold text-content-primary hover:border-border-strong transition-colors"
+            title="Download attendance report as image"
+          >
+            <ImageDown className="size-3.5 text-warm" />
+            Export
+          </button>
+        </div>
       </div>
 
       {staffStats.map(({ staff, present, absent, total, punches }) => {

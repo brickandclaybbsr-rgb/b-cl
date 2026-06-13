@@ -1,7 +1,7 @@
 import { ShoppingCart, Store, Receipt, FileText, Download } from "lucide-react";
 import Link from "next/link";
 import { requireProfile } from "@/lib/auth";
-import { getVendors, getOrders } from "@/lib/data/vendors";
+import { getVendors, getAllVendors, getOrders } from "@/lib/data/vendors";
 import { getPurchases } from "@/lib/data/purchases";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
@@ -10,6 +10,7 @@ import { Card } from "@/components/ui/card";
 import { RaiseOrderForm } from "./raise-order-form";
 import { OrderCard } from "./order-card";
 import { RecordPurchaseForm } from "./record-purchase-form";
+import { VendorManageClient } from "./vendor-manage-client";
 import { formatTimestampIST, formatDateLabel } from "@/lib/date";
 import { cn } from "@/lib/utils";
 
@@ -25,8 +26,9 @@ export default async function VendorsPage({ searchParams }: Props) {
   
   const currentTab = searchParams.tab ?? "orders";
   
-  const [vendors, orders, purchases] = await Promise.all([
+  const [vendors, allVendors, orders, purchases] = await Promise.all([
     getVendors(),
+    isOwner ? getAllVendors() : Promise.resolve([]),
     getOrders(),
     getPurchases(),
   ]);
@@ -40,17 +42,8 @@ export default async function VendorsPage({ searchParams }: Props) {
         title={isOwner ? "Vendor & Purchases" : "Vendors & Bills"}
         subtitle={
           isOwner
-            ? "Manage vendor orders, track purchase bills, and audit history"
+            ? "Manage vendors, track orders, and audit purchase bills"
             : "Raise order requests and log vendor purchase invoices"
-        }
-        action={
-          isOwner ? (
-            <Button asChild variant="secondary" size="sm">
-              <Link href="/settings">
-                <Store className="size-4" /> Manage vendors
-              </Link>
-            </Button>
-          ) : undefined
         }
       />
 
@@ -84,6 +77,22 @@ export default async function VendorsPage({ searchParams }: Props) {
             Purchases & Bills
           </span>
         </Link>
+        {isOwner && (
+          <Link
+            href="/vendors?tab=manage"
+            className={cn(
+              "relative pb-3 text-sm font-semibold transition-all duration-200",
+              currentTab === "manage"
+                ? "text-white after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-full after:bg-white"
+                : "text-content-secondary hover:text-content-primary"
+            )}
+          >
+            <span className="flex items-center gap-1.5">
+              <Store className="size-4" />
+              Vendors
+            </span>
+          </Link>
+        )}
       </div>
 
       {currentTab === "orders" ? (
@@ -95,13 +104,13 @@ export default async function VendorsPage({ searchParams }: Props) {
               title="No vendors configured"
               description={
                 isOwner
-                  ? "Add your suppliers in Settings to start raising orders."
+                  ? "Add your suppliers in the Vendors tab to start raising orders."
                   : "The owner needs to add vendors before you can raise orders."
               }
             >
               {isOwner && (
                 <Button asChild size="sm">
-                  <Link href="/settings">Go to Settings</Link>
+                  <Link href="/vendors?tab=manage">Manage Vendors</Link>
                 </Button>
               )}
             </EmptyState>
@@ -138,6 +147,9 @@ export default async function VendorsPage({ searchParams }: Props) {
             </section>
           )}
         </div>
+      ) : currentTab === "manage" && isOwner ? (
+        // Tab 3: Vendor Management (Owner only)
+        <VendorManageClient vendors={allVendors} />
       ) : (
         // Tab 2: Purchases & Bills (New Flow)
         <div className="space-y-6">
