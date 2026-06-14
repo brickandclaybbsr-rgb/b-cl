@@ -59,12 +59,13 @@ export async function submitOpeningChecklist(
   const supabase = createClient();
   const date = todayIST();
 
-  // head_chef can submit on behalf of front_desk via _team_override hidden field
+  // Any staff can cover the other team via _team_override hidden field
   const teamOverride = String(formData.get("_team_override") ?? "").trim();
+  const ownTeam: "kitchen" | "front_desk" | null =
+    profile.team === "head_chef" ? "kitchen"
+    : (profile.team as "kitchen" | "front_desk" | null) ?? null;
   const team: "kitchen" | "front_desk" | null =
-    profile.team === "head_chef"
-      ? (teamOverride === "front_desk" ? "front_desk" : "kitchen")
-      : (profile.team as "kitchen" | "front_desk" | null) ?? null;
+    (teamOverride === "kitchen" || teamOverride === "front_desk") ? teamOverride : ownTeam;
   const teamKey = team ?? "all";
   const config = await getChecklistConfig("opening", profile.role === "owner" ? null : team);
   const items = buildItems(config, formData);
