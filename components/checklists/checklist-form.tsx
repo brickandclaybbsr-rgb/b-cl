@@ -26,11 +26,13 @@ export function ChecklistForm({
   config,
   action,
   team,
+  hiddenFields,
 }: {
   variant: "opening" | "closing";
   config: ChecklistItemDef[];
   action: Action;
   team?: "kitchen" | "front_desk" | null;
+  hiddenFields?: Record<string, string>;
 }) {
   // Kitchen team (incl. head chef, who maps to "kitchen") doesn't handle cash
   const showCashFields = team !== "kitchen";
@@ -64,6 +66,9 @@ export function ChecklistForm({
     <>
     <Confetti active={showConfetti} />
     <form action={formAction} className="space-y-4">
+      {hiddenFields && Object.entries(hiddenFields).map(([k, v]) => (
+        <input key={k} type="hidden" name={k} value={v} />
+      ))}
       {grouped.map((group) => (
         <Card key={group.section} className="overflow-hidden">
           <div className="border-b border-border px-4 py-2.5">

@@ -69,11 +69,12 @@ export default async function OpeningChecklistPage() {
 
   // ── Head chef: sees both kitchen and front desk ──────────────────────────
   if (headChef) {
-    const [kitchenRecord, frontDeskRecord, nameMap, kitchenConfig] = await Promise.all([
+    const [kitchenRecord, frontDeskRecord, nameMap, kitchenConfig, frontDeskConfig] = await Promise.all([
       getOpeningChecklist(date, "kitchen"),
       getOpeningChecklist(date, "front_desk"),
       getProfileNameMap(),
       getChecklistConfig("opening", "kitchen"),
+      getChecklistConfig("opening", "front_desk"),
     ]);
 
     return (
@@ -114,10 +115,13 @@ export default async function OpeningChecklistPage() {
             submitterName={frontDeskRecord.submitted_by ? nameMap[frontDeskRecord.submitted_by] ?? "Staff" : "Staff"}
           />
         ) : (
-          <div className="flex items-center gap-2.5 rounded-xl border border-border bg-bg-elevated px-4 py-3 text-sm text-content-secondary">
-            <Clock className="size-4 shrink-0" />
-            <span><span className="font-semibold text-content-primary">Front Desk</span> checklist not submitted yet</span>
-          </div>
+          <ChecklistForm
+            variant="opening"
+            config={frontDeskConfig}
+            action={submitOpeningChecklist}
+            team="front_desk"
+            hiddenFields={{ _team_override: "front_desk" }}
+          />
         )}
       </div>
     );
