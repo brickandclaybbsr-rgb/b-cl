@@ -28,7 +28,11 @@ function greeting() {
 
 export default async function StaffDashboard() {
   const profile = await requireProfile();
-  const snap = await getTodaySnapshot();
+  // Resolve team for snapshot — head_chef shares the kitchen record
+  const myTeam: "kitchen" | "front_desk" | undefined =
+    profile.team === "head_chef" ? "kitchen"
+    : (profile.team as "kitchen" | "front_desk" | null | undefined) ?? undefined;
+  const snap = await getTodaySnapshot(myTeam);
   const firstName = profile.name.split(" ")[0];
   const alerts = snap.lowItems.length + snap.outItems.length;
   const kitchenOnly = profile.team === "kitchen";

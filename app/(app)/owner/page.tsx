@@ -86,31 +86,61 @@ export default async function OwnerDashboard() {
         />
       </div>
 
-      {/* Checklist status */}
+      {/* Checklist status — one card per team per shift */}
       <Card className="p-4">
         <h2 className="mb-3 text-sm font-bold uppercase tracking-wider text-content-secondary">
           Checklists
         </h2>
-        <div className="grid grid-cols-2 gap-3">
+
+        {/* Opening row */}
+        <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-warm flex items-center gap-1.5">
+          <Sunrise className="size-3" /> Opening
+        </p>
+        <div className="mb-4 grid grid-cols-2 gap-3">
           <ChecklistStatus
-            icon={Sunrise}
-            label="Opening"
-            done={Boolean(snap.opening)}
-            time={snap.opening ? formatTimeIST(snap.opening.submitted_at) : null}
+            label="Kitchen"
+            done={Boolean(snap.openingKitchen)}
+            time={snap.openingKitchen ? formatTimeIST(snap.openingKitchen.submitted_at) : null}
             submitterName={
-              snap.opening?.submitted_by
-                ? nameMap[snap.opening.submitted_by] ?? "Staff"
+              snap.openingKitchen?.submitted_by
+                ? nameMap[snap.openingKitchen.submitted_by] ?? "Staff"
                 : null
             }
           />
           <ChecklistStatus
-            icon={Sunset}
-            label="Closing"
-            done={Boolean(snap.closing)}
-            time={snap.closing ? formatTimeIST(snap.closing.submitted_at) : null}
+            label="Dining"
+            done={Boolean(snap.openingFrontDesk)}
+            time={snap.openingFrontDesk ? formatTimeIST(snap.openingFrontDesk.submitted_at) : null}
             submitterName={
-              snap.closing?.submitted_by
-                ? nameMap[snap.closing.submitted_by] ?? "Staff"
+              snap.openingFrontDesk?.submitted_by
+                ? nameMap[snap.openingFrontDesk.submitted_by] ?? "Staff"
+                : null
+            }
+          />
+        </div>
+
+        {/* Closing row */}
+        <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-warm flex items-center gap-1.5">
+          <Sunset className="size-3" /> Closing
+        </p>
+        <div className="grid grid-cols-2 gap-3">
+          <ChecklistStatus
+            label="Kitchen"
+            done={Boolean(snap.closingKitchen)}
+            time={snap.closingKitchen ? formatTimeIST(snap.closingKitchen.submitted_at) : null}
+            submitterName={
+              snap.closingKitchen?.submitted_by
+                ? nameMap[snap.closingKitchen.submitted_by] ?? "Staff"
+                : null
+            }
+          />
+          <ChecklistStatus
+            label="Dining"
+            done={Boolean(snap.closingFrontDesk)}
+            time={snap.closingFrontDesk ? formatTimeIST(snap.closingFrontDesk.submitted_at) : null}
+            submitterName={
+              snap.closingFrontDesk?.submitted_by
+                ? nameMap[snap.closingFrontDesk.submitted_by] ?? "Staff"
                 : null
             }
           />
@@ -214,30 +244,33 @@ export default async function OwnerDashboard() {
 }
 
 function ChecklistStatus({
-  icon: Icon,
   label,
   done,
   time,
   submitterName,
 }: {
-  icon: typeof Sunrise;
   label: string;
   done: boolean;
   time: string | null;
   submitterName?: string | null;
 }) {
   return (
-    <div className="rounded-xl border border-border bg-bg-elevated p-3">
+    <div
+      className={`rounded-xl border bg-bg-elevated p-3 transition-colors ${
+        done ? "border-success/30" : "border-border"
+      }`}
+    >
       <div className="flex items-center justify-between">
-        <Icon className="size-4 text-content-secondary" />
+        <p className="text-sm font-semibold">{label}</p>
         {done ? (
           <CheckCircle2 className="size-4 text-success" />
         ) : (
           <XCircle className="size-4 text-danger" />
         )}
       </div>
-      <p className="mt-2 text-sm font-semibold">{label}</p>
-      <p className="text-xs text-content-secondary font-mono">{done ? time : "Pending"}</p>
+      <p className="mt-1 text-xs text-content-secondary font-mono">
+        {done ? time : "Pending"}
+      </p>
       {done && submitterName && (
         <p className="mt-1 text-[11px] font-medium text-warm truncate">
           By {submitterName}
