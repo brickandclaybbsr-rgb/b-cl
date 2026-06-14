@@ -74,6 +74,7 @@ export type OpeningChecklist = {
   opening_cash: number | null;
   absent_staff: string | null;
   notes: string | null;
+  photo_url: string | null;
   submitted_at: string;
 };
 
@@ -88,6 +89,7 @@ export type ClosingChecklist = {
   discrepancy_notes: string | null;
   closing_stock_updated: boolean;
   notes: string | null;
+  photo_url: string | null;
   submitted_at: string;
 };
 

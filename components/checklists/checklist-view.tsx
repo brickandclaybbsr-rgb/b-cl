@@ -111,6 +111,20 @@ export function ChecklistView({
           </>
         )}
         {record.notes && <Row label="Notes" value={record.notes} />}
+        {record.photo_url && (
+          <div className="pt-1">
+            <p className="mb-1.5 text-xs text-content-secondary">Photo</p>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <a href={record.photo_url} target="_blank" rel="noreferrer">
+              <img
+                src={record.photo_url}
+                alt="Checklist photo"
+                className="w-full rounded-xl object-cover"
+                style={{ maxHeight: 240 }}
+              />
+            </a>
+          </div>
+        )}
       </Card>
     </div>
   );

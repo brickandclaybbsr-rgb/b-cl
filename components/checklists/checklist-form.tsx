@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useFormState } from "react-dom";
 import { toast } from "sonner";
-import { Check } from "lucide-react";
+import { Camera, Check, X } from "lucide-react";
 import type { ChecklistItemDef } from "@/lib/constants";
 import {
   type ChecklistFormState,
@@ -65,7 +65,7 @@ export function ChecklistForm({
   return (
     <>
     <Confetti active={showConfetti} />
-    <form action={formAction} className="space-y-4">
+    <form action={formAction} className="space-y-4" encType="multipart/form-data">
       {hiddenFields && Object.entries(hiddenFields).map(([k, v]) => (
         <input key={k} type="hidden" name={k} value={v} />
       ))}
@@ -101,14 +101,6 @@ export function ChecklistForm({
               />
             </div>
           )}
-          <div className="space-y-1.5">
-            <Label htmlFor="absent_staff">Absent staff (if any)</Label>
-            <Input
-              id="absent_staff"
-              name="absent_staff"
-              placeholder="Names, comma separated"
-            />
-          </div>
           <NotesField />
         </Card>
       ) : (
@@ -227,10 +219,60 @@ function CheckRow({ index, label }: { index: number; label: string }) {
 }
 
 function NotesField() {
+  const [preview, setPreview] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setPreview(URL.createObjectURL(file));
+  }
+
+  function clearPhoto() {
+    setPreview(null);
+    if (fileRef.current) fileRef.current.value = "";
+  }
+
   return (
-    <div className="space-y-1.5">
-      <Label htmlFor="notes">Notes / issues</Label>
-      <Textarea id="notes" name="notes" placeholder="Anything to flag for the owner?" />
+    <div className="space-y-3">
+      <div className="space-y-1.5">
+        <Label htmlFor="notes">Notes / issues</Label>
+        <Textarea id="notes" name="notes" placeholder="Anything to flag for the owner?" />
+      </div>
+      <div className="space-y-1.5">
+        <Label className="text-xs text-content-secondary">Photo (optional)</Label>
+        <input
+          ref={fileRef}
+          type="file"
+          name="photo"
+          accept="image/*"
+          capture="environment"
+          className="hidden"
+          onChange={handleFile}
+        />
+        {preview ? (
+          <div className="relative">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={preview} alt="Preview" className="h-40 w-full rounded-xl object-cover" />
+            <button
+              type="button"
+              onClick={clearPhoto}
+              className="absolute right-2 top-2 rounded-full bg-black/60 p-1.5 text-white"
+            >
+              <X className="size-3.5" />
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => fileRef.current?.click()}
+            className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border py-5 text-sm text-content-secondary transition-colors hover:border-border-strong hover:text-content-primary"
+          >
+            <Camera className="size-4" />
+            Add photo
+          </button>
+        )}
+      </div>
     </div>
   );
 }

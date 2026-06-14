@@ -27,6 +27,7 @@ create table if not exists public.opening_checklists (
   opening_cash  numeric(10,2),
   absent_staff  text,
   notes         text,
+  photo_url     text,
   submitted_at  timestamptz not null default now()
 );
 
@@ -40,6 +41,7 @@ create table if not exists public.closing_checklists (
   cash_deposited    numeric(10,2),
   discrepancy_notes text,
   notes             text,
+  photo_url         text,
   submitted_at      timestamptz not null default now()
 );
 

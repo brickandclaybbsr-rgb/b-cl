@@ -7,11 +7,34 @@ import { requireProfile, isHeadChef } from "@/lib/auth";
 import { getChecklistConfig } from "@/lib/data/checklists";
 import { todayIST } from "@/lib/date";
 import { toNumber } from "@/lib/utils";
+import { uploadPublicFile } from "@/lib/storage";
 import { whatsappNotify } from "@/lib/whatsapp-notify";
 import { notifyOwner } from "@/lib/push";
 import type { ChecklistLine } from "@/lib/database.types";
 
 export type ChecklistFormState = { ok?: boolean; error?: string };
+
+async function uploadChecklistPhoto(
+  formData: FormData,
+  date: string,
+  variant: "opening" | "closing",
+  team: string,
+): Promise<string | null> {
+  const file = formData.get("photo");
+  if (!(file instanceof File) || file.size === 0) return null;
+  try {
+    const buf = Buffer.from(await file.arrayBuffer());
+    const ext = file.name.split(".").pop() ?? "jpg";
+    return await uploadPublicFile(
+      `checklists/${variant}`,
+      `${date}_${team}.${ext}`,
+      buf,
+      file.type || "image/jpeg",
+    );
+  } catch {
+    return null;
+  }
+}
 
 function buildItems(
   config: { section: string; label: string }[],
@@ -47,14 +70,15 @@ export async function submitOpeningChecklist(
   const items = buildItems(config, formData);
 
   const openingCashRaw = formData.get("opening_cash");
+  const photoUrl = await uploadChecklistPhoto(formData, date, "opening", teamKey);
   const payload = {
     date,
     team: teamKey,
     submitted_by: profile.id,
     items,
     opening_cash: openingCashRaw === null || openingCashRaw === "" ? null : toNumber(openingCashRaw),
-    absent_staff: String(formData.get("absent_staff") ?? "").trim() || null,
     notes: String(formData.get("notes") ?? "").trim() || null,
+    photo_url: photoUrl,
   };
 
   // Edit mode: upsert so the original record is never lost if something goes wrong
@@ -102,6 +126,7 @@ export async function submitClosingChecklist(
 
   const closingCashRaw = formData.get("closing_cash");
   const depositedRaw = formData.get("cash_deposited");
+  const photoUrl = await uploadChecklistPhoto(formData, date, "closing", teamKey);
 
   const payload = {
     date,
@@ -113,6 +138,7 @@ export async function submitClosingChecklist(
     discrepancy_notes: String(formData.get("discrepancy_notes") ?? "").trim() || null,
     closing_stock_updated: false,
     notes: String(formData.get("notes") ?? "").trim() || null,
+    photo_url: photoUrl,
   };
 
   if (formData.get("_edit_mode") === "1" && isHeadChef(profile)) {
