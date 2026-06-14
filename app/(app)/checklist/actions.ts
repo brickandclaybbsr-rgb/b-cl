@@ -47,13 +47,7 @@ export async function submitOpeningChecklist(
   const items = buildItems(config, formData);
 
   const openingCashRaw = formData.get("opening_cash");
-  // Edit mode: delete the existing record first (only happens when new form is actually submitted)
-  if (formData.get("_edit_mode") === "1" && isHeadChef(profile)) {
-    const admin = createAdminClient();
-    await admin.from("opening_checklists").delete().eq("date", date).eq("team", teamKey);
-  }
-
-  const { error } = await supabase.from("opening_checklists").insert({
+  const payload = {
     date,
     team: teamKey,
     submitted_by: profile.id,
@@ -61,13 +55,23 @@ export async function submitOpeningChecklist(
     opening_cash: openingCashRaw === null || openingCashRaw === "" ? null : toNumber(openingCashRaw),
     absent_staff: String(formData.get("absent_staff") ?? "").trim() || null,
     notes: String(formData.get("notes") ?? "").trim() || null,
-  });
+  };
 
-  if (error) {
-    if (error.code === "23505") {
-      return { error: "Your team's opening checklist for today is already submitted." };
+  // Edit mode: upsert so the original record is never lost if something goes wrong
+  if (formData.get("_edit_mode") === "1" && isHeadChef(profile)) {
+    const admin = createAdminClient();
+    const { error } = await admin
+      .from("opening_checklists")
+      .upsert(payload, { onConflict: "date,team" });
+    if (error) return { error: error.message };
+  } else {
+    const { error } = await supabase.from("opening_checklists").insert(payload);
+    if (error) {
+      if (error.code === "23505") {
+        return { error: "Your team's opening checklist for today is already submitted." };
+      }
+      return { error: error.message };
     }
-    return { error: error.message };
   }
 
   await whatsappNotify.checklistSubmitted(profile.name, "opening");
@@ -99,12 +103,7 @@ export async function submitClosingChecklist(
   const closingCashRaw = formData.get("closing_cash");
   const depositedRaw = formData.get("cash_deposited");
 
-  if (formData.get("_edit_mode") === "1" && isHeadChef(profile)) {
-    const admin = createAdminClient();
-    await admin.from("closing_checklists").delete().eq("date", date).eq("team", teamKey);
-  }
-
-  const { error } = await supabase.from("closing_checklists").insert({
+  const payload = {
     date,
     team: teamKey,
     submitted_by: profile.id,
@@ -114,13 +113,22 @@ export async function submitClosingChecklist(
     discrepancy_notes: String(formData.get("discrepancy_notes") ?? "").trim() || null,
     closing_stock_updated: false,
     notes: String(formData.get("notes") ?? "").trim() || null,
-  });
+  };
 
-  if (error) {
-    if (error.code === "23505") {
-      return { error: "Your team's closing checklist for today is already submitted." };
+  if (formData.get("_edit_mode") === "1" && isHeadChef(profile)) {
+    const admin = createAdminClient();
+    const { error } = await admin
+      .from("closing_checklists")
+      .upsert(payload, { onConflict: "date,team" });
+    if (error) return { error: error.message };
+  } else {
+    const { error } = await supabase.from("closing_checklists").insert(payload);
+    if (error) {
+      if (error.code === "23505") {
+        return { error: "Your team's closing checklist for today is already submitted." };
+      }
+      return { error: error.message };
     }
-    return { error: error.message };
   }
 
   await whatsappNotify.checklistSubmitted(profile.name, "closing");
