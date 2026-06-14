@@ -1,7 +1,4 @@
-import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 import { requireProfile, isHeadChef } from "@/lib/auth";
-import { createAdminClient } from "@/lib/supabase/admin";
 import { todayIST, formatDateLabel, formatTimeIST } from "@/lib/date";
 import {
   getChecklistConfig,
@@ -20,12 +17,17 @@ import { CheckCircle2, Clock, AlertTriangle, UserX } from "lucide-react";
 
 export const metadata = { title: "Closing checklist" };
 
-export default async function ClosingChecklistPage() {
+export default async function ClosingChecklistPage({
+  searchParams,
+}: {
+  searchParams: { edit?: string };
+}) {
   const profile = await requireProfile();
   const date = todayIST();
 
   const isOwner = profile.role === "owner";
   const headChef = isHeadChef(profile);
+  const kitchenEditMode = headChef && searchParams.edit === "1";
   // head_chef shares the kitchen checklist record
   const myTeam: "kitchen" | "front_desk" | null =
     profile.team === "head_chef" ? "kitchen"
@@ -33,18 +35,6 @@ export default async function ClosingChecklistPage() {
   const otherTeam: "kitchen" | "front_desk" | null =
     myTeam === "kitchen" ? "front_desk" : myTeam === "front_desk" ? "kitchen" : null;
   const teamKey = myTeam ?? "all";
-
-  async function resetChecklist() {
-    "use server";
-    const p = await requireProfile();
-    if (!isHeadChef(p)) return;
-    const admin = createAdminClient();
-    const d = todayIST();
-    await admin.from("closing_checklists").delete().eq("date", d).eq("team", "kitchen");
-    revalidatePath("/checklist/closing");
-    revalidatePath("/dashboard");
-    redirect("/checklist/closing");
-  }
 
   // Staff must have a team assigned before they can use the checklist
   if (!isOwner && !headChef && myTeam === null) {
@@ -84,16 +74,16 @@ export default async function ClosingChecklistPage() {
 
         {/* Kitchen section */}
         <p className="mb-2 text-xs font-bold uppercase tracking-wider text-warm">Kitchen</p>
-        {kitchenRecord ? (
+        {kitchenRecord && !kitchenEditMode ? (
           <>
-            <form action={resetChecklist} className="mb-2 flex justify-end">
-              <button
-                type="submit"
+            <div className="mb-2 flex justify-end">
+              <a
+                href="/checklist/closing?edit=1"
                 className="rounded-lg border border-border bg-bg-elevated px-3 py-1.5 text-xs font-medium text-content-secondary hover:border-border-strong hover:text-content-primary transition-colors"
               >
                 Edit / Re-submit
-              </button>
-            </form>
+              </a>
+            </div>
             <ChecklistView
               record={kitchenRecord}
               variant="closing"
@@ -102,7 +92,13 @@ export default async function ClosingChecklistPage() {
             />
           </>
         ) : (
-          <ChecklistForm variant="closing" config={kitchenConfig} action={submitClosingChecklist} team="kitchen" />
+          <ChecklistForm
+            variant="closing"
+            config={kitchenConfig}
+            action={submitClosingChecklist}
+            team="kitchen"
+            hiddenFields={kitchenEditMode ? { _edit_mode: "1" } : undefined}
+          />
         )}
 
         {/* Front desk section */}

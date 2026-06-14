@@ -2,7 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { requireProfile } from "@/lib/auth";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { requireProfile, isHeadChef } from "@/lib/auth";
 import { getChecklistConfig } from "@/lib/data/checklists";
 import { todayIST } from "@/lib/date";
 import { toNumber } from "@/lib/utils";
@@ -46,6 +47,12 @@ export async function submitOpeningChecklist(
   const items = buildItems(config, formData);
 
   const openingCashRaw = formData.get("opening_cash");
+  // Edit mode: delete the existing record first (only happens when new form is actually submitted)
+  if (formData.get("_edit_mode") === "1" && isHeadChef(profile)) {
+    const admin = createAdminClient();
+    await admin.from("opening_checklists").delete().eq("date", date).eq("team", teamKey);
+  }
+
   const { error } = await supabase.from("opening_checklists").insert({
     date,
     team: teamKey,
@@ -91,6 +98,11 @@ export async function submitClosingChecklist(
 
   const closingCashRaw = formData.get("closing_cash");
   const depositedRaw = formData.get("cash_deposited");
+
+  if (formData.get("_edit_mode") === "1" && isHeadChef(profile)) {
+    const admin = createAdminClient();
+    await admin.from("closing_checklists").delete().eq("date", date).eq("team", teamKey);
+  }
 
   const { error } = await supabase.from("closing_checklists").insert({
     date,
