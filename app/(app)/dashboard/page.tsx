@@ -57,10 +57,14 @@ export default async function StaffDashboard() {
           },
         ]
       : []),
+  ];
+
+  const additionalTasks = [
     {
       href: "/stock",
       icon: Package,
       title: "Stock update",
+      subtitle: "Updated 3–4 times a month",
       done: Boolean(snap.stockSnapshot && snap.stockSnapshot.date === snap.date),
       hint: alerts > 0 ? `${alerts} to reorder` : undefined,
     },
@@ -103,9 +107,7 @@ export default async function StaffDashboard() {
               <Card className="flex items-center gap-3 p-4 transition-colors hover:border-border-strong">
                 <div
                   className={`flex size-10 shrink-0 items-center justify-center rounded-xl ${
-                    task.done
-                      ? "bg-success/15 text-success"
-                      : "bg-fire/15 text-fire"
+                    task.done ? "bg-success/15 text-success" : "bg-fire/15 text-fire"
                   }`}
                 >
                   <Icon className="size-5" />
@@ -115,6 +117,41 @@ export default async function StaffDashboard() {
                   {task.hint && (
                     <p className="text-xs text-content-secondary">{task.hint}</p>
                   )}
+                </div>
+                {task.done ? (
+                  <CheckCircle2 className="size-5 text-success" />
+                ) : (
+                  <Circle className="size-5 text-content-secondary/50" />
+                )}
+                <ChevronRight className="size-4 text-content-secondary" />
+              </Card>
+            </Link>
+          );
+        })}
+      </div>
+
+      {/* Additional tasks */}
+      <p className="mb-2 mt-6 text-xs font-bold uppercase tracking-wider text-content-secondary">
+        Additional
+      </p>
+      <div className="space-y-3">
+        {additionalTasks.map((task) => {
+          const Icon = task.icon;
+          return (
+            <Link key={task.href} href={task.href} className="block">
+              <Card className="flex items-center gap-3 p-4 transition-colors hover:border-border-strong">
+                <div
+                  className={`flex size-10 shrink-0 items-center justify-center rounded-xl ${
+                    task.done ? "bg-success/15 text-success" : "bg-bg-elevated text-content-secondary"
+                  }`}
+                >
+                  <Icon className="size-5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="font-semibold">{task.title}</p>
+                  <p className="text-xs text-content-secondary">
+                    {task.hint ?? task.subtitle}
+                  </p>
                 </div>
                 {task.done ? (
                   <CheckCircle2 className="size-5 text-success" />
