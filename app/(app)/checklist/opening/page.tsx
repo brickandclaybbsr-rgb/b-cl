@@ -101,6 +101,7 @@ export default async function OpeningChecklistPage() {
         <ChecklistView
           record={existing}
           variant="opening"
+          team={isOwner ? undefined : myTeam}
           submitterName={
             existing.submitted_by && nameMap
               ? nameMap[existing.submitted_by] ?? "Staff"

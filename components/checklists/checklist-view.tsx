@@ -8,18 +8,32 @@ import type {
   ClosingChecklist,
 } from "@/lib/database.types";
 
+const TEAM_SECTIONS: Record<string, string[]> = {
+  kitchen: ["Kitchen"],
+  front_desk: ["Front Desk", "Staff"],
+};
+
 export function ChecklistView({
   record,
   variant,
   submitterName,
+  team,
 }: {
   record: OpeningChecklist | ClosingChecklist;
   variant: "opening" | "closing";
   submitterName: string;
+  team?: "kitchen" | "front_desk" | null;
 }) {
-  const groups = groupBySection(record.items);
-  const done = record.items.filter((i) => i.checked).length;
-  const total = record.items.length;
+  const allGroups = groupBySection(record.items);
+  // When a team is known, only show that team's sections so kitchen staff
+  // don't see front-desk rows and vice versa (even if stored together).
+  const owned = team ? TEAM_SECTIONS[team] ?? [] : [];
+  const groups = owned.length > 0
+    ? allGroups.filter((g) => owned.some((prefix) => g.section.startsWith(prefix)))
+    : allGroups;
+  const displayedItems = groups.flatMap((g) => g.items);
+  const done = displayedItems.filter((i) => i.checked).length;
+  const total = displayedItems.length;
 
   return (
     <div className="space-y-4">
