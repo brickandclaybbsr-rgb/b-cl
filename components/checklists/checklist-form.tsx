@@ -240,7 +240,10 @@ function NotesField() {
         <Textarea id="notes" name="notes" placeholder="Anything to flag for the owner?" />
       </div>
       <div className="space-y-1.5">
-        <Label className="text-xs text-content-secondary">Photo (optional)</Label>
+        <div>
+          <p className="text-xs font-medium text-content-primary">Photo</p>
+          <p className="text-xs text-content-secondary">If there&apos;s any issue or something to flag, add a photo — not mandatory</p>
+        </div>
         <input
           ref={fileRef}
           type="file"
