@@ -841,7 +841,7 @@ export async function updateStaffProfile(
     const employmentType = String(formData.get("employmentType") ?? "").trim();
     const reportingAuthority = String(formData.get("reportingAuthority") ?? "").trim();
     const teamRaw = String(formData.get("team") ?? "").trim();
-    const team = teamRaw === "kitchen" || teamRaw === "front_desk" ? teamRaw : null;
+    const team = teamRaw === "kitchen" || teamRaw === "front_desk" || teamRaw === "head_chef" ? teamRaw : null;
 
     const aadharFile = formData.get("aadharFile") as File | null;
     const panFile = formData.get("panFile") as File | null;
