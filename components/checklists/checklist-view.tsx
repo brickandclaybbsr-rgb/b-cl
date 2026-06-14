@@ -42,6 +42,8 @@ export function ChecklistView({
         <div className="flex-1">
           <p className="font-semibold text-success">
             {variant === "opening" ? "Opening" : "Closing"} checklist submitted
+            {team === "kitchen" && " (Kitchen)"}
+            {team === "front_desk" && " (Front Desk)"}
           </p>
           <p className="text-xs text-content-secondary">
             By {submitterName} · {formatTimeIST(record.submitted_at)} ·{" "}
