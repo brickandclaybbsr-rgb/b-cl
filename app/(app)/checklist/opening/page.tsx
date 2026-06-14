@@ -121,10 +121,63 @@ export default async function OpeningChecklistPage({
     );
   }
 
+  // ── Owner: sees both teams ───────────────────────────────────────────────
+  if (isOwner) {
+    const [kitchenRecord, frontDeskRecord, nameMap, kitchenConfig, frontDeskConfig] = await Promise.all([
+      getOpeningChecklist(date, "kitchen"),
+      getOpeningChecklist(date, "front_desk"),
+      getProfileNameMap(),
+      getChecklistConfig("opening", "kitchen"),
+      getChecklistConfig("opening", "front_desk"),
+    ]);
+
+    return (
+      <div>
+        <PageHeader title="Opening Checklist" subtitle={formatDateLabel(date)} />
+        <ChecklistTabs />
+
+        <p className="mb-2 text-xs font-bold uppercase tracking-wider text-warm">Kitchen</p>
+        {kitchenRecord ? (
+          <ChecklistView
+            record={kitchenRecord}
+            variant="opening"
+            team="kitchen"
+            submitterName={kitchenRecord.submitted_by ? nameMap[kitchenRecord.submitted_by] ?? "Staff" : "Staff"}
+          />
+        ) : (
+          <ChecklistForm
+            variant="opening"
+            config={kitchenConfig}
+            action={submitOpeningChecklist}
+            team="kitchen"
+          />
+        )}
+
+        <p className="mb-2 mt-6 text-xs font-bold uppercase tracking-wider text-warm">Dining / Front Desk</p>
+        {frontDeskRecord ? (
+          <ChecklistView
+            record={frontDeskRecord}
+            variant="opening"
+            team="front_desk"
+            submitterName={frontDeskRecord.submitted_by ? nameMap[frontDeskRecord.submitted_by] ?? "Staff" : "Staff"}
+          />
+        ) : (
+          <ChecklistForm
+            variant="opening"
+            config={frontDeskConfig}
+            action={submitOpeningChecklist}
+            team="front_desk"
+            hiddenFields={{ _team_override: "front_desk" }}
+          />
+        )}
+      </div>
+    );
+  }
+
   // ── Regular staff ────────────────────────────────────────────────────────
   const [existing, otherExisting] = await Promise.all([
-    getOpeningChecklist(date, isOwner ? undefined : teamKey),
-    (!isOwner && otherTeam) ? getOpeningChecklist(date, otherTeam) : Promise.resolve(null),
+    getOpeningChecklist(date, teamKey),
+    otherTeam ? getOpeningChecklist(date, otherTeam) : Promise.resolve(null),
   ]);
 
   const isSubmitter = existing?.submitted_by === profile.id;
@@ -132,11 +185,11 @@ export default async function OpeningChecklistPage({
   const nameMap = await getProfileNameMap();
 
   // Fetch other team config when own team is done but other team hasn't submitted
-  const otherConfig = (ownDone && !isOwner && otherTeam && !otherExisting)
+  const otherConfig = (ownDone && otherTeam && !otherExisting)
     ? await getChecklistConfig("opening", otherTeam)
     : null;
 
-  let config = await getChecklistConfig("opening", isOwner ? null : myTeam);
+  const config = await getChecklistConfig("opening", myTeam);
 
   return (
     <div>
@@ -146,7 +199,7 @@ export default async function OpeningChecklistPage({
       {/* Own team section */}
       {existing ? (
         <>
-          {!isOwner && !isSubmitter ? (
+          {!isSubmitter ? (
             // Teammate submitted
             <Card className="p-6 text-center max-w-lg mx-auto space-y-4">
               <div className="flex justify-center">
@@ -168,7 +221,7 @@ export default async function OpeningChecklistPage({
             <ChecklistView
               record={existing}
               variant="opening"
-              team={isOwner ? undefined : myTeam}
+              team={myTeam}
               submitterName={existing.submitted_by ? nameMap[existing.submitted_by] ?? "Staff" : "Staff"}
             />
           )}
@@ -183,7 +236,7 @@ export default async function OpeningChecklistPage({
       )}
 
       {/* Other team section — shown when own is done but other hasn't submitted */}
-      {!isOwner && otherTeam && ownDone && !otherExisting && otherConfig && (
+      {otherTeam && ownDone && !otherExisting && otherConfig && (
         <div className="mt-6">
           <div className="mb-2 flex items-center gap-2 rounded-xl border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning">
             <AlertTriangle className="size-4 shrink-0" />
@@ -202,7 +255,7 @@ export default async function OpeningChecklistPage({
       )}
 
       {/* Other team already submitted — show banner */}
-      {!isOwner && otherTeam && otherExisting && (
+      {otherTeam && otherExisting && (
         <OtherTeamBanner otherTeam={otherTeam} otherExisting={otherExisting} nameMap={nameMap} />
       )}
     </div>
