@@ -952,7 +952,7 @@ export function AttendanceHRClient({ staffList, initialLeaves, initialDocuments,
                         </Button>
                       </div>
 
-                      <form ref={profileFormRef} action={profileFormAction} encType="multipart/form-data" className="space-y-4 text-xs">
+                      <form key={staff.id} ref={profileFormRef} action={profileFormAction} encType="multipart/form-data" className="space-y-4 text-xs">
                         <input type="hidden" name="profileId" value={staff.id} />
                         
                         {/* Section 1: Contact Details */}
