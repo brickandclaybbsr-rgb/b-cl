@@ -1,15 +1,26 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "crons": [
-    { "path": "/api/cron/opening-reminder",   "schedule": "30 3 * * *"  },
-    { "path": "/api/cron/sales-reminder",     "schedule": "30 7 * * *"  },
-    { "path": "/api/cron/closing-reminder",   "schedule": "0 12 * * *"  },
-    { "path": "/api/send-eod-report",         "schedule": "30 17 * * *" },
-    { "path": "/api/cron/eod/punchout-1",     "schedule": "30 17 * * *" },
-    { "path": "/api/cron/eod/punchout-2",     "schedule": "45 17 * * *" },
-    { "path": "/api/cron/eod/punchout-3",     "schedule": "0 18 * * *"  },
-    { "path": "/api/cron/eod/tasks-1",        "schedule": "35 17 * * *" },
-    { "path": "/api/cron/eod/tasks-2",        "schedule": "48 17 * * *" },
-    { "path": "/api/cron/eod/tasks-3",        "schedule": "55 17 * * *" }
+    { "path": "/api/cron/am/punch-in",        "schedule": "0 5 * * *"   },
+    { "path": "/api/cron/am/checklist",        "schedule": "15 5 * * *"  },
+    { "path": "/api/cron/am/punch-in",         "schedule": "40 5 * * *"  },
+    { "path": "/api/cron/am/punch-in",         "schedule": "5 6 * * *"   },
+    { "path": "/api/cron/am/checklist",        "schedule": "20 6 * * *"  },
+    { "path": "/api/cron/am/punch-in",         "schedule": "40 6 * * *"  },
+    { "path": "/api/cron/am/checklist",        "schedule": "5 7 * * *"   },
+    { "path": "/api/cron/am/punch-in",         "schedule": "20 7 * * *"  },
+    { "path": "/api/cron/am/punch-in",         "schedule": "0 8 * * *"   },
+    { "path": "/api/cron/am/punch-in",         "schedule": "30 8 * * *"  },
+    { "path": "/api/cron/am/punch-in",         "schedule": "0 9 * * *"   },
+    { "path": "/api/cron/pm/punch-out",        "schedule": "0 17 * * *"  },
+    { "path": "/api/cron/pm/checklist",        "schedule": "10 17 * * *" },
+    { "path": "/api/cron/pm/punch-out",        "schedule": "20 17 * * *" },
+    { "path": "/api/cron/pm/closing-balance",  "schedule": "25 17 * * *" },
+    { "path": "/api/cron/pm/punch-out",        "schedule": "40 17 * * *" },
+    { "path": "/api/cron/pm/checklist",        "schedule": "45 17 * * *" },
+    { "path": "/api/cron/pm/punch-out",        "schedule": "50 17 * * *" },
+    { "path": "/api/cron/pm/punch-out",        "schedule": "0 18 * * *"  },
+    { "path": "/api/cron/pm/checklist",        "schedule": "5 18 * * *"  },
+    { "path": "/api/send-eod-report",          "schedule": "30 18 * * *" }
   ]
 }
