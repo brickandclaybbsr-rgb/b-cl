@@ -216,7 +216,7 @@ create policy profiles_write on public.profiles
 -- opening_checklists --------------------------------------------------------
 drop policy if exists opening_select on public.opening_checklists;
 create policy opening_select on public.opening_checklists
-  for select using (submitted_by = auth.uid() or public.is_owner());
+  for select using (auth.uid() is not null);
 drop policy if exists opening_insert on public.opening_checklists;
 create policy opening_insert on public.opening_checklists
   for insert with check (submitted_by = auth.uid() or public.is_owner());
@@ -227,7 +227,7 @@ create policy opening_update on public.opening_checklists
 -- closing_checklists --------------------------------------------------------
 drop policy if exists closing_select on public.closing_checklists;
 create policy closing_select on public.closing_checklists
-  for select using (submitted_by = auth.uid() or public.is_owner());
+  for select using (auth.uid() is not null);
 drop policy if exists closing_insert on public.closing_checklists;
 create policy closing_insert on public.closing_checklists
   for insert with check (submitted_by = auth.uid() or public.is_owner());
