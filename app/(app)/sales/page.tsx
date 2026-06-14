@@ -19,6 +19,13 @@ export default async function SalesPage({
   searchParams: { tab?: string };
 }) {
   const profile = await requireProfile();
+
+  // Kitchen team handles kitchen tasks only — sales is front desk's responsibility
+  if (profile.team === "kitchen") {
+    const { redirect } = await import("next/navigation");
+    redirect("/dashboard");
+  }
+
   const isExpenses = searchParams.tab === "expenses";
 
   if (isExpenses) {

@@ -9,7 +9,7 @@ export default async function AppLayout({
 }) {
   const profile = await requireProfile();
   return (
-    <AppShell role={profile.role} name={profile.name}>
+    <AppShell role={profile.role} name={profile.name} team={profile.team ?? null}>
       <NativeBootstrap />
       {children}
     </AppShell>

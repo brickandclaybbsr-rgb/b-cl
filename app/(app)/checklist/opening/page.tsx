@@ -13,7 +13,7 @@ import { ChecklistForm } from "@/components/checklists/checklist-form";
 import { ChecklistView } from "@/components/checklists/checklist-view";
 import { submitOpeningChecklist } from "../actions";
 import { Card } from "@/components/ui/card";
-import { CheckCircle2, Clock, AlertTriangle } from "lucide-react";
+import { CheckCircle2, Clock, AlertTriangle, UserX } from "lucide-react";
 
 export const metadata = { title: "Opening checklist" };
 
@@ -26,6 +26,27 @@ export default async function OpeningChecklistPage() {
   const otherTeam: "kitchen" | "front_desk" | null =
     myTeam === "kitchen" ? "front_desk" : myTeam === "front_desk" ? "kitchen" : null;
   const teamKey = myTeam ?? "all";
+
+  // Staff must have a team assigned before they can use the checklist
+  if (!isOwner && myTeam === null) {
+    return (
+      <div>
+        <PageHeader title="Opening Checklist" subtitle={formatDateLabel(date)} />
+        <ChecklistTabs />
+        <Card className="p-6 text-center max-w-lg mx-auto mt-4 space-y-3">
+          <div className="flex justify-center">
+            <div className="bg-warning/15 text-warning rounded-full p-3">
+              <UserX className="size-8" />
+            </div>
+          </div>
+          <h2 className="text-lg font-bold text-content-primary">Team Not Assigned</h2>
+          <p className="text-sm text-content-secondary">
+            Ask the owner to assign your team (Kitchen or Front Desk) before you can submit checklists.
+          </p>
+        </Card>
+      </div>
+    );
+  }
 
   // Each team has its own record — query for this team's submission only.
   const existing = await getOpeningChecklist(date, isOwner ? undefined : teamKey);
