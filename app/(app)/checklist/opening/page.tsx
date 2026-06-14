@@ -40,14 +40,14 @@ export default async function OpeningChecklistPage() {
     if (!isHeadChef(p)) return;
     const admin = createAdminClient();
     const d = todayIST();
-    await admin.from("opening_checklists").delete().eq("date", d).eq("team", p.team ?? "all");
+    await admin.from("opening_checklists").delete().eq("date", d).eq("team", "kitchen");
     revalidatePath("/checklist/opening");
     revalidatePath("/dashboard");
     redirect("/checklist/opening");
   }
 
   // Staff must have a team assigned before they can use the checklist
-  if (!isOwner && myTeam === null) {
+  if (!isOwner && !headChef && myTeam === null) {
     return (
       <div>
         <PageHeader title="Opening Checklist" subtitle={formatDateLabel(date)} />
@@ -67,7 +67,63 @@ export default async function OpeningChecklistPage() {
     );
   }
 
-  // Each team has its own record — query for this team's submission only.
+  // ── Head chef: sees both kitchen and front desk ──────────────────────────
+  if (headChef) {
+    const [kitchenRecord, frontDeskRecord, nameMap, kitchenConfig] = await Promise.all([
+      getOpeningChecklist(date, "kitchen"),
+      getOpeningChecklist(date, "front_desk"),
+      getProfileNameMap(),
+      getChecklistConfig("opening", "kitchen"),
+    ]);
+
+    return (
+      <div>
+        <PageHeader title="Opening Checklist" subtitle={formatDateLabel(date)} />
+        <ChecklistTabs />
+
+        {/* Kitchen section */}
+        <p className="mb-2 text-xs font-bold uppercase tracking-wider text-warm">Kitchen</p>
+        {kitchenRecord ? (
+          <>
+            <form action={resetChecklist} className="mb-2 flex justify-end">
+              <button
+                type="submit"
+                className="rounded-lg border border-border bg-bg-elevated px-3 py-1.5 text-xs font-medium text-content-secondary hover:border-border-strong hover:text-content-primary transition-colors"
+              >
+                Edit / Re-submit
+              </button>
+            </form>
+            <ChecklistView
+              record={kitchenRecord}
+              variant="opening"
+              team="kitchen"
+              submitterName={kitchenRecord.submitted_by ? nameMap[kitchenRecord.submitted_by] ?? "Staff" : "Staff"}
+            />
+          </>
+        ) : (
+          <ChecklistForm variant="opening" config={kitchenConfig} action={submitOpeningChecklist} team="kitchen" />
+        )}
+
+        {/* Front desk section */}
+        <p className="mb-2 mt-6 text-xs font-bold uppercase tracking-wider text-warm">Front Desk</p>
+        {frontDeskRecord ? (
+          <ChecklistView
+            record={frontDeskRecord}
+            variant="opening"
+            team="front_desk"
+            submitterName={frontDeskRecord.submitted_by ? nameMap[frontDeskRecord.submitted_by] ?? "Staff" : "Staff"}
+          />
+        ) : (
+          <div className="flex items-center gap-2.5 rounded-xl border border-border bg-bg-elevated px-4 py-3 text-sm text-content-secondary">
+            <Clock className="size-4 shrink-0" />
+            <span><span className="font-semibold text-content-primary">Front Desk</span> checklist not submitted yet</span>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // ── Regular staff ────────────────────────────────────────────────────────
   const existing = await getOpeningChecklist(date, isOwner ? undefined : teamKey);
   const otherExisting = !isOwner && otherTeam
     ? await getOpeningChecklist(date, otherTeam)
@@ -138,28 +194,16 @@ export default async function OpeningChecklistPage() {
       )}
 
       {existing ? (
-        <>
-          {headChef && (
-            <form action={resetChecklist} className="mb-3 flex justify-end">
-              <button
-                type="submit"
-                className="rounded-lg border border-border bg-bg-elevated px-3 py-1.5 text-xs font-medium text-content-secondary hover:border-border-strong hover:text-content-primary transition-colors"
-              >
-                Edit / Re-submit
-              </button>
-            </form>
-          )}
-          <ChecklistView
-            record={existing}
-            variant="opening"
-            team={isOwner ? undefined : myTeam}
-            submitterName={
-              existing.submitted_by && nameMap
-                ? nameMap[existing.submitted_by] ?? "Staff"
-                : "Staff"
-            }
-          />
-        </>
+        <ChecklistView
+          record={existing}
+          variant="opening"
+          team={isOwner ? undefined : myTeam}
+          submitterName={
+            existing.submitted_by && nameMap
+              ? nameMap[existing.submitted_by] ?? "Staff"
+              : "Staff"
+          }
+        />
       ) : (
         <ChecklistForm
           variant="opening"
