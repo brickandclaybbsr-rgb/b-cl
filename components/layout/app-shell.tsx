@@ -209,10 +209,7 @@ function StaffShell({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
-  // Head chef gets full nav; plain kitchen staff don't handle sales
-  const nav = (team === "kitchen" && !isHeadChef)
-    ? STAFF_NAV.filter((i) => i.href !== "/sales")
-    : STAFF_NAV;
+  const nav = STAFF_NAV;
   return (
     <div className="flex min-h-dvh flex-col">
       <header className="sticky top-0 z-20 border-b border-border bg-bg-primary/80 backdrop-blur-xl">
