@@ -25,11 +25,15 @@ export function ChecklistForm({
   variant,
   config,
   action,
+  team,
 }: {
   variant: "opening" | "closing";
   config: ChecklistItemDef[];
   action: Action;
+  team?: "kitchen" | "front_desk" | null;
 }) {
+  // Kitchen team only handles kitchen tasks — cash is front desk's job
+  const showCashFields = team !== "kitchen";
   const [state, formAction] = useFormState<ChecklistFormState, FormData>(
     action,
     {},
@@ -77,19 +81,21 @@ export function ChecklistForm({
 
       {variant === "opening" ? (
         <Card className="space-y-4 p-4">
-          <div className="space-y-1.5">
-            <Label htmlFor="opening_cash">Opening cash in drawer (₹)</Label>
-            <Input
-              id="opening_cash"
-              name="opening_cash"
-              type="number"
-              inputMode="decimal"
-              min="0"
-              step="0.01"
-              placeholder="0"
-              className="font-mono"
-            />
-          </div>
+          {showCashFields && (
+            <div className="space-y-1.5">
+              <Label htmlFor="opening_cash">Opening cash in drawer (₹)</Label>
+              <Input
+                id="opening_cash"
+                name="opening_cash"
+                type="number"
+                inputMode="decimal"
+                min="0"
+                step="0.01"
+                placeholder="0"
+                className="font-mono"
+              />
+            </div>
+          )}
           <div className="space-y-1.5">
             <Label htmlFor="absent_staff">Absent staff (if any)</Label>
             <Input
@@ -102,43 +108,46 @@ export function ChecklistForm({
         </Card>
       ) : (
         <Card className="space-y-4 p-4">
-          <div className="grid grid-cols-2 gap-3">
+          {showCashFields && (
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="closing_cash">Closing cash (₹)</Label>
+                <Input
+                  id="closing_cash"
+                  name="closing_cash"
+                  type="number"
+                  inputMode="decimal"
+                  min="0"
+                  step="0.01"
+                  placeholder="0"
+                  className="font-mono"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="cash_deposited">Deposited to safe (₹)</Label>
+                <Input
+                  id="cash_deposited"
+                  name="cash_deposited"
+                  type="number"
+                  inputMode="decimal"
+                  min="0"
+                  step="0.01"
+                  placeholder="0"
+                  className="font-mono"
+                />
+              </div>
+            </div>
+          )}
+          {showCashFields && (
             <div className="space-y-1.5">
-              <Label htmlFor="closing_cash">Closing cash (₹)</Label>
+              <Label htmlFor="discrepancy_notes">Cash discrepancy notes</Label>
               <Input
-                id="closing_cash"
-                name="closing_cash"
-                type="number"
-                inputMode="decimal"
-                min="0"
-                step="0.01"
-                placeholder="0"
-                className="font-mono"
+                id="discrepancy_notes"
+                name="discrepancy_notes"
+                placeholder="e.g. ₹50 short — explained"
               />
             </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="cash_deposited">Deposited to safe (₹)</Label>
-              <Input
-                id="cash_deposited"
-                name="cash_deposited"
-                type="number"
-                inputMode="decimal"
-                min="0"
-                step="0.01"
-                placeholder="0"
-                className="font-mono"
-              />
-            </div>
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="discrepancy_notes">Cash discrepancy notes</Label>
-            <Input
-              id="discrepancy_notes"
-              name="discrepancy_notes"
-              placeholder="e.g. ₹50 short — explained"
-            />
-          </div>
-          
+          )}
           <NotesField />
         </Card>
       )}

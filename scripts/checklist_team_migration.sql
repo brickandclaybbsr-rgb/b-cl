@@ -12,9 +12,22 @@ BEGIN;
 ALTER TABLE opening_checklists ADD COLUMN IF NOT EXISTS team text;
 ALTER TABLE closing_checklists  ADD COLUMN IF NOT EXISTS team text;
 
--- ── 2. Back-fill existing rows with 'all' ────────────────────────────
+-- ── 2. Back-fill: infer team from the submitter's profile ────────────
+-- Staff who have a team assignment get that team; others fall back to 'all'.
+UPDATE opening_checklists oc
+SET team = COALESCE(p.team, 'all')
+FROM profiles p
+WHERE oc.submitted_by = p.id AND oc.team IS NULL;
+
+-- Rows with no submitted_by (unlikely) fall back to 'all'
 UPDATE opening_checklists SET team = 'all' WHERE team IS NULL;
-UPDATE closing_checklists  SET team = 'all' WHERE team IS NULL;
+
+UPDATE closing_checklists cc
+SET team = COALESCE(p.team, 'all')
+FROM profiles p
+WHERE cc.submitted_by = p.id AND cc.team IS NULL;
+
+UPDATE closing_checklists SET team = 'all' WHERE team IS NULL;
 
 -- ── 3. Make column NOT NULL ──────────────────────────────────────────
 ALTER TABLE opening_checklists ALTER COLUMN team SET NOT NULL;

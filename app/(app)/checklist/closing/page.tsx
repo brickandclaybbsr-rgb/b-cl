@@ -110,6 +110,7 @@ export default async function ClosingChecklistPage() {
           variant="closing"
           config={config}
           action={submitClosingChecklist}
+          team={myTeam}
         />
       )}
     </div>

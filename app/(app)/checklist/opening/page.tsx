@@ -112,6 +112,7 @@ export default async function OpeningChecklistPage() {
           variant="opening"
           config={config}
           action={submitOpeningChecklist}
+          team={myTeam}
         />
       )}
     </div>
