@@ -32,7 +32,7 @@ export function ChecklistForm({
   action: Action;
   team?: "kitchen" | "front_desk" | null;
 }) {
-  // Kitchen team only handles kitchen tasks — cash is front desk's job
+  // Kitchen team (incl. head chef, who maps to "kitchen") doesn't handle cash
   const showCashFields = team !== "kitchen";
   const [state, formAction] = useFormState<ChecklistFormState, FormData>(
     action,

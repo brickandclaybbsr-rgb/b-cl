@@ -35,8 +35,10 @@ export async function submitOpeningChecklist(
   const supabase = createClient();
   const date = todayIST();
 
-  // Use the submitter's team so config indices match what the form rendered.
-  const team = (profile.team as "kitchen" | "front_desk" | null) ?? null;
+  // head_chef shares the kitchen record
+  const team: "kitchen" | "front_desk" | null =
+    profile.team === "head_chef" ? "kitchen"
+    : (profile.team as "kitchen" | "front_desk" | null) ?? null;
   const teamKey = team ?? "all";
   const config = await getChecklistConfig("opening", profile.role === "owner" ? null : team);
   const items = buildItems(config, formData);
@@ -76,7 +78,9 @@ export async function submitClosingChecklist(
   const supabase = createClient();
   const date = todayIST();
 
-  const team = (profile.team as "kitchen" | "front_desk" | null) ?? null;
+  const team: "kitchen" | "front_desk" | null =
+    profile.team === "head_chef" ? "kitchen"
+    : (profile.team as "kitchen" | "front_desk" | null) ?? null;
   const teamKey = team ?? "all";
   const config = await getChecklistConfig("closing", profile.role === "owner" ? null : team);
   const items = buildItems(config, formData);

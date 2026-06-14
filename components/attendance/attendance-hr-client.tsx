@@ -32,7 +32,7 @@ interface StaffProfile {
   name: string;
   email?: string | null;
   role: string;
-  team?: "kitchen" | "front_desk" | null;
+  team?: "kitchen" | "front_desk" | "head_chef" | null;
   employee_code?: string | null;
   dob?: string | null;
   aadhar_number?: string | null;
@@ -904,7 +904,7 @@ export function AttendanceHRClient({ staffList, initialLeaves, initialDocuments,
                       <div className="flex items-center gap-1 shrink-0">
                         {staff.team && (
                           <Badge variant="default" className="text-[9px] px-1.5 py-0 capitalize">
-                            {staff.team === "front_desk" ? "Front Desk" : "Kitchen"}
+                            {staff.team === "front_desk" ? "Front Desk" : staff.team === "head_chef" ? "Head Chef" : "Kitchen"}
                           </Badge>
                         )}
                         {staff.employee_code && (
@@ -1091,6 +1091,7 @@ export function AttendanceHRClient({ staffList, initialLeaves, initialDocuments,
                                 <option value="">All items (no filter)</option>
                                 <option value="kitchen">Kitchen</option>
                                 <option value="front_desk">Front Desk</option>
+                                <option value="head_chef">Head Chef</option>
                               </Select>
                             </div>
                           </div>

@@ -1,4 +1,4 @@
-import { requireProfile, isHeadChef } from "@/lib/auth";
+import { requireProfile } from "@/lib/auth";
 import { todayIST, formatDateLabel, formatTimeIST } from "@/lib/date";
 import { getSales } from "@/lib/data/sales";
 import { getProfileNameMap, getStaff } from "@/lib/data/profiles";
@@ -19,9 +19,8 @@ export default async function SalesPage({
   searchParams: { tab?: string };
 }) {
   const profile = await requireProfile();
-  const headChef = isHeadChef(profile);
-  // Plain kitchen staff (not head chef) see a notice but can still fill if needed
-  const isKitchenOnly = profile.team === "kitchen" && !headChef;
+  // Plain kitchen staff see a notice; head_chef has full access
+  const isKitchenOnly = profile.team === "kitchen";
 
   const isExpenses = searchParams.tab === "expenses";
 

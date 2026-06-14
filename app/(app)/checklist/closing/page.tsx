@@ -26,7 +26,10 @@ export default async function ClosingChecklistPage() {
 
   const isOwner = profile.role === "owner";
   const headChef = isHeadChef(profile);
-  const myTeam = (profile.team as "kitchen" | "front_desk" | null | undefined) ?? null;
+  // head_chef shares the kitchen checklist record
+  const myTeam: "kitchen" | "front_desk" | null =
+    profile.team === "head_chef" ? "kitchen"
+    : (profile.team as "kitchen" | "front_desk" | null | undefined) ?? null;
   const otherTeam: "kitchen" | "front_desk" | null =
     myTeam === "kitchen" ? "front_desk" : myTeam === "front_desk" ? "kitchen" : null;
   const teamKey = myTeam ?? "all";
