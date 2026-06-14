@@ -1,4 +1,7 @@
-import { requireProfile } from "@/lib/auth";
+import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
+import { requireProfile, isHeadChef } from "@/lib/auth";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { todayIST, formatDateLabel, formatTimeIST } from "@/lib/date";
 import {
   getChecklistConfig,
@@ -22,10 +25,23 @@ export default async function OpeningChecklistPage() {
   const date = todayIST();
 
   const isOwner = profile.role === "owner";
+  const headChef = isHeadChef(profile);
   const myTeam = (profile.team as "kitchen" | "front_desk" | null | undefined) ?? null;
   const otherTeam: "kitchen" | "front_desk" | null =
     myTeam === "kitchen" ? "front_desk" : myTeam === "front_desk" ? "kitchen" : null;
   const teamKey = myTeam ?? "all";
+
+  async function resetChecklist() {
+    "use server";
+    const p = await requireProfile();
+    if (!isHeadChef(p)) return;
+    const admin = createAdminClient();
+    const d = todayIST();
+    await admin.from("opening_checklists").delete().eq("date", d).eq("team", p.team ?? "all");
+    revalidatePath("/checklist/opening");
+    revalidatePath("/dashboard");
+    redirect("/checklist/opening");
+  }
 
   // Staff must have a team assigned before they can use the checklist
   if (!isOwner && myTeam === null) {
@@ -119,16 +135,28 @@ export default async function OpeningChecklistPage() {
       )}
 
       {existing ? (
-        <ChecklistView
-          record={existing}
-          variant="opening"
-          team={isOwner ? undefined : myTeam}
-          submitterName={
-            existing.submitted_by && nameMap
-              ? nameMap[existing.submitted_by] ?? "Staff"
-              : "Staff"
-          }
-        />
+        <>
+          {headChef && (
+            <form action={resetChecklist} className="mb-3 flex justify-end">
+              <button
+                type="submit"
+                className="rounded-lg border border-border bg-bg-elevated px-3 py-1.5 text-xs font-medium text-content-secondary hover:border-border-strong hover:text-content-primary transition-colors"
+              >
+                Edit / Re-submit
+              </button>
+            </form>
+          )}
+          <ChecklistView
+            record={existing}
+            variant="opening"
+            team={isOwner ? undefined : myTeam}
+            submitterName={
+              existing.submitted_by && nameMap
+                ? nameMap[existing.submitted_by] ?? "Staff"
+                : "Staff"
+            }
+          />
+        </>
       ) : (
         <ChecklistForm
           variant="opening"

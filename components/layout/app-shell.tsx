@@ -14,17 +14,19 @@ export function AppShell({
   role,
   name,
   team,
+  isHeadChef,
   children,
 }: {
   role: Role;
   name: string;
   team: string | null;
+  isHeadChef: boolean;
   children: React.ReactNode;
 }) {
   return role === "owner" ? (
     <OwnerShell name={name}>{children}</OwnerShell>
   ) : (
-    <StaffShell name={name} team={team}>{children}</StaffShell>
+    <StaffShell name={name} team={team} isHeadChef={isHeadChef}>{children}</StaffShell>
   );
 }
 
@@ -198,15 +200,19 @@ function UserChip({ name, role }: { name: string; role: string }) {
 function StaffShell({
   name,
   team,
+  isHeadChef,
   children,
 }: {
   name: string;
   team: string | null;
+  isHeadChef: boolean;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
-  // Kitchen team doesn't handle sales — hide that nav item for them
-  const nav = team === "kitchen" ? STAFF_NAV.filter((i) => i.href !== "/sales") : STAFF_NAV;
+  // Head chef gets full nav; plain kitchen staff don't handle sales
+  const nav = (team === "kitchen" && !isHeadChef)
+    ? STAFF_NAV.filter((i) => i.href !== "/sales")
+    : STAFF_NAV;
   return (
     <div className="flex min-h-dvh flex-col">
       <header className="sticky top-0 z-20 border-b border-border bg-bg-primary/80 backdrop-blur-xl">

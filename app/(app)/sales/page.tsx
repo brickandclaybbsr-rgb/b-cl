@@ -1,7 +1,7 @@
-import { requireProfile } from "@/lib/auth";
+import { requireProfile, isHeadChef } from "@/lib/auth";
 import { todayIST, formatDateLabel, formatTimeIST } from "@/lib/date";
 import { getSales } from "@/lib/data/sales";
-import { getProfileNameMap } from "@/lib/data/profiles";
+import { getProfileNameMap, getStaff } from "@/lib/data/profiles";
 import { getTodayCashExpenses } from "@/lib/data/expenses";
 import { PageHeader } from "@/components/page-header";
 import { SalesTabs } from "./sales-tabs";
@@ -9,7 +9,7 @@ import { SalesForm } from "./sales-form";
 import { SalesView } from "./sales-view";
 import { ExpenseClient } from "@/components/expenses/expense-client";
 import { Card } from "@/components/ui/card";
-import { CheckCircle2 } from "lucide-react";
+import { CheckCircle2, Info } from "lucide-react";
 
 export const metadata = { title: "Daily sales" };
 
@@ -19,12 +19,9 @@ export default async function SalesPage({
   searchParams: { tab?: string };
 }) {
   const profile = await requireProfile();
-
-  // Kitchen team handles kitchen tasks only — sales is front desk's responsibility
-  if (profile.team === "kitchen") {
-    const { redirect } = await import("next/navigation");
-    redirect("/dashboard");
-  }
+  const headChef = isHeadChef(profile);
+  // Plain kitchen staff (not head chef) see a notice but can still fill if needed
+  const isKitchenOnly = profile.team === "kitchen" && !headChef;
 
   const isExpenses = searchParams.tab === "expenses";
 
@@ -49,6 +46,14 @@ export default async function SalesPage({
   const existing = await getSales(date);
   const isOwner = profile.role === "owner";
   const isSubmitter = existing && existing.submitted_by === profile.id;
+
+  // For the kitchen notice, find front-desk staff names
+  const frontDeskNames = isKitchenOnly
+    ? (await getStaff())
+        .filter((s) => s.team === "front_desk" && s.is_active)
+        .map((s) => s.name.split(" ")[0])
+        .join(" / ")
+    : null;
 
   if (existing && !isOwner && !isSubmitter) {
     const nameMap = await getProfileNameMap();
@@ -85,6 +90,18 @@ export default async function SalesPage({
     <div>
       <PageHeader title="Daily Sales" subtitle={formatDateLabel(date)} />
       <SalesTabs />
+      {isKitchenOnly && (
+        <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-border bg-bg-elevated px-4 py-3 text-sm text-content-secondary">
+          <Info className="mt-0.5 size-4 shrink-0 text-content-secondary" />
+          <span>
+            Daily sales are filled by the{" "}
+            <span className="font-semibold text-content-primary">
+              Front Desk team{frontDeskNames ? ` (${frontDeskNames})` : ""}
+            </span>
+            . If they&apos;re unavailable, you can fill it here.
+          </span>
+        </div>
+      )}
       {existing ? (
         <SalesView
           sales={existing}

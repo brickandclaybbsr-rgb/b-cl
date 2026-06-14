@@ -2,6 +2,14 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import type { Profile } from "@/lib/database.types";
 
+/** Kitchen staff with "Head Chef" designation — gets full nav + can edit submitted checklists. */
+export function isHeadChef(profile: Profile): boolean {
+  return (
+    profile.team === "kitchen" &&
+    Boolean(profile.designation?.toLowerCase().includes("head chef"))
+  );
+}
+
 /** Current authenticated profile, or null. Safe to call anywhere server-side. */
 export async function getCurrentProfile(): Promise<Profile | null> {
   const supabase = createClient();

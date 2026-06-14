@@ -9,7 +9,7 @@ import {
   Circle,
   AlertTriangle,
 } from "lucide-react";
-import { requireProfile } from "@/lib/auth";
+import { requireProfile, isHeadChef } from "@/lib/auth";
 import { getTodaySnapshot } from "@/lib/data/dashboard";
 import { formatDateLabel } from "@/lib/date";
 import { formatINR } from "@/lib/utils";
@@ -31,6 +31,7 @@ export default async function StaffDashboard() {
   const snap = await getTodaySnapshot();
   const firstName = profile.name.split(" ")[0];
   const alerts = snap.lowItems.length + snap.outItems.length;
+  const kitchenOnly = profile.team === "kitchen" && !isHeadChef(profile);
 
   const tasks = [
     {
@@ -45,13 +46,17 @@ export default async function StaffDashboard() {
       title: "Closing checklist",
       done: Boolean(snap.closing),
     },
-    {
-      href: "/sales",
-      icon: IndianRupee,
-      title: "Daily sales",
-      done: Boolean(snap.sales),
-      hint: snap.sales ? formatINR(snap.salesTotal) : undefined,
-    },
+    ...(!kitchenOnly
+      ? [
+          {
+            href: "/sales",
+            icon: IndianRupee,
+            title: "Daily sales",
+            done: Boolean(snap.sales),
+            hint: snap.sales ? formatINR(snap.salesTotal) : undefined,
+          },
+        ]
+      : []),
     {
       href: "/stock",
       icon: Package,
