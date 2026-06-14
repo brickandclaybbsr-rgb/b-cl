@@ -35,12 +35,16 @@ export async function submitOpeningChecklist(
   const supabase = createClient();
   const date = todayIST();
 
-  const config = await getChecklistConfig("opening");
+  // Use the submitter's team so config indices match what the form rendered.
+  const team = (profile.team as "kitchen" | "front_desk" | null) ?? null;
+  const teamKey = team ?? "all";
+  const config = await getChecklistConfig("opening", profile.role === "owner" ? null : team);
   const items = buildItems(config, formData);
 
   const openingCashRaw = formData.get("opening_cash");
   const { error } = await supabase.from("opening_checklists").insert({
     date,
+    team: teamKey,
     submitted_by: profile.id,
     items,
     opening_cash: openingCashRaw === null || openingCashRaw === "" ? null : toNumber(openingCashRaw),
@@ -50,7 +54,7 @@ export async function submitOpeningChecklist(
 
   if (error) {
     if (error.code === "23505") {
-      return { error: "Opening checklist for today is already submitted." };
+      return { error: "Your team's opening checklist for today is already submitted." };
     }
     return { error: error.message };
   }
@@ -72,7 +76,9 @@ export async function submitClosingChecklist(
   const supabase = createClient();
   const date = todayIST();
 
-  const config = await getChecklistConfig("closing");
+  const team = (profile.team as "kitchen" | "front_desk" | null) ?? null;
+  const teamKey = team ?? "all";
+  const config = await getChecklistConfig("closing", profile.role === "owner" ? null : team);
   const items = buildItems(config, formData);
 
   const closingCashRaw = formData.get("closing_cash");
@@ -80,6 +86,7 @@ export async function submitClosingChecklist(
 
   const { error } = await supabase.from("closing_checklists").insert({
     date,
+    team: teamKey,
     submitted_by: profile.id,
     items,
     closing_cash: closingCashRaw === null || closingCashRaw === "" ? null : toNumber(closingCashRaw),
@@ -91,7 +98,7 @@ export async function submitClosingChecklist(
 
   if (error) {
     if (error.code === "23505") {
-      return { error: "Closing checklist for today is already submitted." };
+      return { error: "Your team's closing checklist for today is already submitted." };
     }
     return { error: error.message };
   }

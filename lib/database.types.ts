@@ -68,6 +68,7 @@ export type Profile = {
 export type OpeningChecklist = {
   id: string;
   date: string;
+  team: string;
   submitted_by: string | null;
   items: ChecklistLine[];
   opening_cash: number | null;
@@ -79,6 +80,7 @@ export type OpeningChecklist = {
 export type ClosingChecklist = {
   id: string;
   date: string;
+  team: string;
   submitted_by: string | null;
   items: ChecklistLine[];
   closing_cash: number | null;

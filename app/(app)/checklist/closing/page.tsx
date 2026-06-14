@@ -13,74 +13,95 @@ import { ChecklistForm } from "@/components/checklists/checklist-form";
 import { ChecklistView } from "@/components/checklists/checklist-view";
 import { submitClosingChecklist } from "../actions";
 import { Card } from "@/components/ui/card";
-import { CheckCircle2, AlertTriangle } from "lucide-react";
+import { CheckCircle2, Clock, AlertTriangle } from "lucide-react";
 
 export const metadata = { title: "Closing checklist" };
 
 export default async function ClosingChecklistPage() {
   const profile = await requireProfile();
   const date = todayIST();
-  const existing = await getClosingChecklist(date);
 
   const isOwner = profile.role === "owner";
-  const isSubmitter = existing && existing.submitted_by === profile.id;
+  const myTeam = (profile.team as "kitchen" | "front_desk" | null | undefined) ?? null;
+  const otherTeam: "kitchen" | "front_desk" | null =
+    myTeam === "kitchen" ? "front_desk" : myTeam === "front_desk" ? "kitchen" : null;
+  const teamKey = myTeam ?? "all";
+
+  const existing = await getClosingChecklist(date, isOwner ? undefined : teamKey);
+  const otherExisting = !isOwner && otherTeam
+    ? await getClosingChecklist(date, otherTeam)
+    : null;
+
+  const isSubmitter = existing?.submitted_by === profile.id;
 
   if (existing && !isOwner && !isSubmitter) {
     const nameMap = await getProfileNameMap();
-    const submitterName = existing.submitted_by ? nameMap[existing.submitted_by] ?? "another staff member" : "another staff member";
+    const submitterName = existing.submitted_by
+      ? nameMap[existing.submitted_by] ?? "a team member"
+      : "a team member";
     return (
       <div>
         <PageHeader title="Closing Checklist" subtitle={formatDateLabel(date)} />
         <ChecklistTabs />
-        <Card className="p-6 text-center max-w-lg mx-auto mt-8 space-y-4">
+        <OtherTeamBanner otherTeam={otherTeam} otherExisting={otherExisting} nameMap={nameMap} />
+        <Card className="p-6 text-center max-w-lg mx-auto mt-4 space-y-4">
           <div className="flex justify-center">
-            <div className="bg-success/15 text-success rounded-full p-3 animate-pulse">
+            <div className="bg-success/15 text-success rounded-full p-3">
               <CheckCircle2 className="size-8" />
             </div>
           </div>
-          <h2 className="text-lg font-bold text-content-primary">Checklist Already Completed</h2>
+          <h2 className="text-lg font-bold text-content-primary">Your Checklist is Done</h2>
           <p className="text-sm text-content-secondary">
-            Today's closing checklist was completed by <span className="font-semibold text-content-primary">{submitterName}</span> at <span className="font-semibold text-content-primary">{formatTimeIST(existing.submitted_at)}</span>.
-          </p>
-          <p className="text-xs text-content-secondary">
-            Checklists are completed by one person per day. Double submissions are not required.
+            The {teamLabel(myTeam)} closing checklist was submitted by{" "}
+            <span className="font-semibold text-content-primary">{submitterName}</span> at{" "}
+            <span className="font-semibold text-content-primary">{formatTimeIST(existing.submitted_at)}</span>.
           </p>
         </Card>
       </div>
     );
   }
 
-  const team = (profile.team as "kitchen" | "front_desk" | null | undefined) ?? null;
-
-  let config = await getChecklistConfig("closing", isOwner ? null : team);
+  let config = await getChecklistConfig("closing", isOwner ? null : myTeam);
   let coveringOtherTeam = false;
 
-  if (!isOwner && team) {
-    const otherAbsent = await isOtherTeamAbsentToday(team);
+  if (!isOwner && myTeam) {
+    const otherAbsent = await isOtherTeamAbsentToday(myTeam);
     if (otherAbsent) {
-      const otherItems = await getOtherTeamConfig("closing", team);
+      const otherItems = await getOtherTeamConfig("closing", myTeam);
       config = [...config, ...otherItems];
       coveringOtherTeam = true;
     }
   }
 
+  const nameMap = existing?.submitted_by ? await getProfileNameMap() : null;
+
   return (
     <div>
       <PageHeader title="Closing Checklist" subtitle={formatDateLabel(date)} />
       <ChecklistTabs />
+
       {coveringOtherTeam && (
         <div className="mb-4 flex items-start gap-2 rounded-xl border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning">
           <AlertTriangle className="mt-0.5 size-4 shrink-0" />
           <span>Other team member is on leave today — their checklist tasks are included below.</span>
         </div>
       )}
+
+      {!isOwner && (
+        <OtherTeamBanner
+          otherTeam={otherTeam}
+          otherExisting={otherExisting}
+          nameMap={nameMap ?? {}}
+        />
+      )}
+
       {existing ? (
         <ChecklistView
           record={existing}
           variant="closing"
           submitterName={
-            existing.submitted_by
-              ? (await getProfileNameMap())[existing.submitted_by] ?? "Staff"
+            existing.submitted_by && nameMap
+              ? nameMap[existing.submitted_by] ?? "Staff"
               : "Staff"
           }
         />
@@ -91,6 +112,49 @@ export default async function ClosingChecklistPage() {
           action={submitClosingChecklist}
         />
       )}
+    </div>
+  );
+}
+
+function teamLabel(team: "kitchen" | "front_desk" | null) {
+  if (team === "kitchen") return "Kitchen";
+  if (team === "front_desk") return "Front Desk";
+  return "your team's";
+}
+
+function OtherTeamBanner({
+  otherTeam,
+  otherExisting,
+  nameMap,
+}: {
+  otherTeam: "kitchen" | "front_desk" | null;
+  otherExisting: { submitted_by: string | null; submitted_at: string } | null;
+  nameMap: Record<string, string>;
+}) {
+  if (!otherTeam) return null;
+  const label = teamLabel(otherTeam);
+
+  if (otherExisting) {
+    const name = otherExisting.submitted_by
+      ? nameMap[otherExisting.submitted_by] ?? "Team member"
+      : "Team member";
+    return (
+      <div className="mb-4 flex items-center gap-2.5 rounded-xl border border-success/25 bg-success/8 px-4 py-3 text-sm text-success">
+        <CheckCircle2 className="size-4 shrink-0" />
+        <span>
+          <span className="font-semibold">{label}</span> checklist submitted by{" "}
+          <span className="font-semibold">{name}</span> at {formatTimeIST(otherExisting.submitted_at)}
+        </span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mb-4 flex items-center gap-2.5 rounded-xl border border-border bg-bg-elevated px-4 py-3 text-sm text-content-secondary">
+      <Clock className="size-4 shrink-0" />
+      <span>
+        <span className="font-semibold text-content-primary">{label}</span> checklist not submitted yet
+      </span>
     </div>
   );
 }

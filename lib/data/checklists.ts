@@ -90,51 +90,42 @@ export async function isOtherTeamAbsentToday(
   return Boolean(leaves && leaves.length > 0);
 }
 
+async function fetchChecklist<T>(
+  table: "opening_checklists" | "closing_checklists",
+  date: string,
+  team?: string | null,
+): Promise<T | null> {
+  const run = async (client: ReturnType<typeof createAdminClient> | ReturnType<typeof createClient>) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let q = (client as any).from(table).select("*").eq("date", date);
+    if (team !== undefined) q = q.eq("team", team ?? "all");
+    const { data } = await q.order("submitted_at", { ascending: true });
+    return (data as T[] | null)?.[0] ?? null;
+  };
+  try {
+    return await run(createAdminClient());
+  } catch {
+    return await run(createClient());
+  }
+}
+
+/**
+ * Get an opening checklist for a date.
+ * - Pass `team` to get only that team's record.
+ * - Omit `team` to get any record (first submitted, for owner/dashboard).
+ */
 export async function getOpeningChecklist(
   date: string,
+  team?: string | null,
 ): Promise<OpeningChecklist | null> {
-  // Use admin client to bypass RLS so any staff member can see if a checklist
-  // was already submitted by someone else today. Falls back to user client
-  // (works once the SELECT policy allows authenticated reads).
-  try {
-    const supabase = createAdminClient();
-    const { data } = await supabase
-      .from("opening_checklists")
-      .select("*")
-      .eq("date", date)
-      .maybeSingle();
-    return data ?? null;
-  } catch {
-    const supabase = createClient();
-    const { data } = await supabase
-      .from("opening_checklists")
-      .select("*")
-      .eq("date", date)
-      .maybeSingle();
-    return data ?? null;
-  }
+  return fetchChecklist<OpeningChecklist>("opening_checklists", date, team);
 }
 
 export async function getClosingChecklist(
   date: string,
+  team?: string | null,
 ): Promise<ClosingChecklist | null> {
-  try {
-    const supabase = createAdminClient();
-    const { data } = await supabase
-      .from("closing_checklists")
-      .select("*")
-      .eq("date", date)
-      .maybeSingle();
-    return data ?? null;
-  } catch {
-    const supabase = createClient();
-    const { data } = await supabase
-      .from("closing_checklists")
-      .select("*")
-      .eq("date", date)
-      .maybeSingle();
-    return data ?? null;
-  }
+  return fetchChecklist<ClosingChecklist>("closing_checklists", date, team);
 }
 
 /** Group flat checklist lines by section, preserving order. */
