@@ -7,13 +7,11 @@ import {
   ChevronRight,
   CheckCircle2,
   Circle,
-  AlertTriangle,
 } from "lucide-react";
 import { requireProfile } from "@/lib/auth";
 import { getTodaySnapshot } from "@/lib/data/dashboard";
-import { getClosingChecklist } from "@/lib/data/checklists";
 import { getSalesRange } from "@/lib/data/sales";
-import { daysAgoIST, formatDateLabel } from "@/lib/date";
+import { formatDateLabel } from "@/lib/date";
 import { APP_START_DATE } from "@/lib/constants";
 import { formatINR } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
@@ -40,17 +38,10 @@ export default async function StaffDashboard() {
   const alerts = snap.lowItems.length + snap.outItems.length;
   const kitchenOnly = profile.team === "kitchen";
 
-  const yesterday = daysAgoIST(1);
-  const isFirstDay = snap.date === APP_START_DATE;
-
-  // Fetch missing sales + yesterday's closing (for opening gate) in parallel
-  const needsClosingGate = !snap.opening && myTeam && !isFirstDay;
-  const [salesInWindow, yesterdayClosing] = await Promise.all([
-    !kitchenOnly ? getSalesRange(APP_START_DATE, snap.date) : Promise.resolve([]),
-    needsClosingGate ? getClosingChecklist(yesterday, myTeam) : Promise.resolve(null),
-  ]);
-
-  const closingGateActive = needsClosingGate && !yesterdayClosing;
+  // Fetch sales range (front desk / owner only — skip for kitchen)
+  const salesInWindow = !kitchenOnly
+    ? await getSalesRange(APP_START_DATE, snap.date)
+    : [];
 
   // Dates from launch with no sales entry (front desk only)
   const filedSalesDates = new Set(salesInWindow.map((s) => s.date));
@@ -126,22 +117,6 @@ export default async function StaffDashboard() {
           />
         </div>
       </Card>
-
-      {/* Yesterday’s closing gate — blocks opening checklist */}
-      {closingGateActive && (
-        <Link href={`/checklist/closing?date=${yesterday}`} className="block mb-3">
-          <Card className="flex items-start gap-3 border-warning/30 bg-warning/10 p-4">
-            <AlertTriangle className="size-5 shrink-0 text-warning mt-0.5" />
-            <div className="flex-1">
-              <p className="text-sm font-semibold text-warning">Yesterday&apos;s closing not filed</p>
-              <p className="text-xs text-content-secondary mt-0.5">
-                File it to unlock today&apos;s opening checklist
-              </p>
-            </div>
-            <ChevronRight className="size-4 text-warning shrink-0 mt-0.5" />
-          </Card>
-        </Link>
-      )}
 
       {/* Missing sales dates — front desk / owner only */}
       {missingSalesDates.length > 0 && !kitchenOnly && (

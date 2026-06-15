@@ -1,10 +1,9 @@
 import { requireProfile, isHeadChef } from "@/lib/auth";
-import { todayIST, daysAgoIST, formatDateLabel, formatTimeIST } from "@/lib/date";
+import { todayIST, formatDateLabel, formatTimeIST } from "@/lib/date";
 import { APP_START_DATE } from "@/lib/constants";
 import {
   getChecklistConfig,
   getOpeningChecklist,
-  getClosingChecklist,
 } from "@/lib/data/checklists";
 import { getProfileNameMap } from "@/lib/data/profiles";
 import { PageHeader } from "@/components/page-header";
@@ -13,7 +12,7 @@ import { ChecklistForm } from "@/components/checklists/checklist-form";
 import { ChecklistView } from "@/components/checklists/checklist-view";
 import { submitOpeningChecklist } from "../actions";
 import { Card } from "@/components/ui/card";
-import { CheckCircle2, Clock, AlertTriangle, UserX } from "lucide-react";
+import { CheckCircle2, Clock, UserX } from "lucide-react";
 
 export const metadata = { title: "Opening checklist" };
 
@@ -185,48 +184,6 @@ export default async function OpeningChecklistPage({
   const isSubmitter = existing?.submitted_by === profile.id;
   const ownDone = Boolean(existing);
   const nameMap = await getProfileNameMap();
-
-  // ── Yesterday's closing gate ─────────────────────────────────────────────
-  // If today's opening isn't done yet and yesterday's closing is missing, block the form.
-  if (!ownDone && myTeam && date > APP_START_DATE) {
-    const yesterday = daysAgoIST(1);
-    const yesterdayClosing = await getClosingChecklist(yesterday, myTeam);
-    if (!yesterdayClosing) {
-      return (
-        <div>
-          <PageHeader title="Opening Checklist" subtitle={formatDateLabel(date)} />
-          <ChecklistTabs />
-          <Card className="p-6 text-center max-w-lg mx-auto mt-4 space-y-3">
-            <div className="flex justify-center">
-              <div className="bg-warning/15 text-warning rounded-full p-3">
-                <AlertTriangle className="size-8" />
-              </div>
-            </div>
-            <h2 className="text-lg font-bold text-content-primary">
-              Yesterday&apos;s Closing Not Filed
-            </h2>
-            <p className="text-sm text-content-secondary">
-              The <span className="font-semibold text-content-primary">{teamLabel(myTeam)}</span>{" "}
-              closing checklist for{" "}
-              <span className="font-semibold text-content-primary">{formatDateLabel(yesterday)}</span>{" "}
-              hasn&apos;t been submitted. File it first to unlock today&apos;s opening.
-            </p>
-            <a
-              href={`/checklist/closing?date=${yesterday}`}
-              className="inline-block rounded-xl bg-fire px-5 py-2.5 text-sm font-semibold text-white hover:opacity-90 transition-opacity"
-            >
-              File yesterday&apos;s closing →
-            </a>
-          </Card>
-          {otherTeam && otherExisting && (
-            <div className="mt-4">
-              <OtherTeamBanner otherTeam={otherTeam} otherExisting={otherExisting} nameMap={nameMap} />
-            </div>
-          )}
-        </div>
-      );
-    }
-  }
 
   // Fetch other team config when own team is done but other team hasn't submitted
   const otherConfig = (ownDone && otherTeam && !otherExisting)
