@@ -7,6 +7,7 @@ import {
   ChevronRight,
   CheckCircle2,
   Circle,
+  AlertTriangle,
 } from "lucide-react";
 import { requireProfile } from "@/lib/auth";
 import { getTodaySnapshot } from "@/lib/data/dashboard";
