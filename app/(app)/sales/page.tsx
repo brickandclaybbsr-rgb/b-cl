@@ -27,7 +27,6 @@ export default async function SalesPage({
     const today = todayIST();
     const rawDate = String(searchParams.date ?? "").trim();
     const expenseDate = (rawDate >= APP_START_DATE && rawDate <= today) ? rawDate : today;
-    const isViewingPast = expenseDate !== today;
 
     const entries = await getCashExpensesByDate(expenseDate);
     return (
@@ -37,17 +36,6 @@ export default async function SalesPage({
           subtitle={isOwner ? "Today's cash out" : "Log cash withdrawals & expenses"}
         />
         <SalesTabs />
-        {isViewingPast && (
-          <div className="flex items-center gap-2 rounded-xl border border-border bg-bg-elevated px-4 py-3 text-sm">
-            <span className="flex-1 text-content-secondary">
-              Viewing cash out for{" "}
-              <span className="font-semibold text-content-primary">{formatDateLabel(expenseDate)}</span>
-            </span>
-            <a href="/sales?tab=expenses" className="shrink-0 text-xs font-semibold text-warm hover:underline">
-              Switch to today →
-            </a>
-          </div>
-        )}
         <ExpenseClient entries={entries} isOwner={isOwner} viewingDate={expenseDate} />
       </div>
     );

@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useFormState } from "react-dom";
 import { toast } from "sonner";
-import { Trash2, IndianRupee, ArrowDownLeft, Wallet } from "lucide-react";
+import { Trash2, IndianRupee, ArrowDownLeft, Wallet, CalendarDays } from "lucide-react";
 import {
   addCashExpense,
   deleteCashExpense,
@@ -55,11 +56,34 @@ export function ExpenseClient({
     }
   }, [state]);
 
+  const router = useRouter();
   const total = entries.reduce((s, e) => s + Number(e.amount), 0);
+
+  function handleDateChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const d = e.target.value;
+    if (d === today) {
+      router.push("/sales?tab=expenses");
+    } else {
+      router.push(`/sales?tab=expenses&date=${d}`);
+    }
+  }
 
   return (
     <>
       <Confetti active={showConfetti} />
+
+      {/* Date picker */}
+      <div className="flex items-center gap-3 rounded-xl border border-border bg-bg-elevated px-4 py-3">
+        <CalendarDays className="size-4 shrink-0 text-content-secondary" />
+        <span className="flex-1 text-sm text-content-secondary">Viewing date</span>
+        <input
+          type="date"
+          value={viewingDate}
+          max={today}
+          onChange={handleDateChange}
+          className="rounded-lg border border-border bg-bg-base px-2 py-1 text-sm font-semibold text-content-primary focus:outline-none focus:ring-2 focus:ring-fire/40"
+        />
+      </div>
 
       {/* Entry form — only shown for today */}
       {isToday && (<form ref={formRef} action={formAction} className="space-y-4">
