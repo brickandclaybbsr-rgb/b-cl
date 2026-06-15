@@ -32,12 +32,16 @@ const CATEGORY_COLORS: Record<string, string> = {
 };
 
 export function ExpenseClient({
-  todayEntries,
+  entries,
   isOwner,
+  viewingDate,
 }: {
-  todayEntries: CashExpense[];
+  entries: CashExpense[];
   isOwner: boolean;
+  viewingDate: string;
 }) {
+  const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+  const isToday = viewingDate === today;
   const [state, formAction] = useFormState<ExpenseFormState, FormData>(addCashExpense, {});
   const [showConfetti, setShowConfetti] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
@@ -51,14 +55,14 @@ export function ExpenseClient({
     }
   }, [state]);
 
-  const todayTotal = todayEntries.reduce((s, e) => s + Number(e.amount), 0);
+  const total = entries.reduce((s, e) => s + Number(e.amount), 0);
 
   return (
     <>
       <Confetti active={showConfetti} />
 
-      {/* Entry form */}
-      <form ref={formRef} action={formAction} className="space-y-4">
+      {/* Entry form — only shown for today */}
+      {isToday && (<form ref={formRef} action={formAction} className="space-y-4">
         <Card className="space-y-4 p-4">
           <div className="space-y-1.5">
             <Label htmlFor="person_name">Person / Purpose</Label>
@@ -111,22 +115,23 @@ export function ExpenseClient({
           Log Cash Out
         </SubmitButton>
       </form>
+      )}
 
-      {/* Today's list */}
-      {todayEntries.length > 0 ? (
+      {/* Entries list */}
+      {entries.length > 0 ? (
         <div className="space-y-3">
           <div className="flex items-center justify-between rounded-xl bg-danger/10 px-4 py-3">
             <div className="flex items-center gap-2 text-sm font-semibold text-danger">
               <Wallet className="size-4" />
-              Total cash out today
+              Total cash out{isToday ? " today" : ""}
             </div>
             <span className="font-mono text-xl font-bold tabular-nums text-danger">
-              {formatINR(todayTotal)}
+              {formatINR(total)}
             </span>
           </div>
 
           <Card className="divide-y divide-border overflow-hidden">
-            {todayEntries.map((entry) => (
+            {entries.map((entry) => (
               <ExpenseRow key={entry.id} entry={entry} isOwner={isOwner} />
             ))}
           </Card>

@@ -3,7 +3,7 @@ import { todayIST, daysAgoIST, nowIST, formatDateLabel, formatTimeIST } from "@/
 import { APP_START_DATE } from "@/lib/constants";
 import { getSales, getSalesRange } from "@/lib/data/sales";
 import { getProfileNameMap, getStaff } from "@/lib/data/profiles";
-import { getTodayCashExpenses } from "@/lib/data/expenses";
+import { getCashExpensesByDate } from "@/lib/data/expenses";
 import { PageHeader } from "@/components/page-header";
 import { SalesTabs } from "./sales-tabs";
 import { SalesForm } from "./sales-form";
@@ -24,7 +24,12 @@ export default async function SalesPage({
 
   if (searchParams.tab === "expenses") {
     const isOwner = profile.role === "owner";
-    const todayEntries = await getTodayCashExpenses();
+    const today = todayIST();
+    const rawDate = String(searchParams.date ?? "").trim();
+    const expenseDate = (rawDate >= APP_START_DATE && rawDate <= today) ? rawDate : today;
+    const isViewingPast = expenseDate !== today;
+
+    const entries = await getCashExpensesByDate(expenseDate);
     return (
       <div className="space-y-5">
         <PageHeader
@@ -32,7 +37,18 @@ export default async function SalesPage({
           subtitle={isOwner ? "Today's cash out" : "Log cash withdrawals & expenses"}
         />
         <SalesTabs />
-        <ExpenseClient todayEntries={todayEntries} isOwner={isOwner} />
+        {isViewingPast && (
+          <div className="flex items-center gap-2 rounded-xl border border-border bg-bg-elevated px-4 py-3 text-sm">
+            <span className="flex-1 text-content-secondary">
+              Viewing cash out for{" "}
+              <span className="font-semibold text-content-primary">{formatDateLabel(expenseDate)}</span>
+            </span>
+            <a href="/sales?tab=expenses" className="shrink-0 text-xs font-semibold text-warm hover:underline">
+              Switch to today →
+            </a>
+          </div>
+        )}
+        <ExpenseClient entries={entries} isOwner={isOwner} viewingDate={expenseDate} />
       </div>
     );
   }
