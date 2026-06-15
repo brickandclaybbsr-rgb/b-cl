@@ -4,6 +4,9 @@
  * checklists / stock items in Settings.
  */
 
+/** Earliest business date — the day the app went live. Used as the backfill window start. */
+export const APP_START_DATE = "2026-06-14";
+
 export type ChecklistType = "opening" | "closing";
 
 export interface ChecklistItemDef {

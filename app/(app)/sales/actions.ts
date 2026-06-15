@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireProfile } from "@/lib/auth";
-import { todayIST, daysAgoIST, formatDateLabel } from "@/lib/date";
+import { todayIST, formatDateLabel } from "@/lib/date";
+import { APP_START_DATE } from "@/lib/constants";
 import { toNumber, toInt } from "@/lib/utils";
 import { whatsappNotify } from "@/lib/whatsapp-notify";
 import { notifyOwner } from "@/lib/push";
@@ -17,10 +18,9 @@ export async function submitSales(
   const profile = await requireProfile();
   const supabase = createClient();
   const today = todayIST();
-  const windowStart = daysAgoIST(6);
   const requested = String(formData.get("_date") ?? "").trim();
-  // Allow any date in the last 7 days — block future dates and anything older
-  const date = (requested >= windowStart && requested <= today) ? requested : today;
+  // Allow any date from app launch onwards — block future dates
+  const date = (requested >= APP_START_DATE && requested <= today) ? requested : today;
 
   const opening_cash        = toNumber(formData.get("opening_cash"));
   const cash_sales          = toNumber(formData.get("cash_sales"));

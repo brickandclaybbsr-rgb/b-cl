@@ -11,7 +11,10 @@ import {
 } from "lucide-react";
 import { requireProfile } from "@/lib/auth";
 import { getTodaySnapshot } from "@/lib/data/dashboard";
-import { formatDateLabel } from "@/lib/date";
+import { getClosingChecklist } from "@/lib/data/checklists";
+import { getSalesRange } from "@/lib/data/sales";
+import { daysAgoIST, formatDateLabel } from "@/lib/date";
+import { APP_START_DATE } from "@/lib/constants";
 import { formatINR } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -36,6 +39,27 @@ export default async function StaffDashboard() {
   const firstName = profile.name.split(" ")[0];
   const alerts = snap.lowItems.length + snap.outItems.length;
   const kitchenOnly = profile.team === "kitchen";
+
+  const yesterday = daysAgoIST(1);
+  const isFirstDay = snap.date === APP_START_DATE;
+
+  // Fetch yesterday's closing + missing sales in parallel (only what's needed)
+  const needsClosingGate = !snap.opening && myTeam && !isFirstDay;
+  const [yesterdayClosing, salesInWindow] = await Promise.all([
+    needsClosingGate ? getClosingChecklist(yesterday, myTeam) : Promise.resolve(null),
+    !kitchenOnly ? getSalesRange(APP_START_DATE, snap.date) : Promise.resolve([]),
+  ]);
+
+  const closingGateActive = needsClosingGate && !yesterdayClosing;
+
+  // Dates from launch with no sales entry
+  const filedSalesDates = new Set(salesInWindow.map((s) => s.date));
+  const missingSalesDates: string[] = [];
+  for (let d = new Date(APP_START_DATE + "T00:00:00Z"); ; d.setUTCDate(d.getUTCDate() + 1)) {
+    const str = d.toISOString().slice(0, 10);
+    if (str > snap.date) break;
+    if (!filedSalesDates.has(str)) missingSalesDates.push(str);
+  }
 
   const tasks = [
     {
@@ -102,6 +126,45 @@ export default async function StaffDashboard() {
           />
         </div>
       </Card>
+
+      {/* Yesterday's closing gate warning */}
+      {closingGateActive && (
+        <Link href={`/checklist/closing?date=${yesterday}`} className="block mb-3">
+          <Card className="flex items-start gap-3 border-warning/30 bg-warning/10 p-4">
+            <AlertTriangle className="size-5 shrink-0 text-warning mt-0.5" />
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-warning">Yesterday&apos;s closing not filed</p>
+              <p className="text-xs text-content-secondary mt-0.5">
+                File it to unlock today&apos;s opening checklist
+              </p>
+            </div>
+            <ChevronRight className="size-4 text-warning shrink-0 mt-0.5" />
+          </Card>
+        </Link>
+      )}
+
+      {/* Missing sales dates */}
+      {missingSalesDates.length > 0 && (
+        <div className="mb-3 rounded-xl border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning">
+          <div className="flex items-start gap-2.5">
+            <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+            <div className="flex-1">
+              <p className="font-semibold">Sales not filed for {missingSalesDates.length} day{missingSalesDates.length > 1 ? "s" : ""}</p>
+              <div className="mt-1.5 flex flex-wrap gap-2">
+                {missingSalesDates.map((d) => (
+                  <Link
+                    key={d}
+                    href={`/sales?date=${d}`}
+                    className="rounded-lg border border-warning/40 bg-warning/15 px-2.5 py-1 text-xs font-semibold"
+                  >
+                    {formatDateLabel(d)}
+                  </Link>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="space-y-3">
         {tasks.map((task) => {

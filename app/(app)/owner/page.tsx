@@ -11,13 +11,16 @@ import {
   Activity,
   ChevronRight,
   Wallet,
+  AlertTriangle,
 } from "lucide-react";
 import { requireOwner } from "@/lib/auth";
 import { getTodaySnapshot } from "@/lib/data/dashboard";
-import { getSalesTrend } from "@/lib/data/sales";
+import { getClosingChecklist } from "@/lib/data/checklists";
+import { getSalesTrend, getSalesRange } from "@/lib/data/sales";
 import { getTodayActivity } from "@/lib/data/activity";
 import { getTodayCashExpenses } from "@/lib/data/expenses";
-import { formatDateLabel, formatTimeIST } from "@/lib/date";
+import { daysAgoIST, formatDateLabel, formatTimeIST } from "@/lib/date";
+import { APP_START_DATE } from "@/lib/constants";
 import { getProfileNameMap } from "@/lib/data/profiles";
 import { formatINR, formatNumber } from "@/lib/utils";
 import { PageHeader } from "@/components/page-header";
@@ -31,15 +34,30 @@ export const metadata = { title: "Dashboard" };
 
 export default async function OwnerDashboard() {
   await requireOwner();
-  const [snap, trend, activity, nameMap, cashExpenses] = await Promise.all([
+  const yesterday = daysAgoIST(1);
+
+  const [snap, trend, activity, nameMap, cashExpenses, yKitchen, yFrontDesk] = await Promise.all([
     getTodaySnapshot(),
     getSalesTrend(7),
     getTodayActivity(),
     getProfileNameMap(),
     getTodayCashExpenses(),
+    getClosingChecklist(yesterday, "kitchen"),
+    getClosingChecklist(yesterday, "front_desk"),
   ]);
 
+  const salesWindowRecords = await getSalesRange(APP_START_DATE, snap.date);
+
   const alerts = snap.lowItems.length + snap.outItems.length;
+
+  const isFirstDay = snap.date === APP_START_DATE;
+  const filedSalesDates = new Set(salesWindowRecords.map((s) => s.date));
+  const missingSalesDates: string[] = [];
+  for (let d = new Date(APP_START_DATE + "T00:00:00Z"); ; d.setUTCDate(d.getUTCDate() + 1)) {
+    const str = d.toISOString().slice(0, 10);
+    if (str > snap.date) break;
+    if (!filedSalesDates.has(str)) missingSalesDates.push(str);
+  }
 
   const cash = Number(snap.sales?.cash_sales ?? 0);
   const online = Number(snap.sales?.online_sales ?? 0);
@@ -56,6 +74,55 @@ export default async function OwnerDashboard() {
         subtitle={formatDateLabel(snap.date)}
         action={<SendReportButton size="sm" variant="secondary" />}
       />
+
+      {/* Yesterday's closing alerts */}
+      {!isFirstDay && (!yKitchen || !yFrontDesk) && (
+        <div className="rounded-xl border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning space-y-1.5">
+          <div className="flex items-center gap-2 font-semibold">
+            <AlertTriangle className="size-4 shrink-0" />
+            Yesterday&apos;s closing not filed
+          </div>
+          <div className="flex flex-wrap gap-2 pl-6">
+            {!yKitchen && (
+              <Link
+                href={`/checklist/closing?date=${yesterday}`}
+                className="rounded-lg border border-warning/40 bg-warning/15 px-2.5 py-1 text-xs font-semibold hover:bg-warning/25"
+              >
+                Kitchen — {formatDateLabel(yesterday)}
+              </Link>
+            )}
+            {!yFrontDesk && (
+              <Link
+                href={`/checklist/closing?date=${yesterday}`}
+                className="rounded-lg border border-warning/40 bg-warning/15 px-2.5 py-1 text-xs font-semibold hover:bg-warning/25"
+              >
+                Dining — {formatDateLabel(yesterday)}
+              </Link>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Missing sales dates */}
+      {missingSalesDates.length > 0 && (
+        <div className="rounded-xl border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning space-y-1.5">
+          <div className="flex items-center gap-2 font-semibold">
+            <AlertTriangle className="size-4 shrink-0" />
+            Sales not filed for {missingSalesDates.length} day{missingSalesDates.length > 1 ? "s" : ""}
+          </div>
+          <div className="flex flex-wrap gap-2 pl-6">
+            {missingSalesDates.map((d) => (
+              <Link
+                key={d}
+                href={`/sales?date=${d}`}
+                className="rounded-lg border border-warning/40 bg-warning/15 px-2.5 py-1 text-xs font-semibold hover:bg-warning/25"
+              >
+                {formatDateLabel(d)}
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Overview cards */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">

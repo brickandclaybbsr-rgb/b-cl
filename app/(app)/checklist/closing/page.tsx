@@ -1,5 +1,5 @@
 import { requireProfile, isHeadChef } from "@/lib/auth";
-import { todayIST, formatDateLabel, formatTimeIST } from "@/lib/date";
+import { todayIST, daysAgoIST, formatDateLabel, formatTimeIST } from "@/lib/date";
 import {
   getChecklistConfig,
   getClosingChecklist,
@@ -11,14 +11,14 @@ import { ChecklistForm } from "@/components/checklists/checklist-form";
 import { ChecklistView } from "@/components/checklists/checklist-view";
 import { submitClosingChecklist } from "../actions";
 import { Card } from "@/components/ui/card";
-import { CheckCircle2, Clock, AlertTriangle, UserX } from "lucide-react";
+import { CheckCircle2, Clock, AlertTriangle, UserX, CalendarClock } from "lucide-react";
 
 export const metadata = { title: "Closing checklist" };
 
 export default async function ClosingChecklistPage({
   searchParams,
 }: {
-  searchParams: { edit?: string };
+  searchParams: { edit?: string; date?: string };
 }) {
   const profile = await requireProfile();
   const date = todayIST();
@@ -175,9 +175,14 @@ export default async function ClosingChecklistPage({
   }
 
   // ── Regular staff ────────────────────────────────────────────────────────
+  // Allow filing yesterday's closing when requested (via the opening gate link)
+  const yesterday = daysAgoIST(1);
+  const filingDate = searchParams.date === yesterday ? yesterday : date;
+  const isFilingYesterday = filingDate !== date;
+
   const [existing, otherExisting] = await Promise.all([
-    getClosingChecklist(date, teamKey),
-    otherTeam ? getClosingChecklist(date, otherTeam) : Promise.resolve(null),
+    getClosingChecklist(filingDate, teamKey),
+    otherTeam ? getClosingChecklist(filingDate, otherTeam) : Promise.resolve(null),
   ]);
 
   const isSubmitter = existing?.submitted_by === profile.id;
@@ -192,8 +197,20 @@ export default async function ClosingChecklistPage({
 
   return (
     <div>
-      <PageHeader title="Closing Checklist" subtitle={formatDateLabel(date)} />
+      <PageHeader title="Closing Checklist" subtitle={formatDateLabel(filingDate)} />
       <ChecklistTabs />
+
+      {isFilingYesterday && (
+        <div className="mb-4 flex items-center gap-2 rounded-xl border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning">
+          <AlertTriangle className="size-4 shrink-0" />
+          <span className="flex-1">
+            Filing closing for <span className="font-semibold">{formatDateLabel(yesterday)}</span>
+          </span>
+          <a href="/checklist/closing" className="shrink-0 text-xs font-semibold underline">
+            Switch to today →
+          </a>
+        </div>
+      )}
 
       {existing ? (
         <>

@@ -1,5 +1,6 @@
 import { requireProfile } from "@/lib/auth";
 import { todayIST, daysAgoIST, formatDateLabel, formatTimeIST } from "@/lib/date";
+import { APP_START_DATE } from "@/lib/constants";
 import { getSales, getSalesRange } from "@/lib/data/sales";
 import { getProfileNameMap, getStaff } from "@/lib/data/profiles";
 import { getTodayCashExpenses } from "@/lib/data/expenses";
@@ -38,7 +39,7 @@ export default async function SalesPage({
 
   // ── Sales tab ────────────────────────────────────────────────────────────
   const today = todayIST();
-  const windowStart = daysAgoIST(6); // last 7 days including today
+  const windowStart = APP_START_DATE;
 
   // Validate requested date: must be within the 7-day window and not in the future
   const requestedDate = (() => {
