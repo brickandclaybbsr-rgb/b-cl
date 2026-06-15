@@ -240,7 +240,7 @@ create policy closing_update on public.closing_checklists
 -- daily_sales ---------------------------------------------------------------
 drop policy if exists sales_select on public.daily_sales;
 create policy sales_select on public.daily_sales
-  for select using (submitted_by = auth.uid() or public.is_owner());
+  for select using (auth.uid() is not null); -- any authenticated staff can read sales
 drop policy if exists sales_insert on public.daily_sales;
 create policy sales_insert on public.daily_sales
   for insert with check (submitted_by = auth.uid() or public.is_owner());
