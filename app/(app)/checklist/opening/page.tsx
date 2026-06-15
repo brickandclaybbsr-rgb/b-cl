@@ -12,7 +12,7 @@ import { ChecklistForm } from "@/components/checklists/checklist-form";
 import { ChecklistView } from "@/components/checklists/checklist-view";
 import { submitOpeningChecklist } from "../actions";
 import { Card } from "@/components/ui/card";
-import { CheckCircle2, Clock, UserX } from "lucide-react";
+import { CheckCircle2, Clock, AlertTriangle, UserX } from "lucide-react";
 
 export const metadata = { title: "Opening checklist" };
 
