@@ -143,8 +143,8 @@ export default async function StaffDashboard() {
         </Link>
       )}
 
-      {/* Missing sales dates */}
-      {missingSalesDates.length > 0 && (
+      {/* Missing sales dates — front desk / owner only */}
+      {missingSalesDates.length > 0 && !kitchenOnly && (
         <div className="mb-3 rounded-xl border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning">
           <div className="flex items-start gap-2.5">
             <AlertTriangle className="mt-0.5 size-4 shrink-0" />
