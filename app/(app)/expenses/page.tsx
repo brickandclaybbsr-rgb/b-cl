@@ -18,8 +18,9 @@ export default async function ExpensesPage() {
         subtitle={formatDateLabel(todayIST())}
       />
       <ExpenseClient
-        todayEntries={entries}
+        entries={entries}
         isOwner={profile.role === "owner"}
+        viewingDate={todayIST()}
       />
     </div>
   );
