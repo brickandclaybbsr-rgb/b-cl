@@ -28,8 +28,13 @@ export async function addCashExpense(
     return { error: "Please enter a valid amount." };
   }
 
+  const today = todayIST();
+  const dateRaw = String(formData.get("date") ?? "").trim();
+  // Only allow today or past dates (no future filing)
+  const date = (dateRaw && dateRaw <= today) ? dateRaw : today;
+
   const { error } = await supabase.from("cash_expenses").insert({
-    date: todayIST(),
+    date,
     person_name,
     amount,
     category: category,

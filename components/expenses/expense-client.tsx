@@ -75,7 +75,7 @@ export function ExpenseClient({
       {/* Date picker */}
       <div className="flex items-center gap-3 rounded-xl border border-border bg-bg-elevated px-4 py-3">
         <CalendarDays className="size-4 shrink-0 text-content-secondary" />
-        <span className="flex-1 text-sm text-content-secondary">Viewing date</span>
+        <span className="flex-1 text-sm font-medium text-content-primary">Cash out entry date</span>
         <input
           type="date"
           value={viewingDate}
@@ -85,8 +85,9 @@ export function ExpenseClient({
         />
       </div>
 
-      {/* Entry form — only shown for today */}
-      {isToday && (<form ref={formRef} action={formAction} className="space-y-4">
+      {/* Entry form — always visible; hidden date field sends the selected date */}
+      <form ref={formRef} action={formAction} className="space-y-4">
+        <input type="hidden" name="date" value={viewingDate} />
         <Card className="space-y-4 p-4">
           <div className="space-y-1.5">
             <Label htmlFor="person_name">Person / Purpose</Label>
@@ -139,7 +140,6 @@ export function ExpenseClient({
           Log Cash Out
         </SubmitButton>
       </form>
-      )}
 
       {/* Entries list */}
       {entries.length > 0 ? (
