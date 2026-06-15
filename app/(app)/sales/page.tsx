@@ -1,6 +1,6 @@
 import { requireProfile } from "@/lib/auth";
-import { todayIST, formatDateLabel, formatTimeIST } from "@/lib/date";
-import { getSales } from "@/lib/data/sales";
+import { todayIST, daysAgoIST, formatDateLabel, formatTimeIST } from "@/lib/date";
+import { getSales, getSalesRange } from "@/lib/data/sales";
 import { getProfileNameMap, getStaff } from "@/lib/data/profiles";
 import { getTodayCashExpenses } from "@/lib/data/expenses";
 import { PageHeader } from "@/components/page-header";
@@ -9,25 +9,21 @@ import { SalesForm } from "./sales-form";
 import { SalesView } from "./sales-view";
 import { ExpenseClient } from "@/components/expenses/expense-client";
 import { Card } from "@/components/ui/card";
-import { CheckCircle2, Info } from "lucide-react";
+import { CheckCircle2, Info, AlertTriangle } from "lucide-react";
 
 export const metadata = { title: "Daily sales" };
 
 export default async function SalesPage({
   searchParams,
 }: {
-  searchParams: { tab?: string };
+  searchParams: { tab?: string; date?: string };
 }) {
   const profile = await requireProfile();
-  // Plain kitchen staff see a notice; head_chef has full access
   const isKitchenOnly = profile.team === "kitchen";
 
-  const isExpenses = searchParams.tab === "expenses";
-
-  if (isExpenses) {
+  if (searchParams.tab === "expenses") {
     const isOwner = profile.role === "owner";
     const todayEntries = await getTodayCashExpenses();
-
     return (
       <div className="space-y-5">
         <PageHeader
@@ -40,13 +36,40 @@ export default async function SalesPage({
     );
   }
 
-  // ── Sales tab (default) ──────────────────────────────────────────────────
-  const date = todayIST();
-  const existing = await getSales(date);
-  const isOwner = profile.role === "owner";
-  const isSubmitter = existing && existing.submitted_by === profile.id;
+  // ── Sales tab ────────────────────────────────────────────────────────────
+  const today = todayIST();
+  const windowStart = daysAgoIST(6); // last 7 days including today
 
-  // For the kitchen notice, find front-desk staff names
+  // Validate requested date: must be within the 7-day window and not in the future
+  const requestedDate = (() => {
+    const d = String(searchParams.date ?? "").trim();
+    if (d >= windowStart && d <= today) return d;
+    return today;
+  })();
+
+  // Fetch all sales in the window to find missing dates
+  const [allSalesInWindow, existing] = await Promise.all([
+    getSalesRange(windowStart, today),
+    getSales(requestedDate),
+  ]);
+
+  const filedDates = new Set(allSalesInWindow.map((s) => s.date));
+
+  // Dates in the window that have no sales entry (oldest first), excluding today if it's the selected date
+  const missingDates: string[] = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = daysAgoIST(i);
+    if (!filedDates.has(d)) missingDates.push(d);
+  }
+
+  const isOwner = profile.role === "owner";
+  const isSubmitter = existing?.submitted_by === profile.id;
+  const viewingToday = requestedDate === today;
+
+  // Missing dates excluding the one currently being viewed
+  const otherMissing = missingDates.filter((d) => d !== requestedDate);
+
+  // For kitchen notice
   const frontDeskNames = isKitchenOnly
     ? (await getStaff())
         .filter((s) => s.team === "front_desk" && s.is_active)
@@ -54,6 +77,7 @@ export default async function SalesPage({
         .join(" / ")
     : null;
 
+  // ── Already submitted by someone else ───────────────────────────────────
   if (existing && !isOwner && !isSubmitter) {
     const nameMap = await getProfileNameMap();
     const submitterName = existing.submitted_by
@@ -61,37 +85,60 @@ export default async function SalesPage({
       : "another staff member";
     return (
       <div>
-        <PageHeader title="Daily Sales" subtitle={formatDateLabel(date)} />
+        <PageHeader title="Daily Sales" subtitle={formatDateLabel(requestedDate)} />
         <SalesTabs />
+        {otherMissing.length > 0 && (
+          <MissingDatesBanner missing={otherMissing} />
+        )}
         <Card className="p-6 text-center max-w-lg mx-auto mt-4 space-y-4">
           <div className="flex justify-center">
-            <div className="bg-success/15 text-success rounded-full p-3 animate-pulse">
+            <div className="bg-success/15 text-success rounded-full p-3">
               <CheckCircle2 className="size-8" />
             </div>
           </div>
-          <h2 className="text-lg font-bold text-content-primary">Daily Sales Already Submitted</h2>
+          <h2 className="text-lg font-bold text-content-primary">
+            {viewingToday ? "Today's" : formatDateLabel(requestedDate)} Sales Already Submitted
+          </h2>
           <p className="text-sm text-content-secondary">
-            Today&apos;s daily sales were submitted by{" "}
+            Submitted by{" "}
             <span className="font-semibold text-content-primary">{submitterName}</span> at{" "}
             <span className="font-semibold text-content-primary">
               {formatTimeIST(existing.submitted_at)}
             </span>.
           </p>
           <p className="text-xs text-content-secondary">
-            Sales entries are completed by one person per day. Double submissions are not required.
+            Sales entries are completed by one person per day.
           </p>
         </Card>
       </div>
     );
   }
 
+  // ── Form / view ──────────────────────────────────────────────────────────
   return (
     <div>
-      <PageHeader title="Daily Sales" subtitle={formatDateLabel(date)} />
+      <PageHeader title="Daily Sales" subtitle={formatDateLabel(requestedDate)} />
       <SalesTabs />
+
+      {/* Missing dates banner */}
+      {otherMissing.length > 0 && <MissingDatesBanner missing={otherMissing} />}
+
+      {/* Backdate context strip */}
+      {!viewingToday && (
+        <div className="mb-4 flex items-center gap-2 rounded-xl border border-border bg-bg-elevated px-4 py-3 text-sm">
+          <span className="flex-1 text-content-secondary">
+            Filing sales for{" "}
+            <span className="font-semibold text-content-primary">{formatDateLabel(requestedDate)}</span>
+          </span>
+          <a href="/sales" className="shrink-0 text-xs font-semibold text-warm hover:underline">
+            Switch to today →
+          </a>
+        </div>
+      )}
+
       {isKitchenOnly && (
         <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-border bg-bg-elevated px-4 py-3 text-sm text-content-secondary">
-          <Info className="mt-0.5 size-4 shrink-0 text-content-secondary" />
+          <Info className="mt-0.5 size-4 shrink-0" />
           <span>
             Daily sales are filled by the{" "}
             <span className="font-semibold text-content-primary">
@@ -101,6 +148,7 @@ export default async function SalesPage({
           </span>
         </div>
       )}
+
       {existing ? (
         <SalesView
           sales={existing}
@@ -111,8 +159,39 @@ export default async function SalesPage({
           }
         />
       ) : (
-        <SalesForm />
+        <SalesForm date={requestedDate} />
       )}
+    </div>
+  );
+}
+
+function MissingDatesBanner({ missing }: { missing: string[] }) {
+  const label =
+    missing.length === 1
+      ? formatDateLabel(missing[0])
+      : `${missing.length} days`;
+
+  return (
+    <div className="mb-4 rounded-xl border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning">
+      <div className="flex items-start gap-2.5">
+        <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+        <div className="flex-1">
+          <p className="font-semibold">
+            Sales missing for {label}
+          </p>
+          <div className="mt-1.5 flex flex-wrap gap-2">
+            {missing.map((d) => (
+              <a
+                key={d}
+                href={`/sales?date=${d}`}
+                className="rounded-lg border border-warning/40 bg-warning/15 px-2.5 py-1 text-xs font-semibold text-warning hover:bg-warning/25"
+              >
+                {formatDateLabel(d)}
+              </a>
+            ))}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

@@ -13,7 +13,7 @@ import { SubmitButton } from "@/components/ui/submit-button";
 import { Confetti } from "@/components/ui/confetti";
 import { formatINR } from "@/lib/utils";
 
-export function SalesForm() {
+export function SalesForm({ date }: { date?: string }) {
   const [state, formAction] = useFormState<SalesFormState, FormData>(submitSales, {});
   const [showConfetti, setShowConfetti] = useState(false);
 
@@ -44,6 +44,7 @@ export function SalesForm() {
     <>
     <Confetti active={showConfetti} />
     <form action={formAction} className="space-y-4">
+      {date && <input type="hidden" name="_date" value={date} />}
 
       {/* Opening Cash */}
       <Card className="space-y-3 p-4">

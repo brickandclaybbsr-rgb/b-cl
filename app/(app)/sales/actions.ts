@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireProfile } from "@/lib/auth";
-import { todayIST } from "@/lib/date";
+import { todayIST, daysAgoIST, formatDateLabel } from "@/lib/date";
 import { toNumber, toInt } from "@/lib/utils";
 import { whatsappNotify } from "@/lib/whatsapp-notify";
 import { notifyOwner } from "@/lib/push";
@@ -16,7 +16,11 @@ export async function submitSales(
 ): Promise<SalesFormState> {
   const profile = await requireProfile();
   const supabase = createClient();
-  const date = todayIST();
+  const today = todayIST();
+  const windowStart = daysAgoIST(6);
+  const requested = String(formData.get("_date") ?? "").trim();
+  // Allow any date in the last 7 days — block future dates and anything older
+  const date = (requested >= windowStart && requested <= today) ? requested : today;
 
   const opening_cash        = toNumber(formData.get("opening_cash"));
   const cash_sales          = toNumber(formData.get("cash_sales"));
@@ -55,7 +59,7 @@ export async function submitSales(
 
   if (error) {
     if (error.code === "23505") {
-      return { error: "Sales for today are already submitted." };
+      return { error: `Sales for ${date === today ? "today" : formatDateLabel(date)} are already submitted.` };
     }
     return { error: error.message };
   }
