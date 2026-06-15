@@ -1,8 +1,10 @@
 import { requireProfile, isHeadChef } from "@/lib/auth";
 import { todayIST, daysAgoIST, formatDateLabel, formatTimeIST } from "@/lib/date";
+import { APP_START_DATE } from "@/lib/constants";
 import {
   getChecklistConfig,
   getClosingChecklist,
+  getClosingRange,
 } from "@/lib/data/checklists";
 import { getProfileNameMap } from "@/lib/data/profiles";
 import { PageHeader } from "@/components/page-header";
@@ -175,15 +177,33 @@ export default async function ClosingChecklistPage({
   }
 
   // ── Regular staff ────────────────────────────────────────────────────────
-  // Allow filing yesterday's closing when requested (via the opening gate link)
+  // Accept any past date from app launch so staff can backfill missing closings
   const yesterday = daysAgoIST(1);
-  const filingDate = searchParams.date === yesterday ? yesterday : date;
-  const isFilingYesterday = filingDate !== date;
+  const isFirstDay = date === APP_START_DATE;
+  const rawDateParam = String(searchParams.date ?? "").trim();
+  const filingDate = (rawDateParam >= APP_START_DATE && rawDateParam < date) ? rawDateParam : date;
+  const isFilingPastDate = filingDate !== date;
 
-  const [existing, otherExisting] = await Promise.all([
+  // Find all missing previous closing dates for this team
+  const [closingWindow, existing, otherExisting] = await Promise.all([
+    (myTeam && !isFirstDay) ? getClosingRange(APP_START_DATE, yesterday, myTeam) : Promise.resolve([]),
     getClosingChecklist(filingDate, teamKey),
     otherTeam ? getClosingChecklist(filingDate, otherTeam) : Promise.resolve(null),
   ]);
+
+  const filedClosingDates = new Set(closingWindow.map((c) => c.date));
+  const missingClosingDates: string[] = [];
+  if (!isFirstDay) {
+    for (let d = new Date(APP_START_DATE + "T00:00:00Z"); ; d.setUTCDate(d.getUTCDate() + 1)) {
+      const str = d.toISOString().slice(0, 10);
+      if (str >= date) break;
+      if (!filedClosingDates.has(str)) missingClosingDates.push(str);
+    }
+  }
+  // Missing dates other than the one currently being filed
+  const otherMissingClosings = missingClosingDates.filter((d) => d !== filingDate);
+  // Gate: can't file today's closing if any previous ones are missing
+  const gateFromToday = otherMissingClosings.length > 0 && !isFilingPastDate;
 
   const isSubmitter = existing?.submitted_by === profile.id;
   const ownDone = Boolean(existing);
@@ -200,11 +220,37 @@ export default async function ClosingChecklistPage({
       <PageHeader title="Closing Checklist" subtitle={formatDateLabel(filingDate)} />
       <ChecklistTabs />
 
-      {isFilingYesterday && (
+      {/* Missing previous closings banner */}
+      {otherMissingClosings.length > 0 && (
+        <div className="mb-4 rounded-xl border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning">
+          <div className="flex items-start gap-2.5">
+            <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+            <div className="flex-1">
+              <p className="font-semibold">
+                Closing not filed for {otherMissingClosings.length === 1 ? formatDateLabel(otherMissingClosings[0]) : `${otherMissingClosings.length} days`}
+              </p>
+              <div className="mt-1.5 flex flex-wrap gap-2">
+                {otherMissingClosings.map((d) => (
+                  <a
+                    key={d}
+                    href={`/checklist/closing?date=${d}`}
+                    className="rounded-lg border border-warning/40 bg-warning/15 px-2.5 py-1 text-xs font-semibold text-warning hover:bg-warning/25"
+                  >
+                    {formatDateLabel(d)}
+                  </a>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Context strip when filing a past date */}
+      {isFilingPastDate && (
         <div className="mb-4 flex items-center gap-2 rounded-xl border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning">
           <AlertTriangle className="size-4 shrink-0" />
           <span className="flex-1">
-            Filing closing for <span className="font-semibold">{formatDateLabel(yesterday)}</span>
+            Filing closing for <span className="font-semibold">{formatDateLabel(filingDate)}</span>
           </span>
           <a href="/checklist/closing" className="shrink-0 text-xs font-semibold underline">
             Switch to today →
@@ -212,7 +258,32 @@ export default async function ClosingChecklistPage({
         </div>
       )}
 
-      {existing ? (
+      {/* Gate: block today's closing until all previous closings are filed */}
+      {gateFromToday ? (
+        <Card className="p-6 max-w-lg mx-auto mt-4 space-y-3 border-warning/30 bg-warning/10">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="size-5 shrink-0 text-warning mt-0.5" />
+            <div className="flex-1">
+              <h2 className="text-base font-bold text-content-primary">File previous closing first</h2>
+              <p className="text-sm text-content-secondary mt-1">
+                Closing data for the following date{otherMissingClosings.length > 1 ? "s are" : " is"} missing.
+                File {otherMissingClosings.length > 1 ? "them" : "it"} before submitting today&apos;s closing.
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {otherMissingClosings.map((d) => (
+                  <a
+                    key={d}
+                    href={`/checklist/closing?date=${d}`}
+                    className="rounded-lg border border-warning/40 bg-warning/15 px-3 py-1.5 text-xs font-semibold text-warning hover:bg-warning/25"
+                  >
+                    {formatDateLabel(d)} →
+                  </a>
+                ))}
+              </div>
+            </div>
+          </div>
+        </Card>
+      ) : existing ? (
         <>
           {!isSubmitter ? (
             <Card className="p-6 text-center max-w-lg mx-auto space-y-4">

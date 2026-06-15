@@ -78,6 +78,9 @@ export default async function SalesPage({
   // Missing dates excluding the one currently being viewed
   const otherMissing = missingDates.filter((d) => d !== requestedDate);
 
+  // Gate: front desk must file all previous days before today
+  const gateForToday = !isOwner && !isKitchenOnly && missingDates.length > 0 && viewingToday;
+
   // For kitchen notice
   const frontDeskNames = isKitchenOnly
     ? (await getStaff())
@@ -167,6 +170,30 @@ export default async function SalesPage({
               : "Staff"
           }
         />
+      ) : gateForToday ? (
+        <Card className="p-6 max-w-lg mx-auto mt-4 space-y-3 border-warning/30 bg-warning/10">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="size-5 shrink-0 text-warning mt-0.5" />
+            <div className="flex-1">
+              <h2 className="text-base font-bold text-content-primary">File previous sales first</h2>
+              <p className="text-sm text-content-secondary mt-1">
+                Sales data for the following date{missingDates.length > 1 ? "s are" : " is"} missing.
+                File {missingDates.length > 1 ? "them" : "it"} before entering today&apos;s figures.
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {missingDates.map((d) => (
+                  <a
+                    key={d}
+                    href={`/sales?date=${d}`}
+                    className="rounded-lg border border-warning/40 bg-warning/15 px-3 py-1.5 text-xs font-semibold text-warning hover:bg-warning/25"
+                  >
+                    {formatDateLabel(d)} →
+                  </a>
+                ))}
+              </div>
+            </div>
+          </div>
+        </Card>
       ) : tooEarlyForToday ? (
         <Card className="p-6 text-center max-w-lg mx-auto space-y-3">
           <p className="text-4xl">🕘</p>

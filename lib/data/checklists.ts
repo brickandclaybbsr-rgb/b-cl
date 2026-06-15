@@ -128,6 +128,23 @@ export async function getClosingChecklist(
   return fetchChecklist<ClosingChecklist>("closing_checklists", date, team);
 }
 
+/** All filed closing dates for a team within a date range — used to find missing dates. */
+export async function getClosingRange(
+  from: string,
+  to: string,
+  team: string,
+): Promise<{ date: string }[]> {
+  const supabase = createClient();
+  const { data } = await supabase
+    .from("closing_checklists")
+    .select("date")
+    .gte("date", from)
+    .lte("date", to)
+    .eq("team", team)
+    .order("date", { ascending: true });
+  return data ?? [];
+}
+
 /** Group flat checklist lines by section, preserving order. */
 export function groupBySection<T extends { section: string }>(
   items: T[],
