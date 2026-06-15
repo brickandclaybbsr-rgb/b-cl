@@ -60,7 +60,7 @@ export default async function SalesPage({
   const missingDates: string[] = [];
   for (let d = new Date(windowStart + "T00:00:00Z"); ; d.setUTCDate(d.getUTCDate() + 1)) {
     const str = d.toISOString().slice(0, 10);
-    if (str > today) break;
+    if (str >= today) break; // today can still be filed tonight — never show as missing
     if (!filedDates.has(str)) missingDates.push(str);
   }
 

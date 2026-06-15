@@ -57,7 +57,7 @@ export default async function StaffDashboard() {
   const missingSalesDates: string[] = [];
   for (let d = new Date(APP_START_DATE + "T00:00:00Z"); ; d.setUTCDate(d.getUTCDate() + 1)) {
     const str = d.toISOString().slice(0, 10);
-    if (str > snap.date) break;
+    if (str >= snap.date) break; // today can still be filed tonight — never show as missing
     if (!filedSalesDates.has(str)) missingSalesDates.push(str);
   }
 
