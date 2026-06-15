@@ -72,16 +72,29 @@ export function ExpenseClient({
     <>
       <Confetti active={showConfetti} />
 
-      {/* Date picker */}
-      <div className="flex items-center gap-3 rounded-xl border border-border bg-bg-elevated px-4 py-3">
-        <CalendarDays className="size-4 shrink-0 text-content-secondary" />
-        <span className="flex-1 text-sm font-medium text-content-primary">Cash out entry date</span>
+      {/* Date picker — styled card, invisible native input overlaid for tap */}
+      <div className="relative flex items-center gap-3 rounded-xl border border-border bg-bg-elevated px-4 py-3.5 cursor-pointer">
+        <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-fire/15">
+          <CalendarDays className="size-4 text-fire" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-[11px] font-semibold uppercase tracking-widest text-content-secondary">Cash out entry date</p>
+          <p className="text-sm font-bold text-content-primary mt-0.5">
+            {viewingDate === today
+              ? "Today"
+              : new Date(viewingDate + "T00:00:00").toLocaleDateString("en-IN", {
+                  weekday: "short", day: "numeric", month: "short", year: "numeric",
+                })}
+          </p>
+        </div>
+        <span className="text-xs font-semibold text-fire px-3 py-1.5 rounded-lg bg-fire/10 shrink-0">Change</span>
+        {/* Invisible native date input covers the whole row */}
         <input
           type="date"
           value={viewingDate}
           max={today}
           onChange={handleDateChange}
-          className="rounded-lg border border-border bg-bg-base px-2 py-1 text-sm font-semibold text-content-primary focus:outline-none focus:ring-2 focus:ring-fire/40"
+          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
         />
       </div>
 
