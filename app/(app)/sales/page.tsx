@@ -10,7 +10,7 @@ import { SalesForm } from "./sales-form";
 import { SalesView } from "./sales-view";
 import { ExpenseClient } from "@/components/expenses/expense-client";
 import { Card } from "@/components/ui/card";
-import { CheckCircle2, Info, AlertTriangle } from "lucide-react";
+import { CheckCircle2, Info, AlertTriangle, ArrowRight } from "lucide-react";
 
 export const metadata = { title: "Daily sales" };
 
@@ -99,7 +99,7 @@ export default async function SalesPage({
       <div>
         <PageHeader title="Daily Sales" subtitle={formatDateLabel(requestedDate)} />
         <SalesTabs />
-        {otherMissing.length > 0 && (
+        {otherMissing.length > 0 && !isKitchenOnly && (
           <MissingDatesBanner missing={otherMissing} />
         )}
         <Card className="p-6 text-center max-w-lg mx-auto mt-4 space-y-4">
@@ -132,8 +132,8 @@ export default async function SalesPage({
       <PageHeader title="Daily Sales" subtitle={formatDateLabel(requestedDate)} />
       <SalesTabs />
 
-      {/* Missing dates banner */}
-      {otherMissing.length > 0 && <MissingDatesBanner missing={otherMissing} />}
+      {/* Missing dates banner — hidden for kitchen team and when gate card already lists them */}
+      {otherMissing.length > 0 && !isKitchenOnly && !gateForToday && <MissingDatesBanner missing={otherMissing} />}
 
       {/* Backdate context strip */}
       {!viewingToday && (
@@ -171,29 +171,41 @@ export default async function SalesPage({
           }
         />
       ) : gateForToday ? (
-        <Card className="p-6 max-w-lg mx-auto mt-4 space-y-3 border-warning/30 bg-warning/10">
-          <div className="flex items-start gap-3">
-            <AlertTriangle className="size-5 shrink-0 text-warning mt-0.5" />
-            <div className="flex-1">
+        <div className="mt-4 rounded-2xl border-2 border-amber-400/50 bg-gradient-to-b from-amber-400/15 to-amber-500/5 overflow-hidden">
+          {/* Header strip */}
+          <div className="flex items-center gap-3 border-b border-amber-400/20 px-5 py-4">
+            <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-amber-400/20">
+              <AlertTriangle className="size-5 text-amber-400" />
+            </div>
+            <div>
               <h2 className="text-base font-bold text-content-primary">File previous sales first</h2>
-              <p className="text-sm text-content-secondary mt-1">
-                Sales data for the following date{missingDates.length > 1 ? "s are" : " is"} missing.
-                File {missingDates.length > 1 ? "them" : "it"} before entering today&apos;s figures.
+              <p className="text-xs text-content-secondary mt-0.5">
+                {missingDates.length === 1
+                  ? "1 date is missing — file it to continue."
+                  : `${missingDates.length} dates are missing — file them to continue.`}
               </p>
-              <div className="mt-3 flex flex-wrap gap-2">
-                {missingDates.map((d) => (
-                  <a
-                    key={d}
-                    href={`/sales?date=${d}`}
-                    className="rounded-lg border border-warning/40 bg-warning/15 px-3 py-1.5 text-xs font-semibold text-warning hover:bg-warning/25"
-                  >
-                    {formatDateLabel(d)} →
-                  </a>
-                ))}
-              </div>
             </div>
           </div>
-        </Card>
+          {/* Date buttons */}
+          <div className="px-5 py-4 space-y-2.5">
+            <p className="text-xs font-semibold uppercase tracking-widest text-amber-400/80 mb-3">
+              Tap a date below to file its sales
+            </p>
+            {missingDates.map((d) => (
+              <a
+                key={d}
+                href={`/sales?date=${d}`}
+                className="flex w-full items-center justify-between rounded-xl bg-amber-400 px-4 py-3.5 text-sm font-bold text-amber-950 transition-all hover:bg-amber-300 active:scale-[0.98] shadow-md shadow-amber-400/20"
+              >
+                <span>{formatDateLabel(d)}</span>
+                <span className="flex items-center gap-1.5">
+                  File now
+                  <ArrowRight className="size-4" />
+                </span>
+              </a>
+            ))}
+          </div>
+        </div>
       ) : tooEarlyForToday ? (
         <Card className="p-6 text-center max-w-lg mx-auto space-y-3">
           <p className="text-4xl">🕘</p>
@@ -211,31 +223,37 @@ export default async function SalesPage({
 }
 
 function MissingDatesBanner({ missing }: { missing: string[] }) {
-  const label =
-    missing.length === 1
-      ? formatDateLabel(missing[0])
-      : `${missing.length} days`;
-
   return (
-    <div className="mb-4 rounded-xl border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning">
-      <div className="flex items-start gap-2.5">
-        <AlertTriangle className="mt-0.5 size-4 shrink-0" />
-        <div className="flex-1">
-          <p className="font-semibold">
-            Sales missing for {label}
-          </p>
-          <div className="mt-1.5 flex flex-wrap gap-2">
-            {missing.map((d) => (
-              <a
-                key={d}
-                href={`/sales?date=${d}`}
-                className="rounded-lg border border-warning/40 bg-warning/15 px-2.5 py-1 text-xs font-semibold text-warning hover:bg-warning/25"
-              >
-                {formatDateLabel(d)}
-              </a>
-            ))}
-          </div>
+    <div className="mb-4 rounded-2xl border-2 border-amber-400/40 bg-gradient-to-b from-amber-400/12 to-amber-500/4 overflow-hidden">
+      {/* Header */}
+      <div className="flex items-center gap-3 px-4 py-3 border-b border-amber-400/20">
+        <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-amber-400/20">
+          <AlertTriangle className="size-4 text-amber-400" />
         </div>
+        <div>
+          <p className="text-sm font-bold text-content-primary">
+            {missing.length === 1
+              ? "Sales missing for a previous date"
+              : `Sales missing for ${missing.length} previous dates`}
+          </p>
+          <p className="text-xs text-content-secondary mt-0.5">Tap to file the missing data</p>
+        </div>
+      </div>
+      {/* Date buttons */}
+      <div className="px-4 py-3 space-y-2">
+        {missing.map((d) => (
+          <a
+            key={d}
+            href={`/sales?date=${d}`}
+            className="flex w-full items-center justify-between rounded-xl bg-amber-400 px-4 py-3 text-sm font-bold text-amber-950 transition-all hover:bg-amber-300 active:scale-[0.98] shadow-sm shadow-amber-400/20"
+          >
+            <span>{formatDateLabel(d)}</span>
+            <span className="flex items-center gap-1.5">
+              File now
+              <ArrowRight className="size-4" />
+            </span>
+          </a>
+        ))}
       </div>
     </div>
   );
