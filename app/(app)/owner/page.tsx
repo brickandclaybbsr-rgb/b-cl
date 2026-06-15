@@ -200,6 +200,7 @@ export default async function OwnerDashboard() {
                 ? nameMap[snap.closingKitchen.submitted_by] ?? "Staff"
                 : null
             }
+            closingCash={snap.closingKitchen?.closing_cash}
           />
           <ChecklistStatus
             label="Dining"
@@ -210,6 +211,7 @@ export default async function OwnerDashboard() {
                 ? nameMap[snap.closingFrontDesk.submitted_by] ?? "Staff"
                 : null
             }
+            closingCash={snap.closingFrontDesk?.closing_cash}
           />
         </div>
       </Card>
@@ -315,11 +317,13 @@ function ChecklistStatus({
   done,
   time,
   submitterName,
+  closingCash,
 }: {
   label: string;
   done: boolean;
   time: string | null;
   submitterName?: string | null;
+  closingCash?: number | null;
 }) {
   return (
     <div
@@ -341,6 +345,11 @@ function ChecklistStatus({
       {done && submitterName && (
         <p className="mt-1 text-[11px] font-medium text-warm truncate">
           By {submitterName}
+        </p>
+      )}
+      {done && closingCash != null && (
+        <p className="mt-1 text-[11px] font-mono font-semibold text-content-primary">
+          Cash: {formatINR(closingCash)}
         </p>
       )}
     </div>
