@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireProfile } from "@/lib/auth";
-import { todayIST, formatDateLabel } from "@/lib/date";
+import { todayIST, nowIST, formatDateLabel } from "@/lib/date";
 import { APP_START_DATE } from "@/lib/constants";
 import { toNumber, toInt } from "@/lib/utils";
 import { whatsappNotify } from "@/lib/whatsapp-notify";
@@ -21,6 +21,11 @@ export async function submitSales(
   const requested = String(formData.get("_date") ?? "").trim();
   // Allow any date from app launch onwards — block future dates
   const date = (requested >= APP_START_DATE && requested <= today) ? requested : today;
+
+  // Today's sales can only be filed after 9:00 PM IST
+  if (date === today && nowIST().getHours() < 21) {
+    return { error: "Today's sales can only be submitted after 9:00 PM IST." };
+  }
 
   const opening_cash        = toNumber(formData.get("opening_cash"));
   const cash_sales          = toNumber(formData.get("cash_sales"));

@@ -1,5 +1,5 @@
 import { requireProfile } from "@/lib/auth";
-import { todayIST, daysAgoIST, formatDateLabel, formatTimeIST } from "@/lib/date";
+import { todayIST, daysAgoIST, nowIST, formatDateLabel, formatTimeIST } from "@/lib/date";
 import { APP_START_DATE } from "@/lib/constants";
 import { getSales, getSalesRange } from "@/lib/data/sales";
 import { getProfileNameMap, getStaff } from "@/lib/data/profiles";
@@ -56,16 +56,22 @@ export default async function SalesPage({
 
   const filedDates = new Set(allSalesInWindow.map((s) => s.date));
 
-  // Dates in the window that have no sales entry (oldest first), excluding today if it's the selected date
+  // All dates from launch with no sales entry (oldest first)
   const missingDates: string[] = [];
-  for (let i = 6; i >= 0; i--) {
-    const d = daysAgoIST(i);
-    if (!filedDates.has(d)) missingDates.push(d);
+  for (let d = new Date(windowStart + "T00:00:00Z"); ; d.setUTCDate(d.getUTCDate() + 1)) {
+    const str = d.toISOString().slice(0, 10);
+    if (str > today) break;
+    if (!filedDates.has(str)) missingDates.push(str);
   }
 
   const isOwner = profile.role === "owner";
   const isSubmitter = existing?.submitted_by === profile.id;
   const viewingToday = requestedDate === today;
+
+  // Sales for today can only be filed after 9:00 PM IST
+  const istHour = nowIST().getHours();
+  const salesOpenToday = istHour >= 21; // 9 PM IST
+  const tooEarlyForToday = viewingToday && !salesOpenToday && !existing;
 
   // Missing dates excluding the one currently being viewed
   const otherMissing = missingDates.filter((d) => d !== requestedDate);
@@ -159,6 +165,15 @@ export default async function SalesPage({
               : "Staff"
           }
         />
+      ) : tooEarlyForToday ? (
+        <Card className="p-6 text-center max-w-lg mx-auto space-y-3">
+          <p className="text-4xl">🕘</p>
+          <h2 className="text-lg font-bold text-content-primary">Sales open after 9:00 PM</h2>
+          <p className="text-sm text-content-secondary">
+            Today&apos;s sales can be filed from <span className="font-semibold text-content-primary">9:00 PM IST</span> onwards.
+            Come back then to enter the figures.
+          </p>
+        </Card>
       ) : (
         <SalesForm date={requestedDate} />
       )}
