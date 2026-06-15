@@ -22,8 +22,11 @@ export async function submitSales(
   // Allow any date from app launch onwards — block future dates
   const date = (requested >= APP_START_DATE && requested <= today) ? requested : today;
 
-  // Today's sales can only be filed after 9:00 PM IST
-  if (date === today && nowIST().getHours() < 21) {
+  // Today's sales can only be filed after 9:00 PM IST.
+  // Midnight–4 AM is still the same business day, so filing stays open then too.
+  const istHour = nowIST().getHours();
+  const tooEarlyToFile = istHour >= 4 && istHour < 21;
+  if (date === today && tooEarlyToFile) {
     return { error: "Today's sales can only be submitted after 9:00 PM IST." };
   }
 

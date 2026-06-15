@@ -68,9 +68,11 @@ export default async function SalesPage({
   const isSubmitter = existing?.submitted_by === profile.id;
   const viewingToday = requestedDate === today;
 
-  // Sales for today can only be filed after 9:00 PM IST
+  // Sales for today can only be filed after 9:00 PM IST.
+  // The business day runs until 4 AM next calendar day, so midnight–4 AM is
+  // still "today" and filing must remain open (it's past 9 PM on that day).
   const istHour = nowIST().getHours();
-  const salesOpenToday = istHour >= 21; // 9 PM IST
+  const salesOpenToday = istHour >= 21 || istHour < 4; // 9 PM – 4 AM window
   const tooEarlyForToday = viewingToday && !salesOpenToday && !existing;
 
   // Missing dates excluding the one currently being viewed
