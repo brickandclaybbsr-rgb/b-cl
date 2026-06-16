@@ -123,9 +123,10 @@ export default async function StaffDashboard() {
     l => l.status === "approved" && l.start_date >= snap.date
   );
 
-  // Yesterday's data for front desk + head chef
+  // Yesterday's data — strictly front_desk and head_chef only
+  const canSeeYesterday = profile.team === "front_desk" || profile.team === "head_chef";
   const yesterday = daysAgoIST(1);
-  const [yesterdaySales, yesterdayCashOut, nameMap] = !kitchenOnly
+  const [yesterdaySales, yesterdayCashOut, nameMap] = canSeeYesterday
     ? await Promise.all([
         getSales(yesterday),
         getCashExpensesByDate(yesterday),
@@ -358,7 +359,7 @@ export default async function StaffDashboard() {
       </div>
 
       {/* Yesterday's summary — front desk & head chef only */}
-      {!kitchenOnly && (
+      {canSeeYesterday && (
         <div className="mt-8">
           <div className="mb-3 flex items-center gap-2">
             <History className="size-4 text-content-secondary" />
