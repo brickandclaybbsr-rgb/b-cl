@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useFormState } from "react-dom";
 import { toast } from "sonner";
-import { Camera, Check, X } from "lucide-react";
+import { Camera, Check, X, TrendingDown, TrendingUp, CheckCircle2 } from "lucide-react";
 import type { ChecklistItemDef } from "@/lib/constants";
 import {
   type ChecklistFormState,
@@ -14,7 +14,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { Confetti } from "@/components/ui/confetti";
-import { cn } from "@/lib/utils";
+import { cn, formatINR } from "@/lib/utils";
 
 type Action = (
   prev: ChecklistFormState,
@@ -27,12 +27,14 @@ export function ChecklistForm({
   action,
   team,
   hiddenFields,
+  prevClosingBalance,
 }: {
   variant: "opening" | "closing";
   config: ChecklistItemDef[];
   action: Action;
   team?: "kitchen" | "front_desk" | null;
   hiddenFields?: Record<string, string>;
+  prevClosingBalance?: number;
 }) {
   // Kitchen team (incl. head chef, who maps to "kitchen") doesn't handle cash
   const showCashFields = team !== "kitchen";
@@ -41,6 +43,7 @@ export function ChecklistForm({
     {},
   );
   const [showConfetti, setShowConfetti] = useState(false);
+  const [openingCashRaw, setOpeningCashRaw] = useState("");
 
   useEffect(() => {
     if (state.error) toast.error(state.error);
@@ -49,6 +52,15 @@ export function ChecklistForm({
       setShowConfetti(true);
     }
   }, [state]);
+
+  // Discrepancy logic
+  const openingCash = parseFloat(openingCashRaw);
+  const hasPrev = prevClosingBalance !== undefined && prevClosingBalance !== null;
+  const cashEntered = openingCashRaw !== "" && !isNaN(openingCash);
+  const discrepancy = hasPrev && cashEntered ? openingCash - prevClosingBalance! : null;
+  const isShort = discrepancy !== null && discrepancy < 0;
+  const isExcess = discrepancy !== null && discrepancy > 0;
+  const isMatch = discrepancy !== null && discrepancy === 0;
 
   // group items while preserving the flat index used for field names
   const grouped: { section: string; items: { def: ChecklistItemDef; index: number }[] }[] =
@@ -87,19 +99,81 @@ export function ChecklistForm({
       {variant === "opening" ? (
         <Card className="space-y-4 p-4">
           {showCashFields && (
-            <div className="space-y-1.5">
-              <Label htmlFor="opening_cash">Opening cash in drawer (₹)</Label>
-              <Input
-                id="opening_cash"
-                name="opening_cash"
-                type="number"
-                inputMode="decimal"
-                min="0"
-                step="0.01"
-                placeholder="0"
-                className="font-mono"
-              />
-            </div>
+            <>
+              <div className="space-y-1.5">
+                <Label htmlFor="opening_cash">Opening cash in drawer (₹)</Label>
+                <Input
+                  id="opening_cash"
+                  name="opening_cash"
+                  type="number"
+                  inputMode="decimal"
+                  min="0"
+                  step="0.01"
+                  placeholder="0"
+                  className="font-mono"
+                  value={openingCashRaw}
+                  onChange={(e) => setOpeningCashRaw(e.target.value)}
+                />
+              </div>
+
+              {/* Match indicator */}
+              {isMatch && (
+                <div className="flex items-center gap-2 rounded-lg bg-success/10 px-3 py-2 text-xs font-semibold text-success">
+                  <CheckCircle2 className="size-4 shrink-0" />
+                  Matches yesterday&apos;s closing cash
+                </div>
+              )}
+
+              {/* Shortage */}
+              {isShort && (
+                <div className="space-y-3 rounded-xl border border-danger/30 bg-danger/8 p-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-xs font-bold text-danger">
+                      <TrendingDown className="size-4" />
+                      Short by
+                    </div>
+                    <span className="font-mono text-sm font-bold text-danger">
+                      {formatINR(Math.abs(discrepancy!))}
+                    </span>
+                  </div>
+                  <input type="hidden" name="cash_discrepancy" value={discrepancy!} />
+                  <div className="space-y-1">
+                    <Label htmlFor="cash_discrepancy_reason" className="text-xs">Reason for shortage</Label>
+                    <Input
+                      id="cash_discrepancy_reason"
+                      name="cash_discrepancy_reason"
+                      placeholder="e.g. ₹200 used for change, etc."
+                      className="text-sm"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Excess */}
+              {isExcess && (
+                <div className="space-y-3 rounded-xl border border-warning/30 bg-warning/8 p-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-xs font-bold text-warning">
+                      <TrendingUp className="size-4" />
+                      Extra cash
+                    </div>
+                    <span className="font-mono text-sm font-bold text-warning">
+                      +{formatINR(discrepancy!)}
+                    </span>
+                  </div>
+                  <input type="hidden" name="cash_discrepancy" value={discrepancy!} />
+                  <div className="space-y-1">
+                    <Label htmlFor="cash_discrepancy_reason" className="text-xs">Reason for extra cash</Label>
+                    <Input
+                      id="cash_discrepancy_reason"
+                      name="cash_discrepancy_reason"
+                      placeholder="e.g. refund received, etc."
+                      className="text-sm"
+                    />
+                  </div>
+                </div>
+              )}
+            </>
           )}
           <NotesField />
         </Card>

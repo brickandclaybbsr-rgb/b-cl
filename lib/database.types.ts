@@ -72,6 +72,8 @@ export type OpeningChecklist = {
   submitted_by: string | null;
   items: ChecklistLine[];
   opening_cash: number | null;
+  cash_discrepancy: number | null;
+  cash_discrepancy_reason: string | null;
   absent_staff: string | null;
   notes: string | null;
   photo_url: string | null;

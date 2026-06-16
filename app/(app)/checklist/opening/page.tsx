@@ -121,6 +121,7 @@ export default async function OpeningChecklistPage({
               action={submitOpeningChecklist}
               team="front_desk"
               hiddenFields={{ _team_override: "front_desk" }}
+              prevClosingBalance={prevSales?.closing_balance}
             />
           </>
         )}
@@ -177,6 +178,7 @@ export default async function OpeningChecklistPage({
               action={submitOpeningChecklist}
               team="front_desk"
               hiddenFields={{ _team_override: "front_desk" }}
+              prevClosingBalance={prevSales?.closing_balance}
             />
           </>
         )}
@@ -244,6 +246,7 @@ export default async function OpeningChecklistPage({
             config={config}
             action={submitOpeningChecklist}
             team={myTeam}
+            prevClosingBalance={myTeam === "front_desk" ? prevSales?.closing_balance : undefined}
           />
         </>
       )}

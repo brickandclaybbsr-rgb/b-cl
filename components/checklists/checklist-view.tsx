@@ -94,6 +94,26 @@ export function ChecklistView({
         {variant === "opening" ? (
           <>
             <Row label="Opening cash" value={fmtCash((record as OpeningChecklist).opening_cash)} />
+            {(() => {
+              const disc = (record as OpeningChecklist).cash_discrepancy;
+              const reason = (record as OpeningChecklist).cash_discrepancy_reason;
+              if (disc === null || disc === undefined) return null;
+              if (disc < 0) return (
+                <Row
+                  label={`Short by ${formatINR(Math.abs(disc))}`}
+                  value={reason ?? "—"}
+                  danger
+                />
+              );
+              if (disc > 0) return (
+                <Row
+                  label={`Extra ${formatINR(disc)}`}
+                  value={reason ?? "—"}
+                  warning
+                />
+              );
+              return null;
+            })()}
             {(record as OpeningChecklist).absent_staff && (
               <Row label="Absent staff" value={(record as OpeningChecklist).absent_staff!} />
             )}
@@ -129,11 +149,11 @@ export function ChecklistView({
   );
 }
 
-function Row({ label, value }: { label: string; value: React.ReactNode }) {
+function Row({ label, value, danger, warning }: { label: string; value: React.ReactNode; danger?: boolean; warning?: boolean }) {
   return (
     <div className="flex items-start justify-between gap-4 text-sm">
-      <span className="text-content-secondary">{label}</span>
-      <span className="text-right font-medium text-content-primary">{value}</span>
+      <span className={danger ? "font-semibold text-danger" : warning ? "font-semibold text-warning" : "text-content-secondary"}>{label}</span>
+      <span className={`text-right font-medium ${danger ? "text-danger" : warning ? "text-warning" : "text-content-primary"}`}>{value}</span>
     </div>
   );
 }

@@ -71,6 +71,7 @@ export async function submitOpeningChecklist(
   const items = buildItems(config, formData);
 
   const openingCashRaw = formData.get("opening_cash");
+  const discrepancyRaw = formData.get("cash_discrepancy");
   const photoUrl = await uploadChecklistPhoto(formData, date, "opening", teamKey);
   const payload = {
     date,
@@ -78,6 +79,8 @@ export async function submitOpeningChecklist(
     submitted_by: profile.id,
     items,
     opening_cash: openingCashRaw === null || openingCashRaw === "" ? null : toNumber(openingCashRaw),
+    cash_discrepancy: discrepancyRaw === null || discrepancyRaw === "" ? null : toNumber(String(discrepancyRaw)),
+    cash_discrepancy_reason: String(formData.get("cash_discrepancy_reason") ?? "").trim() || null,
     notes: String(formData.get("notes") ?? "").trim() || null,
     photo_url: photoUrl,
   };
