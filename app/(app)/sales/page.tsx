@@ -69,7 +69,7 @@ export default async function SalesPage({
             </Card>
           </div>
         )}
-        <ExpenseClient entries={entries} isOwner={isOwner} viewingDate={expenseDate} />
+        <ExpenseClient entries={entries} isOwner={isOwner} viewingDate={expenseDate} canDelete={canSeeYesterday} />
       </div>
     );
   }

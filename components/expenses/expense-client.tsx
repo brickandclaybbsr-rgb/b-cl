@@ -36,10 +36,12 @@ export function ExpenseClient({
   entries,
   isOwner,
   viewingDate,
+  canDelete,
 }: {
   entries: CashExpense[];
   isOwner: boolean;
   viewingDate: string;
+  canDelete?: boolean;
 }) {
   const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
   const isToday = viewingDate === today;
@@ -169,7 +171,7 @@ export function ExpenseClient({
 
           <Card className="divide-y divide-border overflow-hidden">
             {entries.map((entry) => (
-              <ExpenseRow key={entry.id} entry={entry} isOwner={isOwner} />
+              <ExpenseRow key={entry.id} entry={entry} isOwner={isOwner} canDelete={canDelete} />
             ))}
           </Card>
         </div>
@@ -183,7 +185,7 @@ export function ExpenseClient({
   );
 }
 
-function ExpenseRow({ entry, isOwner }: { entry: CashExpense; isOwner: boolean }) {
+function ExpenseRow({ entry, isOwner, canDelete }: { entry: CashExpense; isOwner: boolean; canDelete?: boolean }) {
   const [deleteState, deleteAction] = useFormState<ExpenseFormState, FormData>(deleteCashExpense, {});
 
   useEffect(() => {
@@ -213,7 +215,7 @@ function ExpenseRow({ entry, isOwner }: { entry: CashExpense; isOwner: boolean }
       <span className="shrink-0 font-mono text-base font-bold tabular-nums text-danger">
         -{formatINR(Number(entry.amount))}
       </span>
-      {isOwner && (
+      {(isOwner || canDelete) && (
         <form action={deleteAction}>
           <input type="hidden" name="id" value={entry.id} />
           <button
