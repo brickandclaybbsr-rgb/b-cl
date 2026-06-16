@@ -8,15 +8,19 @@ import {
   CheckCircle2,
   Circle,
   AlertTriangle,
+  History,
 } from "lucide-react";
 import { requireProfile } from "@/lib/auth";
 import { getTodaySnapshot } from "@/lib/data/dashboard";
-import { getSalesRange } from "@/lib/data/sales";
-import { formatDateLabel } from "@/lib/date";
+import { getSalesRange, getSales, salesTotal } from "@/lib/data/sales";
+import { getCashExpensesByDate } from "@/lib/data/expenses";
+import { getProfileNameMap } from "@/lib/data/profiles";
+import { formatDateLabel, formatTimeIST, daysAgoIST } from "@/lib/date";
 import { APP_START_DATE } from "@/lib/constants";
 import { formatINR } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import type { CashExpense } from "@/lib/database.types";
 
 export const metadata = { title: "Home" };
 
@@ -78,6 +82,16 @@ export default async function StaffDashboard() {
         ]
       : []),
   ];
+
+  // Yesterday's data for front desk + head chef
+  const yesterday = daysAgoIST(1);
+  const [yesterdaySales, yesterdayCashOut, nameMap] = !kitchenOnly
+    ? await Promise.all([
+        getSales(yesterday),
+        getCashExpensesByDate(yesterday),
+        getProfileNameMap(),
+      ])
+    : [null, [], {}];
 
   const additionalTasks = [
     {
@@ -224,6 +238,103 @@ export default async function StaffDashboard() {
           </Card>
         </Link>
       )}
+
+      {/* Yesterday's summary — front desk & head chef only */}
+      {!kitchenOnly && (
+        <div className="mt-8">
+          <div className="mb-3 flex items-center gap-2">
+            <History className="size-4 text-content-secondary" />
+            <p className="text-xs font-bold uppercase tracking-wider text-content-secondary">
+              Yesterday · {formatDateLabel(yesterday)}
+            </p>
+          </div>
+
+          {/* Yesterday's sales */}
+          <Link href={`/sales?date=${yesterday}`} className="block mb-3">
+            <Card className="p-4 transition-colors hover:border-border-strong">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-sm font-semibold">Daily Sales</p>
+                {yesterdaySales ? (
+                  <span className="font-mono text-sm font-bold tabular-nums text-warm">
+                    {formatINR(salesTotal(yesterdaySales))}
+                  </span>
+                ) : (
+                  <span className="text-xs text-content-secondary">Not filed</span>
+                )}
+              </div>
+              {yesterdaySales ? (
+                <>
+                  <div className="flex gap-4 text-xs text-content-secondary">
+                    <span>Cash {formatINR(yesterdaySales.cash_sales)}</span>
+                    <span>Online {formatINR(Number(yesterdaySales.card_sales) + Number(yesterdaySales.upi_sales))}</span>
+                    <span>Aggregators {formatINR(yesterdaySales.aggregator_sales)}</span>
+                  </div>
+                  <p className="mt-1.5 text-xs text-content-secondary opacity-70">
+                    Filed by {yesterdaySales.submitted_by ? nameMap[yesterdaySales.submitted_by] ?? "Staff" : "Staff"}
+                    {" · "}{formatTimeIST(yesterdaySales.submitted_at)}
+                  </p>
+                </>
+              ) : (
+                <p className="text-xs text-content-secondary">No sales entry for this date</p>
+              )}
+            </Card>
+          </Link>
+
+          {/* Yesterday's cash out */}
+          {yesterdayCashOut.length > 0 && (
+            <Link href={`/sales?tab=expenses&date=${yesterday}`} className="block">
+              <Card className="divide-y divide-border transition-colors hover:border-border-strong">
+                <div className="flex items-center justify-between px-4 py-3">
+                  <p className="text-sm font-semibold">Cash Out</p>
+                  <span className="font-mono text-sm font-bold tabular-nums text-danger">
+                    -{formatINR(yesterdayCashOut.reduce((s, e) => s + Number(e.amount), 0))}
+                  </span>
+                </div>
+                {yesterdayCashOut.map((entry) => (
+                  <YesterdayCashOutRow key={entry.id} entry={entry} />
+                ))}
+              </Card>
+            </Link>
+          )}
+
+          {!yesterdaySales && yesterdayCashOut.length === 0 && (
+            <p className="text-center text-xs text-content-secondary py-3">
+              No data recorded for yesterday
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function YesterdayCashOutRow({ entry }: { entry: CashExpense }) {
+  const CATEGORY_LABELS: Record<string, string> = {
+    withdrawal: "Withdrawal",
+    advance: "Advance",
+    expense: "Expense",
+    other: "Other",
+  };
+  const CATEGORY_COLORS: Record<string, string> = {
+    withdrawal: "text-danger",
+    advance: "text-warning",
+    expense: "text-warm",
+    other: "text-content-secondary",
+  };
+  return (
+    <div className="flex items-center gap-3 px-4 py-3">
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-semibold text-content-primary">{entry.person_name}</p>
+        <p className="text-xs text-content-secondary">
+          <span className={CATEGORY_COLORS[entry.category] ?? "text-content-secondary"}>
+            {CATEGORY_LABELS[entry.category] ?? entry.category}
+          </span>
+          {entry.notes && <> · {entry.notes}</>}
+        </p>
+      </div>
+      <span className="shrink-0 font-mono text-sm font-bold tabular-nums text-danger">
+        -{formatINR(Number(entry.amount))}
+      </span>
     </div>
   );
 }
