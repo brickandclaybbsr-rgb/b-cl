@@ -198,6 +198,9 @@ function ExpenseRow({ entry, isOwner, canDelete }: { entry: CashExpense; isOwner
     timeZone: "Asia/Kolkata",
   });
 
+  const withinTwoHours = Date.now() - new Date(entry.submitted_at).getTime() < 2 * 60 * 60 * 1000;
+  const showDelete = isOwner || (canDelete && withinTwoHours);
+
   return (
     <div className="flex items-center gap-3 px-4 py-3">
       <div className="min-w-0 flex-1">
@@ -215,7 +218,7 @@ function ExpenseRow({ entry, isOwner, canDelete }: { entry: CashExpense; isOwner
       <span className="shrink-0 font-mono text-base font-bold tabular-nums text-danger">
         -{formatINR(Number(entry.amount))}
       </span>
-      {(isOwner || canDelete) && (
+      {showDelete && (
         <form action={deleteAction}>
           <input type="hidden" name="id" value={entry.id} />
           <button
