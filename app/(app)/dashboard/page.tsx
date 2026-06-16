@@ -98,13 +98,25 @@ export default async function StaffDashboard() {
     myLeaves = (data ?? []) as StaffLeave[];
   } catch { /* table may not exist yet */ }
 
-  const currentYear = new Date().getFullYear().toString();
-  const approvedThisYear = myLeaves.filter(
-    l => l.status === "approved" && l.start_date.startsWith(currentYear)
-  );
-  const clTaken = approvedThisYear.filter(l => l.leave_type === "cl").length;
-  const slTaken = approvedThisYear.filter(l => l.leave_type === "sl").length;
-  const lwpTaken = approvedThisYear.filter(l => l.leave_type === "lwp").length;
+  const now = new Date();
+  const currentYear = now.getFullYear().toString();
+  const currentMonth = `${currentYear}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+
+  const getDays = (l: StaffLeave) => {
+    const start = new Date(l.start_date + "T00:00:00");
+    const end = new Date(l.end_date + "T00:00:00");
+    return Math.ceil(Math.abs(end.getTime() - start.getTime()) / 86400000) + 1;
+  };
+
+  let clYear = 0, slYear = 0, lwpYear = 0, clMonth = 0, slMonth = 0;
+  for (const l of myLeaves) {
+    if (l.status !== "approved") continue;
+    if (!l.start_date.startsWith(currentYear)) continue;
+    const days = getDays(l);
+    if (l.leave_type === "cl") { clYear += days; if (l.start_date.startsWith(currentMonth)) clMonth += days; }
+    if (l.leave_type === "sl") { slYear += days; if (l.start_date.startsWith(currentMonth)) slMonth += days; }
+    if (l.leave_type === "lwp") lwpYear += days;
+  }
 
   const pendingLeaves = myLeaves.filter(l => l.status === "pending");
   const upcomingApproved = myLeaves.filter(
@@ -281,19 +293,34 @@ export default async function StaffDashboard() {
           </Link>
         </div>
 
-        {/* Balance row */}
-        <Card className="mb-3 grid grid-cols-3 divide-x divide-border p-0 overflow-hidden">
-          <div className="py-3 text-center">
-            <p className="font-mono text-lg font-bold tabular-nums text-content-primary">{clTaken}</p>
-            <p className="text-xs text-content-secondary">CL used</p>
+        {/* Balance card — per-month & per-year */}
+        <Card className="mb-3 overflow-hidden p-0">
+          <div className="grid grid-cols-3 border-b border-border text-center">
+            <div className="border-r border-border px-2 py-1.5">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-content-secondary">WL / CL</p>
+            </div>
+            <div className="border-r border-border px-2 py-1.5">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-content-secondary">Sick Leave</p>
+            </div>
+            <div className="px-2 py-1.5">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-content-secondary">LWP</p>
+            </div>
           </div>
-          <div className="py-3 text-center">
-            <p className="font-mono text-lg font-bold tabular-nums text-content-primary">{slTaken}</p>
-            <p className="text-xs text-content-secondary">SL used</p>
-          </div>
-          <div className="py-3 text-center">
-            <p className="font-mono text-lg font-bold tabular-nums text-content-primary">{lwpTaken}</p>
-            <p className="text-xs text-content-secondary">LWP</p>
+          <div className="grid grid-cols-3 divide-x divide-border">
+            <div className="py-3 text-center">
+              <p className="font-mono text-lg font-bold tabular-nums text-content-primary">{clMonth}</p>
+              <p className="text-[10px] text-content-secondary">this month</p>
+              <p className="mt-0.5 font-mono text-xs text-content-secondary">{clYear} / yr</p>
+            </div>
+            <div className="py-3 text-center">
+              <p className="font-mono text-lg font-bold tabular-nums text-content-primary">{slMonth}</p>
+              <p className="text-[10px] text-content-secondary">this month</p>
+              <p className="mt-0.5 font-mono text-xs text-content-secondary">{slYear} / yr</p>
+            </div>
+            <div className="py-3 text-center">
+              <p className="font-mono text-lg font-bold tabular-nums text-content-primary">{lwpYear}</p>
+              <p className="text-[10px] text-content-secondary">this year</p>
+            </div>
           </div>
         </Card>
 

@@ -95,21 +95,34 @@ function getDurationInDays(startDateStr: string, endDateStr: string): number {
 function calculateUsedLeaves(leaves: LeaveRequest[], profileId: string) {
   let clUsed = 0;
   let slUsed = 0;
-  const currentYear = new Date().getFullYear().toString();
-  
+  let lwpUsed = 0;
+  const now = new Date();
+  const currentYear = now.getFullYear().toString();
+  const currentMonth = `${currentYear}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  let clThisMonth = 0;
+  let slThisMonth = 0;
+
   leaves.forEach((leave) => {
     if (leave.profile_id === profileId && leave.status === "approved") {
       if (leave.start_date.startsWith(currentYear)) {
         const days = getDurationInDays(leave.start_date, leave.end_date);
-        if (leave.leave_type === "cl") clUsed += days;
-        if (leave.leave_type === "sl") slUsed += days;
+        if (leave.leave_type === "cl") { clUsed += days; }
+        if (leave.leave_type === "sl") { slUsed += days; }
+        if (leave.leave_type === "lwp") { lwpUsed += days; }
+        if (leave.start_date.startsWith(currentMonth)) {
+          if (leave.leave_type === "cl") clThisMonth += days;
+          if (leave.leave_type === "sl") slThisMonth += days;
+        }
       }
     }
   });
-  
+
   return {
     clUsed,
     slUsed,
+    lwpUsed,
+    clThisMonth,
+    slThisMonth,
     clRemaining: Math.max(0, 48 - clUsed),
     slRemaining: Math.max(0, 6 - slUsed),
   };
@@ -522,11 +535,18 @@ export function AttendanceHRClient({ staffList, initialLeaves, initialDocuments,
                   <table className="w-full text-xs text-left border-collapse">
                     <thead>
                       <tr className="bg-bg-elevated/50 border-b border-border/40 text-content-secondary font-bold">
-                        <th className="p-3.5">Staff Name</th>
-                        <th className="p-3.5 text-center">CL Remaining</th>
-                        <th className="p-3.5 text-center">CL Used</th>
-                        <th className="p-3.5 text-center">SL Remaining</th>
-                        <th className="p-3.5 text-center">SL Used</th>
+                        <th className="p-3.5" rowSpan={2}>Staff Name</th>
+                        <th className="p-2 text-center border-b-0 border-l border-border/30" colSpan={3}>WL / CL (Annual · 48)</th>
+                        <th className="p-2 text-center border-b-0 border-l border-border/30" colSpan={2}>SL (Annual · 6)</th>
+                        <th className="p-2 text-center border-l border-border/30">LWP</th>
+                      </tr>
+                      <tr className="bg-bg-elevated/30 border-b border-border/40 text-content-secondary font-bold text-[10px]">
+                        <th className="p-2 text-center border-l border-border/30">This Month</th>
+                        <th className="p-2 text-center">Year Total</th>
+                        <th className="p-2 text-center">Remaining</th>
+                        <th className="p-2 text-center border-l border-border/30">This Month</th>
+                        <th className="p-2 text-center">Year Total</th>
+                        <th className="p-2 text-center border-l border-border/30">Year Total</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border/20">
@@ -538,10 +558,12 @@ export function AttendanceHRClient({ staffList, initialLeaves, initialDocuments,
                               <User className="size-3.5 text-content-secondary" />
                               {staff.name}
                             </td>
-                            <td className="p-3.5 text-center font-mono font-bold text-warm">{bal.clRemaining} / 48</td>
-                            <td className="p-3.5 text-center font-mono text-content-secondary">{bal.clUsed}</td>
-                            <td className="p-3.5 text-center font-mono font-bold text-warm">{bal.slRemaining} / 6</td>
-                            <td className="p-3.5 text-center font-mono text-content-secondary">{bal.slUsed}</td>
+                            <td className="p-3 text-center font-mono text-content-secondary border-l border-border/20">{bal.clThisMonth}</td>
+                            <td className="p-3 text-center font-mono text-content-secondary">{bal.clUsed}</td>
+                            <td className="p-3 text-center font-mono font-bold text-warm">{bal.clRemaining}</td>
+                            <td className="p-3 text-center font-mono text-content-secondary border-l border-border/20">{bal.slThisMonth}</td>
+                            <td className="p-3 text-center font-mono text-content-secondary">{bal.slUsed}</td>
+                            <td className="p-3 text-center font-mono text-content-secondary border-l border-border/20">{bal.lwpUsed}</td>
                           </tr>
                         );
                       })}
