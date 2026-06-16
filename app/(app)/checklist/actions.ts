@@ -73,27 +73,40 @@ export async function submitOpeningChecklist(
   const openingCashRaw = formData.get("opening_cash");
   const discrepancyRaw = formData.get("cash_discrepancy");
   const photoUrl = await uploadChecklistPhoto(formData, date, "opening", teamKey);
-  const payload = {
+  const basePayload = {
     date,
     team: teamKey,
     submitted_by: profile.id,
     items,
     opening_cash: openingCashRaw === null || openingCashRaw === "" ? null : toNumber(openingCashRaw),
-    cash_discrepancy: discrepancyRaw === null || discrepancyRaw === "" ? null : toNumber(String(discrepancyRaw)),
-    cash_discrepancy_reason: String(formData.get("cash_discrepancy_reason") ?? "").trim() || null,
     notes: String(formData.get("notes") ?? "").trim() || null,
     photo_url: photoUrl,
   };
+  const discrepancyPayload = {
+    cash_discrepancy: discrepancyRaw === null || discrepancyRaw === "" ? null : toNumber(String(discrepancyRaw)),
+    cash_discrepancy_reason: String(formData.get("cash_discrepancy_reason") ?? "").trim() || null,
+  };
+
+  async function tryInsert(payload: typeof basePayload & Partial<typeof discrepancyPayload>, isUpsert = false) {
+    if (isUpsert) {
+      const admin = createAdminClient();
+      return admin.from("opening_checklists").upsert(payload, { onConflict: "date,team" });
+    }
+    return supabase.from("opening_checklists").insert(payload);
+  }
 
   // Edit mode: upsert so the original record is never lost if something goes wrong
   if (formData.get("_edit_mode") === "1" && isHeadChef(profile)) {
-    const admin = createAdminClient();
-    const { error } = await admin
-      .from("opening_checklists")
-      .upsert(payload, { onConflict: "date,team" });
+    let { error } = await tryInsert({ ...basePayload, ...discrepancyPayload }, true);
+    if (error?.message?.includes("cash_discrepancy")) {
+      ({ error } = await tryInsert(basePayload, true));
+    }
     if (error) return { error: error.message };
   } else {
-    const { error } = await supabase.from("opening_checklists").insert(payload);
+    let { error } = await tryInsert({ ...basePayload, ...discrepancyPayload });
+    if (error?.message?.includes("cash_discrepancy")) {
+      ({ error } = await tryInsert(basePayload));
+    }
     if (error) {
       if (error.code === "23505") {
         return { error: "Your team's opening checklist for today is already submitted." };
