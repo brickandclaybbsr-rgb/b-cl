@@ -46,7 +46,6 @@ export default async function SalesPage({
           subtitle={isOwner ? "Today's cash out" : "Log cash withdrawals & expenses"}
         />
         <SalesTabs />
-        <ExpenseClient entries={entries} isOwner={isOwner} viewingDate={expenseDate} />
         {isViewingToday && canSeeYesterday && yesterdayEntries.length > 0 && (
           <div>
             <div className="mb-3 flex items-center gap-2">
@@ -68,6 +67,7 @@ export default async function SalesPage({
             </Card>
           </div>
         )}
+        <ExpenseClient entries={entries} isOwner={isOwner} viewingDate={expenseDate} />
       </div>
     );
   }
