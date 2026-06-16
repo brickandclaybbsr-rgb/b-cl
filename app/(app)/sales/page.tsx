@@ -24,6 +24,8 @@ export default async function SalesPage({
   const profile = await requireProfile();
   const isKitchenOnly = profile.team === "kitchen";
 
+  const canSeeYesterday = profile.team === "front_desk" || profile.team === "head_chef";
+
   if (searchParams.tab === "expenses") {
     const isOwner = profile.role === "owner";
     const today = todayIST();
@@ -34,7 +36,7 @@ export default async function SalesPage({
 
     const [entries, yesterdayEntries] = await Promise.all([
       getCashExpensesByDate(expenseDate),
-      isViewingToday ? getCashExpensesByDate(yesterday) : Promise.resolve([] as CashExpense[]),
+      isViewingToday && canSeeYesterday ? getCashExpensesByDate(yesterday) : Promise.resolve([] as CashExpense[]),
     ]);
 
     return (
@@ -45,7 +47,7 @@ export default async function SalesPage({
         />
         <SalesTabs />
         <ExpenseClient entries={entries} isOwner={isOwner} viewingDate={expenseDate} />
-        {isViewingToday && yesterdayEntries.length > 0 && (
+        {isViewingToday && canSeeYesterday && yesterdayEntries.length > 0 && (
           <div>
             <div className="mb-3 flex items-center gap-2">
               <History className="size-4 text-content-secondary" />
@@ -255,8 +257,8 @@ export default async function SalesPage({
         <SalesForm date={requestedDate} />
       )}
 
-      {/* Yesterday's sales reference — shown when viewing today */}
-      {viewingToday && (
+      {/* Yesterday's sales reference — front_desk and head_chef only */}
+      {viewingToday && canSeeYesterday && (
         <div className="mt-8">
           <div className="mb-3 flex items-center gap-2">
             <History className="size-4 text-content-secondary" />
