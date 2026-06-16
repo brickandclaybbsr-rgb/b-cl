@@ -525,52 +525,51 @@ export function AttendanceHRClient({ staffList, initialLeaves, initialDocuments,
 
             {/* Staff Leave Balances List */}
             <div className="lg:col-span-3">
-              <Card className="p-5 space-y-3.5 bg-white/[0.01] border-border/30">
-                <div>
-                  <h3 className="text-sm font-bold text-content-primary">Staff Leave Balances ({new Date().getFullYear()})</h3>
-                  <p className="text-xs text-content-secondary mt-0.5 font-normal">Remaining balances for all active staff members</p>
+              <div className="space-y-3">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-content-secondary">
+                  Leave Balances · {new Date().getFullYear()}
+                </h3>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {activeStaffList.map((staff) => {
+                    const bal = calculateUsedLeaves(initialLeaves, staff.id);
+                    return (
+                      <Card key={staff.id} className="p-4 space-y-3 bg-white/[0.01] border-border/30">
+                        <div className="flex items-center gap-2 border-b border-border/30 pb-2.5">
+                          <User className="size-3.5 text-warm shrink-0" />
+                          <span className="text-sm font-bold text-content-primary">{staff.name}</span>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2 text-center">
+                          <div className="space-y-0.5">
+                            <p className="text-[10px] font-bold uppercase tracking-wider text-content-secondary">WL/CL</p>
+                            <p className="font-mono text-lg font-bold text-warm">{bal.clRemaining}</p>
+                            <p className="text-[10px] text-content-secondary">remaining</p>
+                          </div>
+                          <div className="space-y-0.5">
+                            <p className="text-[10px] font-bold uppercase tracking-wider text-content-secondary">Used</p>
+                            <p className="font-mono text-lg font-bold text-content-primary">{bal.clUsed}</p>
+                            <p className="text-[10px] text-content-secondary">this year</p>
+                          </div>
+                          <div className="space-y-0.5">
+                            <p className="text-[10px] font-bold uppercase tracking-wider text-content-secondary">This Month</p>
+                            <p className="font-mono text-lg font-bold text-content-primary">{bal.clThisMonth}</p>
+                            <p className="text-[10px] text-content-secondary">WL/CL days</p>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 border-t border-border/20 pt-2.5">
+                          <div className="flex items-center justify-between rounded-lg bg-bg-elevated/40 px-3 py-2">
+                            <span className="text-xs text-content-secondary">SL used</span>
+                            <span className="font-mono text-sm font-bold text-content-primary">{bal.slUsed} <span className="text-[10px] font-normal text-content-secondary">/ 6</span></span>
+                          </div>
+                          <div className="flex items-center justify-between rounded-lg bg-bg-elevated/40 px-3 py-2">
+                            <span className="text-xs text-content-secondary">LWP</span>
+                            <span className="font-mono text-sm font-bold text-danger">{bal.lwpUsed} <span className="text-[10px] font-normal text-content-secondary">days</span></span>
+                          </div>
+                        </div>
+                      </Card>
+                    );
+                  })}
                 </div>
-                
-                <div className="overflow-x-auto border border-border/40 rounded-xl">
-                  <table className="w-full text-xs text-left border-collapse">
-                    <thead>
-                      <tr className="bg-bg-elevated/50 border-b border-border/40 text-content-secondary font-bold">
-                        <th className="p-3.5" rowSpan={2}>Staff Name</th>
-                        <th className="p-2 text-center border-b-0 border-l border-border/30" colSpan={3}>WL / CL (Annual · 48)</th>
-                        <th className="p-2 text-center border-b-0 border-l border-border/30" colSpan={2}>SL (Annual · 6)</th>
-                        <th className="p-2 text-center border-l border-border/30">LWP</th>
-                      </tr>
-                      <tr className="bg-bg-elevated/30 border-b border-border/40 text-content-secondary font-bold text-[10px]">
-                        <th className="p-2 text-center border-l border-border/30">This Month</th>
-                        <th className="p-2 text-center">Year Total</th>
-                        <th className="p-2 text-center">Remaining</th>
-                        <th className="p-2 text-center border-l border-border/30">This Month</th>
-                        <th className="p-2 text-center">Year Total</th>
-                        <th className="p-2 text-center border-l border-border/30">Year Total</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border/20">
-                      {activeStaffList.map((staff) => {
-                        const bal = calculateUsedLeaves(initialLeaves, staff.id);
-                        return (
-                          <tr key={staff.id} className="hover:bg-white/[0.01] transition-colors text-content-primary">
-                            <td className="p-3.5 font-semibold flex items-center gap-2">
-                              <User className="size-3.5 text-content-secondary" />
-                              {staff.name}
-                            </td>
-                            <td className="p-3 text-center font-mono text-content-secondary border-l border-border/20">{bal.clThisMonth}</td>
-                            <td className="p-3 text-center font-mono text-content-secondary">{bal.clUsed}</td>
-                            <td className="p-3 text-center font-mono font-bold text-warm">{bal.clRemaining}</td>
-                            <td className="p-3 text-center font-mono text-content-secondary border-l border-border/20">{bal.slThisMonth}</td>
-                            <td className="p-3 text-center font-mono text-content-secondary">{bal.slUsed}</td>
-                            <td className="p-3 text-center font-mono text-content-secondary border-l border-border/20">{bal.lwpUsed}</td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </Card>
+              </div>
             </div>
 
           </div>
