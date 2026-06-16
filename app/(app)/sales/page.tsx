@@ -1,7 +1,7 @@
 import { requireProfile } from "@/lib/auth";
 import { todayIST, daysAgoIST, nowIST, formatDateLabel, formatTimeIST } from "@/lib/date";
 import { APP_START_DATE } from "@/lib/constants";
-import { getSales, getSalesRange, salesTotal } from "@/lib/data/sales";
+import { getSales, getSalesRange } from "@/lib/data/sales";
 import { getProfileNameMap, getStaff } from "@/lib/data/profiles";
 import { getCashExpensesByDate } from "@/lib/data/expenses";
 import { formatINR } from "@/lib/utils";
@@ -269,34 +269,15 @@ export default async function SalesPage({
             </p>
           </div>
           {yesterdaySales ? (
-            <>
-              <div className="mb-3 flex items-center justify-between rounded-xl bg-fire/10 px-4 py-3">
-                <span className="text-sm font-semibold text-warm">Total Sales</span>
-                <span className="font-mono text-lg font-bold tabular-nums text-warm">
-                  {formatINR(salesTotal(yesterdaySales))}
-                </span>
-              </div>
-              <Card className="divide-y divide-border">
-                <div className="flex items-center justify-between px-4 py-2.5">
-                  <span className="text-xs text-content-secondary">Cash</span>
-                  <span className="font-mono text-xs font-semibold tabular-nums">{formatINR(yesterdaySales.cash_sales)}</span>
-                </div>
-                <div className="flex items-center justify-between px-4 py-2.5">
-                  <span className="text-xs text-content-secondary">Online (Card + UPI)</span>
-                  <span className="font-mono text-xs font-semibold tabular-nums">{formatINR(Number(yesterdaySales.card_sales) + Number(yesterdaySales.upi_sales))}</span>
-                </div>
-                <div className="flex items-center justify-between px-4 py-2.5">
-                  <span className="text-xs text-content-secondary">Aggregators</span>
-                  <span className="font-mono text-xs font-semibold tabular-nums">{formatINR(yesterdaySales.aggregator_sales)}</span>
-                </div>
-              </Card>
-              <p className="mt-2 text-center text-xs text-content-secondary opacity-70">
-                Filed by {yesterdaySales.submitted_by
+            <SalesView
+              sales={yesterdaySales}
+              submitterName={
+                yesterdaySales.submitted_by
                   ? (await getProfileNameMap())[yesterdaySales.submitted_by] ?? "Staff"
-                  : "Staff"}
-                {" · "}{formatTimeIST(yesterdaySales.submitted_at)}
-              </p>
-            </>
+                  : "Staff"
+              }
+              showHeader={false}
+            />
           ) : (
             <p className="text-center text-xs text-content-secondary py-2">Sales not filed for yesterday</p>
           )}

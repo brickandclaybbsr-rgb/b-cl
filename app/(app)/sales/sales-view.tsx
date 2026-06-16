@@ -8,23 +8,27 @@ import type { DailySales } from "@/lib/database.types";
 export function SalesView({
   sales,
   submitterName,
+  showHeader = true,
 }: {
   sales: DailySales;
   submitterName: string;
+  showHeader?: boolean;
 }) {
   const total = salesTotal(sales);
 
   return (
     <div className="space-y-4">
-      <Card className="flex items-center gap-3 border-success/30 bg-success/10 p-4">
-        <CircleCheck className="size-6 shrink-0 text-success" />
-        <div>
-          <p className="font-semibold text-success">Sales recorded</p>
-          <p className="text-xs text-content-secondary">
-            By {submitterName} · {formatTimeIST(sales.submitted_at)}
-          </p>
-        </div>
-      </Card>
+      {showHeader && (
+        <Card className="flex items-center gap-3 border-success/30 bg-success/10 p-4">
+          <CircleCheck className="size-6 shrink-0 text-success" />
+          <div>
+            <p className="font-semibold text-success">Sales recorded</p>
+            <p className="text-xs text-content-secondary">
+              By {submitterName} · {formatTimeIST(sales.submitted_at)}
+            </p>
+          </div>
+        </Card>
+      )}
 
       {/* Grand total */}
       <div className="flex items-center justify-between rounded-xl bg-fire/10 px-4 py-3">
