@@ -1,11 +1,11 @@
 import { requireProfile } from "@/lib/auth";
 import { todayIST, daysAgoIST, nowIST, formatDateLabel, formatTimeIST } from "@/lib/date";
 import { APP_START_DATE } from "@/lib/constants";
-import { getSales, getSalesRange } from "@/lib/data/sales";
+import { getSales, getSalesRange, salesTotal } from "@/lib/data/sales";
 import { getProfileNameMap, getStaff } from "@/lib/data/profiles";
 import { getCashExpensesByDate } from "@/lib/data/expenses";
 import { formatINR } from "@/lib/utils";
-import type { CashExpense } from "@/lib/database.types";
+import type { CashExpense, DailySales } from "@/lib/database.types";
 import { PageHeader } from "@/components/page-header";
 import { SalesTabs } from "./sales-tabs";
 import { SalesForm } from "./sales-form";
@@ -269,15 +269,7 @@ export default async function SalesPage({
             </p>
           </div>
           {yesterdaySales ? (
-            <SalesView
-              sales={yesterdaySales}
-              submitterName={
-                yesterdaySales.submitted_by
-                  ? (await getProfileNameMap())[yesterdaySales.submitted_by] ?? "Staff"
-                  : "Staff"
-              }
-              showHeader={false}
-            />
+            <YesterdaySalesSummary sales={yesterdaySales} />
           ) : (
             <p className="text-center text-xs text-content-secondary py-2">Sales not filed for yesterday</p>
           )}
@@ -336,6 +328,39 @@ const CASH_CATEGORY_COLORS: Record<string, string> = {
   expense: "text-warm",
   other: "text-content-secondary",
 };
+
+function YesterdaySalesSummary({ sales }: { sales: DailySales }) {
+  const total = salesTotal(sales);
+  const aggregators = Number(sales.zomato_gold_sales) + Number(sales.zomato_sales) + Number(sales.swiggy_sales) + Number(sales.swiggy_dineout_sales) + Number(sales.eazy_diner_sales);
+  const online = Number(sales.card_sales) + Number(sales.upi_sales);
+  const rows = [
+    { label: "Cash", value: sales.cash_sales },
+    { label: "UPI", value: sales.upi_sales },
+    ...(sales.card_sales > 0 ? [{ label: "Card", value: sales.card_sales }] : []),
+    { label: "Zomato Gold", value: sales.zomato_gold_sales },
+    { label: "Zomato", value: sales.zomato_sales },
+    { label: "Swiggy", value: sales.swiggy_sales },
+    ...(sales.swiggy_dineout_sales > 0 ? [{ label: "Swiggy Dineout", value: sales.swiggy_dineout_sales }] : []),
+    ...(sales.eazy_diner_sales > 0 ? [{ label: "EazyDiner", value: sales.eazy_diner_sales }] : []),
+  ].filter((r) => r.value > 0);
+
+  return (
+    <Card className="overflow-hidden">
+      <div className="flex items-center justify-between bg-fire/10 px-4 py-3">
+        <span className="text-sm font-semibold text-warm">Total Sales</span>
+        <span className="font-mono text-base font-bold tabular-nums text-warm">{formatINR(total)}</span>
+      </div>
+      <div className="grid grid-cols-2 divide-x divide-y divide-border">
+        {rows.map((r) => (
+          <div key={r.label} className="flex flex-col px-3 py-2">
+            <span className="text-[10px] text-content-secondary">{r.label}</span>
+            <span className="font-mono text-sm font-semibold tabular-nums text-content-primary">{formatINR(r.value)}</span>
+          </div>
+        ))}
+      </div>
+    </Card>
+  );
+}
 
 function YesterdayCashRow({ entry }: { entry: CashExpense }) {
   return (
