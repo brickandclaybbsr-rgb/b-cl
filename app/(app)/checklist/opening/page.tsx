@@ -1,11 +1,12 @@
 import { requireProfile, isHeadChef } from "@/lib/auth";
-import { todayIST, formatDateLabel, formatTimeIST } from "@/lib/date";
+import { todayIST, daysAgoIST, formatDateLabel, formatTimeIST } from "@/lib/date";
 import { APP_START_DATE } from "@/lib/constants";
 import {
   getChecklistConfig,
   getOpeningChecklist,
 } from "@/lib/data/checklists";
 import { getProfileNameMap } from "@/lib/data/profiles";
+import { getSales } from "@/lib/data/sales";
 import { PageHeader } from "@/components/page-header";
 import { ChecklistTabs } from "@/components/checklists/checklist-tabs";
 import { ChecklistForm } from "@/components/checklists/checklist-form";
@@ -13,6 +14,7 @@ import { ChecklistView } from "@/components/checklists/checklist-view";
 import { submitOpeningChecklist } from "../actions";
 import { Card } from "@/components/ui/card";
 import { CheckCircle2, Clock, AlertTriangle, UserX } from "lucide-react";
+import { formatINR } from "@/lib/utils";
 
 export const metadata = { title: "Opening checklist" };
 
@@ -23,6 +25,7 @@ export default async function OpeningChecklistPage({
 }) {
   const profile = await requireProfile();
   const date = todayIST();
+  const prevSales = await getSales(daysAgoIST(1));
 
   const isOwner = profile.role === "owner";
   const headChef = isHeadChef(profile);
@@ -110,13 +113,16 @@ export default async function OpeningChecklistPage({
             submitterName={frontDeskRecord.submitted_by ? nameMap[frontDeskRecord.submitted_by] ?? "Staff" : "Staff"}
           />
         ) : (
-          <ChecklistForm
-            variant="opening"
-            config={frontDeskConfig}
-            action={submitOpeningChecklist}
-            team="front_desk"
-            hiddenFields={{ _team_override: "front_desk" }}
-          />
+          <>
+            {prevSales && <PrevClosingBanner amount={prevSales.closing_balance} />}
+            <ChecklistForm
+              variant="opening"
+              config={frontDeskConfig}
+              action={submitOpeningChecklist}
+              team="front_desk"
+              hiddenFields={{ _team_override: "front_desk" }}
+            />
+          </>
         )}
       </div>
     );
@@ -163,13 +169,16 @@ export default async function OpeningChecklistPage({
             submitterName={frontDeskRecord.submitted_by ? nameMap[frontDeskRecord.submitted_by] ?? "Staff" : "Staff"}
           />
         ) : (
-          <ChecklistForm
-            variant="opening"
-            config={frontDeskConfig}
-            action={submitOpeningChecklist}
-            team="front_desk"
-            hiddenFields={{ _team_override: "front_desk" }}
-          />
+          <>
+            {prevSales && <PrevClosingBanner amount={prevSales.closing_balance} />}
+            <ChecklistForm
+              variant="opening"
+              config={frontDeskConfig}
+              action={submitOpeningChecklist}
+              team="front_desk"
+              hiddenFields={{ _team_override: "front_desk" }}
+            />
+          </>
         )}
       </div>
     );
@@ -228,12 +237,15 @@ export default async function OpeningChecklistPage({
           )}
         </>
       ) : (
-        <ChecklistForm
-          variant="opening"
-          config={config}
-          action={submitOpeningChecklist}
-          team={myTeam}
-        />
+        <>
+          {prevSales && myTeam === "front_desk" && <PrevClosingBanner amount={prevSales.closing_balance} />}
+          <ChecklistForm
+            variant="opening"
+            config={config}
+            action={submitOpeningChecklist}
+            team={myTeam}
+          />
+        </>
       )}
 
       {/* Other team section — shown when own is done but other hasn't submitted */}
@@ -259,6 +271,20 @@ export default async function OpeningChecklistPage({
       {otherTeam && otherExisting && (
         <OtherTeamBanner otherTeam={otherTeam} otherExisting={otherExisting} nameMap={nameMap} />
       )}
+    </div>
+  );
+}
+
+function PrevClosingBanner({ amount }: { amount: number }) {
+  return (
+    <div className="mb-4 flex items-center justify-between rounded-xl border border-border bg-bg-elevated px-4 py-3">
+      <div>
+        <p className="text-xs font-bold uppercase tracking-wider text-content-secondary">Yesterday&apos;s Closing Cash</p>
+        <p className="mt-0.5 text-[11px] text-content-secondary">Use this as your opening cash in drawer</p>
+      </div>
+      <span className="font-mono text-lg font-bold tabular-nums text-content-primary">
+        {formatINR(amount)}
+      </span>
     </div>
   );
 }
