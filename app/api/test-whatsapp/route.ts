@@ -28,7 +28,7 @@ export async function GET() {
     const debug = {
       configured,
       hasToken: token.length > 0,
-      tokenPrefix: token.slice(0, 8) + "...",
+      tokenPrefix: token.slice(0, 20) + "...",
       phoneId,
       templateName,
       ownerNumberEnv: ownerNumber,
