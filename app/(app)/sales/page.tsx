@@ -1,16 +1,18 @@
 import { requireProfile } from "@/lib/auth";
 import { todayIST, daysAgoIST, nowIST, formatDateLabel, formatTimeIST } from "@/lib/date";
 import { APP_START_DATE } from "@/lib/constants";
-import { getSales, getSalesRange } from "@/lib/data/sales";
+import { getSales, getSalesRange, salesTotal } from "@/lib/data/sales";
 import { getProfileNameMap, getStaff } from "@/lib/data/profiles";
 import { getCashExpensesByDate } from "@/lib/data/expenses";
+import { formatINR } from "@/lib/utils";
+import type { CashExpense } from "@/lib/database.types";
 import { PageHeader } from "@/components/page-header";
 import { SalesTabs } from "./sales-tabs";
 import { SalesForm } from "./sales-form";
 import { SalesView } from "./sales-view";
 import { ExpenseClient } from "@/components/expenses/expense-client";
 import { Card } from "@/components/ui/card";
-import { CheckCircle2, Info, AlertTriangle, ArrowRight } from "lucide-react";
+import { CheckCircle2, Info, AlertTriangle, ArrowRight, History } from "lucide-react";
 
 export const metadata = { title: "Daily sales" };
 
@@ -27,8 +29,14 @@ export default async function SalesPage({
     const today = todayIST();
     const rawDate = String(searchParams.date ?? "").trim();
     const expenseDate = (rawDate >= APP_START_DATE && rawDate <= today) ? rawDate : today;
+    const isViewingToday = expenseDate === today;
+    const yesterday = daysAgoIST(1);
 
-    const entries = await getCashExpensesByDate(expenseDate);
+    const [entries, yesterdayEntries] = await Promise.all([
+      getCashExpensesByDate(expenseDate),
+      isViewingToday ? getCashExpensesByDate(yesterday) : Promise.resolve([] as CashExpense[]),
+    ]);
+
     return (
       <div className="space-y-5">
         <PageHeader
@@ -37,6 +45,27 @@ export default async function SalesPage({
         />
         <SalesTabs />
         <ExpenseClient entries={entries} isOwner={isOwner} viewingDate={expenseDate} />
+        {isViewingToday && yesterdayEntries.length > 0 && (
+          <div>
+            <div className="mb-3 flex items-center gap-2">
+              <History className="size-4 text-content-secondary" />
+              <p className="text-xs font-bold uppercase tracking-wider text-content-secondary">
+                Yesterday · {formatDateLabel(yesterday)}
+              </p>
+            </div>
+            <Card className="divide-y divide-border">
+              <div className="flex items-center justify-between px-4 py-3">
+                <p className="text-sm font-semibold">Cash Out Total</p>
+                <span className="font-mono text-sm font-bold tabular-nums text-danger">
+                  -{formatINR(yesterdayEntries.reduce((s, e) => s + Number(e.amount), 0))}
+                </span>
+              </div>
+              {yesterdayEntries.map((entry) => (
+                <YesterdayCashRow key={entry.id} entry={entry} />
+              ))}
+            </Card>
+          </div>
+        )}
       </div>
     );
   }
@@ -71,6 +100,9 @@ export default async function SalesPage({
   const isOwner = profile.role === "owner";
   const isSubmitter = existing?.submitted_by === profile.id;
   const viewingToday = requestedDate === today;
+
+  const yesterday = daysAgoIST(1);
+  const yesterdaySales = viewingToday ? (allSalesInWindow.find(s => s.date === yesterday) ?? null) : null;
 
   // Sales for today can only be filed after 9:00 PM IST.
   // The business day runs until 4 AM next calendar day, so midnight–4 AM is
@@ -222,6 +254,50 @@ export default async function SalesPage({
       ) : (
         <SalesForm date={requestedDate} />
       )}
+
+      {/* Yesterday's sales reference — shown when viewing today */}
+      {viewingToday && (
+        <div className="mt-8">
+          <div className="mb-3 flex items-center gap-2">
+            <History className="size-4 text-content-secondary" />
+            <p className="text-xs font-bold uppercase tracking-wider text-content-secondary">
+              Yesterday · {formatDateLabel(yesterday)}
+            </p>
+          </div>
+          {yesterdaySales ? (
+            <>
+              <div className="mb-3 flex items-center justify-between rounded-xl bg-fire/10 px-4 py-3">
+                <span className="text-sm font-semibold text-warm">Total Sales</span>
+                <span className="font-mono text-lg font-bold tabular-nums text-warm">
+                  {formatINR(salesTotal(yesterdaySales))}
+                </span>
+              </div>
+              <Card className="divide-y divide-border">
+                <div className="flex items-center justify-between px-4 py-2.5">
+                  <span className="text-xs text-content-secondary">Cash</span>
+                  <span className="font-mono text-xs font-semibold tabular-nums">{formatINR(yesterdaySales.cash_sales)}</span>
+                </div>
+                <div className="flex items-center justify-between px-4 py-2.5">
+                  <span className="text-xs text-content-secondary">Online (Card + UPI)</span>
+                  <span className="font-mono text-xs font-semibold tabular-nums">{formatINR(Number(yesterdaySales.card_sales) + Number(yesterdaySales.upi_sales))}</span>
+                </div>
+                <div className="flex items-center justify-between px-4 py-2.5">
+                  <span className="text-xs text-content-secondary">Aggregators</span>
+                  <span className="font-mono text-xs font-semibold tabular-nums">{formatINR(yesterdaySales.aggregator_sales)}</span>
+                </div>
+              </Card>
+              <p className="mt-2 text-center text-xs text-content-secondary opacity-70">
+                Filed by {yesterdaySales.submitted_by
+                  ? (await getProfileNameMap())[yesterdaySales.submitted_by] ?? "Staff"
+                  : "Staff"}
+                {" · "}{formatTimeIST(yesterdaySales.submitted_at)}
+              </p>
+            </>
+          ) : (
+            <p className="text-center text-xs text-content-secondary py-2">Sales not filed for yesterday</p>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -259,6 +335,38 @@ function MissingDatesBanner({ missing }: { missing: string[] }) {
           </a>
         ))}
       </div>
+    </div>
+  );
+}
+
+const CASH_CATEGORY_LABELS: Record<string, string> = {
+  withdrawal: "Withdrawal",
+  advance: "Advance",
+  expense: "Expense",
+  other: "Other",
+};
+const CASH_CATEGORY_COLORS: Record<string, string> = {
+  withdrawal: "text-danger",
+  advance: "text-warning",
+  expense: "text-warm",
+  other: "text-content-secondary",
+};
+
+function YesterdayCashRow({ entry }: { entry: CashExpense }) {
+  return (
+    <div className="flex items-center gap-3 px-4 py-3">
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-semibold text-content-primary">{entry.person_name}</p>
+        <p className="text-xs text-content-secondary">
+          <span className={CASH_CATEGORY_COLORS[entry.category] ?? "text-content-secondary"}>
+            {CASH_CATEGORY_LABELS[entry.category] ?? entry.category}
+          </span>
+          {entry.notes && <> · {entry.notes}</>}
+        </p>
+      </div>
+      <span className="shrink-0 font-mono text-sm font-bold tabular-nums text-danger">
+        -{formatINR(Number(entry.amount))}
+      </span>
     </div>
   );
 }

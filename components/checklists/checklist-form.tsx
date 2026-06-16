@@ -106,33 +106,18 @@ export function ChecklistForm({
       ) : (
         <Card className="space-y-4 p-4">
           {showCashFields && (
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="closing_cash">Closing cash (₹)</Label>
-                <Input
-                  id="closing_cash"
-                  name="closing_cash"
-                  type="number"
-                  inputMode="decimal"
-                  min="0"
-                  step="0.01"
-                  placeholder="0"
-                  className="font-mono"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="cash_deposited">Deposited to safe (₹)</Label>
-                <Input
-                  id="cash_deposited"
-                  name="cash_deposited"
-                  type="number"
-                  inputMode="decimal"
-                  min="0"
-                  step="0.01"
-                  placeholder="0"
-                  className="font-mono"
-                />
-              </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="closing_cash">Closing cash (₹)</Label>
+              <Input
+                id="closing_cash"
+                name="closing_cash"
+                type="number"
+                inputMode="decimal"
+                min="0"
+                step="0.01"
+                placeholder="0"
+                className="font-mono"
+              />
             </div>
           )}
           {showCashFields && (

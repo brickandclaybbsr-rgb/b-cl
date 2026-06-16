@@ -101,7 +101,6 @@ export function ChecklistView({
         ) : (
           <>
             <Row label="Closing cash" value={fmtCash((record as ClosingChecklist).closing_cash)} />
-            <Row label="Deposited to safe" value={fmtCash((record as ClosingChecklist).cash_deposited)} />
             {(record as ClosingChecklist).discrepancy_notes && (
               <Row
                 label="Discrepancy"

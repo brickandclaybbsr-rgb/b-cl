@@ -9,6 +9,7 @@ import {
   Circle,
   AlertTriangle,
   History,
+  CalendarClock,
 } from "lucide-react";
 import { requireProfile } from "@/lib/auth";
 import { getTodaySnapshot } from "@/lib/data/dashboard";
@@ -18,9 +19,10 @@ import { getProfileNameMap } from "@/lib/data/profiles";
 import { formatDateLabel, formatTimeIST, daysAgoIST } from "@/lib/date";
 import { APP_START_DATE } from "@/lib/constants";
 import { formatINR } from "@/lib/utils";
+import { createClient } from "@/lib/supabase/server";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import type { CashExpense } from "@/lib/database.types";
+import type { CashExpense, StaffLeave } from "@/lib/database.types";
 
 export const metadata = { title: "Home" };
 
@@ -82,6 +84,32 @@ export default async function StaffDashboard() {
         ]
       : []),
   ];
+
+  // Leaves for this staff member
+  let myLeaves: StaffLeave[] = [];
+  try {
+    const supabase = createClient();
+    const { data } = await supabase
+      .from("leaves")
+      .select("*")
+      .eq("profile_id", profile.id)
+      .order("start_date", { ascending: false })
+      .limit(10);
+    myLeaves = (data ?? []) as StaffLeave[];
+  } catch { /* table may not exist yet */ }
+
+  const currentYear = new Date().getFullYear().toString();
+  const approvedThisYear = myLeaves.filter(
+    l => l.status === "approved" && l.start_date.startsWith(currentYear)
+  );
+  const clTaken = approvedThisYear.filter(l => l.leave_type === "cl").length;
+  const slTaken = approvedThisYear.filter(l => l.leave_type === "sl").length;
+  const lwpTaken = approvedThisYear.filter(l => l.leave_type === "lwp").length;
+
+  const pendingLeaves = myLeaves.filter(l => l.status === "pending");
+  const upcomingApproved = myLeaves.filter(
+    l => l.status === "approved" && l.start_date >= snap.date
+  );
 
   // Yesterday's data for front desk + head chef
   const yesterday = daysAgoIST(1);
@@ -239,6 +267,69 @@ export default async function StaffDashboard() {
         </Link>
       )}
 
+      {/* Leaves section */}
+      <div className="mt-8">
+        <div className="mb-3 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <CalendarClock className="size-4 text-content-secondary" />
+            <p className="text-xs font-bold uppercase tracking-wider text-content-secondary">
+              My Leaves
+            </p>
+          </div>
+          <Link href="/profile" className="text-xs font-semibold text-warm hover:underline">
+            View all
+          </Link>
+        </div>
+
+        {/* Balance row */}
+        <Card className="mb-3 grid grid-cols-3 divide-x divide-border p-0 overflow-hidden">
+          <div className="py-3 text-center">
+            <p className="font-mono text-lg font-bold tabular-nums text-content-primary">{clTaken}</p>
+            <p className="text-xs text-content-secondary">CL used</p>
+          </div>
+          <div className="py-3 text-center">
+            <p className="font-mono text-lg font-bold tabular-nums text-content-primary">{slTaken}</p>
+            <p className="text-xs text-content-secondary">SL used</p>
+          </div>
+          <div className="py-3 text-center">
+            <p className="font-mono text-lg font-bold tabular-nums text-content-primary">{lwpTaken}</p>
+            <p className="text-xs text-content-secondary">LWP</p>
+          </div>
+        </Card>
+
+        {pendingLeaves.length > 0 && (
+          <Card className="mb-3 divide-y divide-border">
+            {pendingLeaves.map(l => (
+              <div key={l.id} className="flex items-center justify-between px-4 py-3">
+                <div>
+                  <p className="text-sm font-semibold">{formatDateLabel(l.start_date)}{l.start_date !== l.end_date && ` → ${formatDateLabel(l.end_date)}`}</p>
+                  <p className="text-xs text-content-secondary">{LEAVE_LABELS[l.leave_type]} · {l.reason}</p>
+                </div>
+                <Badge variant="warning">Pending</Badge>
+              </div>
+            ))}
+          </Card>
+        )}
+
+        {upcomingApproved.length > 0 && (
+          <Card className="divide-y divide-border">
+            {upcomingApproved.map(l => (
+              <div key={l.id} className="flex items-center justify-between px-4 py-3">
+                <div>
+                  <p className="text-sm font-semibold">{formatDateLabel(l.start_date)}{l.start_date !== l.end_date && ` → ${formatDateLabel(l.end_date)}`}</p>
+                  <p className="text-xs text-content-secondary">{LEAVE_LABELS[l.leave_type]} · {l.reason}</p>
+                </div>
+                <Badge variant="success">Approved</Badge>
+              </div>
+            ))}
+          </Card>
+        )}
+
+        {myLeaves.length === 0 && (
+          <p className="text-center text-xs text-content-secondary py-2">No leave records yet</p>
+        )}
+      </div>
+
       {/* Yesterday's summary — front desk & head chef only */}
       {!kitchenOnly && (
         <div className="mt-8">
@@ -307,6 +398,12 @@ export default async function StaffDashboard() {
     </div>
   );
 }
+
+const LEAVE_LABELS: Record<string, string> = {
+  cl: "Casual Leave",
+  sl: "Sick Leave",
+  lwp: "Leave Without Pay",
+};
 
 function YesterdayCashOutRow({ entry }: { entry: CashExpense }) {
   const CATEGORY_LABELS: Record<string, string> = {
