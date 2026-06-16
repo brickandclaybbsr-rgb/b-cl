@@ -34,9 +34,10 @@ export default async function SalesPage({
     const isViewingToday = expenseDate === today;
     const yesterday = daysAgoIST(1);
 
-    const [entries, yesterdayEntries] = await Promise.all([
+    const [entries, yesterdayEntries, yesterdaySalesForCash] = await Promise.all([
       getCashExpensesByDate(expenseDate),
       isViewingToday && canSeeYesterday ? getCashExpensesByDate(yesterday) : Promise.resolve([] as CashExpense[]),
+      isViewingToday && canSeeYesterday ? getSales(yesterday) : Promise.resolve(null),
     ]);
 
     return (
@@ -46,6 +47,20 @@ export default async function SalesPage({
           subtitle={isOwner ? "Today's cash out" : "Log cash withdrawals & expenses"}
         />
         <SalesTabs />
+
+        {/* Yesterday's closing cash = today's opening cash in drawer */}
+        {isViewingToday && canSeeYesterday && yesterdaySalesForCash && (
+          <div className="flex items-center justify-between rounded-xl border border-border bg-bg-elevated px-4 py-3">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wider text-content-secondary">Opening Cash in Drawer</p>
+              <p className="mt-0.5 text-[11px] text-content-secondary">Yesterday&apos;s closing balance</p>
+            </div>
+            <span className="font-mono text-lg font-bold tabular-nums text-content-primary">
+              {formatINR(yesterdaySalesForCash.closing_balance)}
+            </span>
+          </div>
+        )}
+
         {isViewingToday && canSeeYesterday && yesterdayEntries.length > 0 && (
           <div>
             <div className="mb-3 flex items-center gap-2">
