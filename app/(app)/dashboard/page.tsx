@@ -1,5 +1,6 @@
 import Link from "next/link";
 import {
+  Sunrise,
   Sunset,
   IndianRupee,
   Package,
@@ -59,6 +60,12 @@ export default async function StaffDashboard() {
   }
 
   const tasks = [
+    {
+      href: "/checklist/opening",
+      icon: Sunrise,
+      title: "Opening checklist",
+      done: Boolean(snap.opening),
+    },
     {
       href: "/checklist/closing",
       icon: Sunset,
