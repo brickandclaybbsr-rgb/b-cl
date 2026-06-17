@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useFormState } from "react-dom";
 import { toast } from "sonner";
 import { Bell, Users, User, Globe } from "lucide-react";
 import { sendCustomNotification, type NotifyState } from "./actions";
 import { Card } from "@/components/ui/card";
+import { Confetti } from "@/components/ui/confetti";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -23,13 +24,19 @@ export function SendNotificationForm() {
     sendCustomNotification,
     {},
   );
+  const [showConfetti, setShowConfetti] = useState(false);
 
   useEffect(() => {
     if (state.error) toast.error(state.error);
-    if (state.ok) toast.success("Notification sent!");
+    if (state.ok) {
+      toast.success("Notification sent!");
+      setShowConfetti(true);
+    }
   }, [state]);
 
   return (
+    <>
+    <Confetti active={showConfetti} />
     <form action={formAction} className="space-y-4">
       <Card className="space-y-4 p-4">
         <h2 className="text-xs font-bold uppercase tracking-wider text-warm">
@@ -95,5 +102,6 @@ export function SendNotificationForm() {
         Send notification
       </SubmitButton>
     </form>
+    </>
   );
 }

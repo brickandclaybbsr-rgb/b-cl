@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Plus, Store, ToggleLeft, ToggleRight, Trash2, ChevronDown, ChevronUp } from "lucide-react";
 import { addVendor, toggleVendor, deleteVendor } from "@/app/(app)/settings/actions";
 import { Card } from "@/components/ui/card";
+import { Confetti } from "@/components/ui/confetti";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -28,12 +29,14 @@ interface Props {
 
 export function VendorManageClient({ vendors }: Props) {
   const [showAddForm, setShowAddForm] = useState(false);
+  const [showConfetti, setShowConfetti] = useState(false);
   const [addState, addAction] = useFormState(addVendor, {});
 
   useEffect(() => {
     if (addState.error) toast.error(addState.error);
     if (addState.ok) {
       toast.success("Vendor added!");
+      setShowConfetti(true);
       setShowAddForm(false);
     }
   }, [addState]);
@@ -56,6 +59,7 @@ export function VendorManageClient({ vendors }: Props) {
 
   return (
     <div className="space-y-5">
+      <Confetti active={showConfetti} />
       {/* Add vendor */}
       <Card className="overflow-hidden">
         <button

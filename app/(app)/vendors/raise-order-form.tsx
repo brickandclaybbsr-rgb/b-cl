@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useFormState } from "react-dom";
 import { toast } from "sonner";
 import { raiseOrder, type OrderFormState } from "./actions";
 import { Card } from "@/components/ui/card";
+import { Confetti } from "@/components/ui/confetti";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
@@ -18,16 +19,20 @@ export function RaiseOrderForm({ vendors }: { vendors: Vendor[] }) {
     {},
   );
   const formRef = useRef<HTMLFormElement>(null);
+  const [showConfetti, setShowConfetti] = useState(false);
 
   useEffect(() => {
     if (state.error) toast.error(state.error);
     if (state.ok) {
       toast.success("Order request raised ✓");
+      setShowConfetti(true);
       formRef.current?.reset();
     }
   }, [state]);
 
   return (
+    <>
+    <Confetti active={showConfetti} />
     <Card className="p-4">
       <div className="mb-3">
         <h2 className="text-sm font-bold uppercase tracking-wider text-warm">
@@ -81,5 +86,6 @@ export function RaiseOrderForm({ vendors }: { vendors: Vendor[] }) {
         </SubmitButton>
       </form>
     </Card>
+    </>
   );
 }

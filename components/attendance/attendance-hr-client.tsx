@@ -3,6 +3,7 @@
 import { useState, useTransition, useRef, useEffect } from "react";
 import { useFormState } from "react-dom";
 import { toast } from "sonner";
+import { Confetti } from "@/components/ui/confetti";
 import { 
   FileText, 
   CalendarDays, 
@@ -132,6 +133,7 @@ export function AttendanceHRClient({ staffList, initialLeaves, initialDocuments,
   const [activeTab, setActiveTab] = useState<"attendance" | "leaves" | "documents" | "people">("people");
   const [reviewingLeaveId, setReviewingLeaveId] = useState<string | null>(null);
   const [managerNotes, setManagerNotes] = useState<string>("");
+  const [showConfetti, setShowConfetti] = useState(false);
   const [pending, startTransition] = useTransition();
   const fileFormRef = useRef<HTMLFormElement>(null);
   const [docType, setDocType] = useState<"appointment_letter" | "salary_slip" | "aadhar_card" | "pan_card">("appointment_letter");
@@ -161,6 +163,7 @@ export function AttendanceHRClient({ staffList, initialLeaves, initialDocuments,
       toast.error(profileState.error);
     } else if (profileState.ok) {
       toast.success(profileState.message || "Profile updated successfully!");
+      setShowConfetti(true);
       setEditingStaffId(null);
       window.location.reload();
     }
@@ -200,6 +203,7 @@ export function AttendanceHRClient({ staffList, initialLeaves, initialDocuments,
       toast.error(payslipState.error);
     } else if (payslipState.ok) {
       toast.success(payslipState.message || "Payslip generated successfully!");
+      setShowConfetti(true);
       payslipFormRef.current?.reset();
       setSelectedStaffId("");
       window.location.reload();
@@ -214,6 +218,7 @@ export function AttendanceHRClient({ staffList, initialLeaves, initialDocuments,
       toast.error(sigState.error);
     } else if (sigState.ok) {
       toast.success(sigState.message || "Signature uploaded!");
+      setShowConfetti(true);
       sigFormRef.current?.reset();
       window.location.reload();
     }
@@ -281,6 +286,7 @@ export function AttendanceHRClient({ staffList, initialLeaves, initialDocuments,
 
   return (
     <div className="space-y-4">
+      <Confetti active={showConfetti} />
       {/* Top Title */}
       <div className="flex items-center justify-between border-b border-border/40 pb-4">
         <div>

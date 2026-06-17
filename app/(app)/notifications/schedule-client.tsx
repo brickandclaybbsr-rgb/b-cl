@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useFormState } from "react-dom";
 import { toast } from "sonner";
 import { Clock, Play, ToggleLeft, ToggleRight } from "lucide-react";
 import { toggleNotificationSetting, triggerManualNotification, type NotifyState } from "./actions";
 import { Card } from "@/components/ui/card";
+import { Confetti } from "@/components/ui/confetti";
 import { SubmitButton } from "@/components/ui/submit-button";
 
 interface ScheduleGroup {
@@ -48,12 +49,18 @@ function ToggleForm({ groupKey, enabled }: { groupKey: string; enabled: boolean 
 
 function TriggerForm({ triggerType, label }: { triggerType: string; label: string }) {
   const [state, action] = useFormState<NotifyState, FormData>(triggerManualNotification, {});
+  const [showConfetti, setShowConfetti] = useState(false);
   useEffect(() => {
     if (state.error) toast.error(state.error);
-    if (state.ok) toast.success(`${label} sent!`);
+    if (state.ok) {
+      toast.success(`${label} sent!`);
+      setShowConfetti(true);
+    }
   }, [state]);
 
   return (
+    <>
+    <Confetti active={showConfetti} />
     <form action={action}>
       <input type="hidden" name="type" value={triggerType} />
       <SubmitButton
@@ -65,6 +72,7 @@ function TriggerForm({ triggerType, label }: { triggerType: string; label: strin
         <Play className="size-3" /> Send now
       </SubmitButton>
     </form>
+    </>
   );
 }
 

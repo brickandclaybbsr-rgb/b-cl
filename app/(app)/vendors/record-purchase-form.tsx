@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useFormState } from "react-dom";
 import { toast } from "sonner";
 import { recordPurchase, type PurchaseFormState } from "./purchase-actions";
 import { Card } from "@/components/ui/card";
+import { Confetti } from "@/components/ui/confetti";
 import { Input } from "@/components/ui/input";
 import { FileInput } from "@/components/ui/file-input";
 import { Label } from "@/components/ui/label";
@@ -19,11 +20,13 @@ export function RecordPurchaseForm({ vendors }: { vendors: Vendor[] }) {
     {},
   );
   const formRef = useRef<HTMLFormElement>(null);
+  const [showConfetti, setShowConfetti] = useState(false);
 
   useEffect(() => {
     if (state.error) toast.error(state.error);
     if (state.ok) {
       toast.success("Purchase recorded ✓");
+      setShowConfetti(true);
       formRef.current?.reset();
     }
   }, [state]);
@@ -31,6 +34,8 @@ export function RecordPurchaseForm({ vendors }: { vendors: Vendor[] }) {
   const today = new Date().toISOString().split("T")[0];
 
   return (
+    <>
+    <Confetti active={showConfetti} />
     <Card className="p-4">
       <form ref={formRef} action={formAction} className="space-y-4">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -104,5 +109,6 @@ export function RecordPurchaseForm({ vendors }: { vendors: Vendor[] }) {
         </SubmitButton>
       </form>
     </Card>
+    </>
   );
 }

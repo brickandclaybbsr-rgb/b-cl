@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useFormState } from "react-dom";
 import { toast } from "sonner";
 import { Wallet, Receipt, FileText } from "lucide-react";
 import { submitReimbursementClaim, type ReimbursementFormState } from "./actions";
+import { Confetti } from "@/components/ui/confetti";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { FileInput } from "@/components/ui/file-input";
@@ -17,16 +18,20 @@ export function ReimbursementClaimForm() {
     {},
   );
   const formRef = useRef<HTMLFormElement>(null);
+  const [showConfetti, setShowConfetti] = useState(false);
 
   useEffect(() => {
     if (state.error) toast.error(state.error);
     if (state.ok) {
       toast.success("Expense recorded ✓");
+      setShowConfetti(true);
       formRef.current?.reset();
     }
   }, [state]);
 
   return (
+    <>
+    <Confetti active={showConfetti} />
     <Card className="p-4">
       <div className="mb-4">
         <h2 className="text-sm font-bold uppercase tracking-wider text-warm">
@@ -87,5 +92,6 @@ export function ReimbursementClaimForm() {
         </SubmitButton>
       </form>
     </Card>
+    </>
   );
 }

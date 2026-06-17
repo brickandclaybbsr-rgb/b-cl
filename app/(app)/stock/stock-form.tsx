@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { ShoppingCart, Search, Plus, Package } from "lucide-react";
 import { submitStock, addStockItemInline, type StockFormState } from "./actions";
 import { Card } from "@/components/ui/card";
+import { Confetti } from "@/components/ui/confetti";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -106,9 +107,14 @@ export function StockForm({
   const [newItemCategory, setNewItemCategory] = useState("");
   const [isAdding, startAdding] = useTransition();
 
+  const [showConfetti, setShowConfetti] = useState(false);
+
   useEffect(() => {
     if (state.error) toast.error(state.error);
-    if (state.ok) toast.success("Stock status saved ✓");
+    if (state.ok) {
+      toast.success("Stock status saved ✓");
+      setShowConfetti(true);
+    }
   }, [state]);
 
   // Unique categories for the dropdown select
@@ -192,6 +198,7 @@ export function StockForm({
 
   return (
     <div className="space-y-4">
+      <Confetti active={showConfetti} />
       {/* 1. Header Toolbar: Search + Quick Add Inline */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
         {/* Search Input */}

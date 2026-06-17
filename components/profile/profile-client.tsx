@@ -3,6 +3,7 @@
 import { useState, useTransition, useEffect, useRef } from "react";
 import { useFormState } from "react-dom";
 import { toast } from "sonner";
+import { Confetti } from "@/components/ui/confetti";
 import { 
   FileText, 
   CalendarDays, 
@@ -111,6 +112,7 @@ export function ProfileClient({ initialLeaves, initialDocuments, attendanceChild
   const [leaves, setLeaves] = useState<LeaveRequest[]>(initialLeaves);
   const [documents, setDocuments] = useState<StaffDocument[]>(initialDocuments);
   const [showPolicy, setShowPolicy] = useState(false);
+  const [showConfetti, setShowConfetti] = useState(false);
   
   const [pending, startTransition] = useTransition();
   const formRef = useRef<HTMLFormElement>(null);
@@ -139,6 +141,7 @@ export function ProfileClient({ initialLeaves, initialDocuments, attendanceChild
       toast.error(state.error);
     } else if (state.ok) {
       toast.success(state.message || "Leave request submitted successfully.");
+      setShowConfetti(true);
       formRef.current?.reset();
       setLeaveType("cl");
       setStartDate("");
@@ -214,6 +217,7 @@ export function ProfileClient({ initialLeaves, initialDocuments, attendanceChild
 
   return (
     <div className="space-y-5">
+      <Confetti active={showConfetti} />
       {/* Tabs Selector */}
       <div className="no-scrollbar -mx-4 flex gap-1 overflow-x-auto px-4 md:mx-0 md:px-0 border-b border-border/40 pb-3">
         <button

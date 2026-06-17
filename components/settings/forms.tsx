@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useFormState } from "react-dom";
 import { toast } from "sonner";
+import { Confetti } from "@/components/ui/confetti";
 import { Plus, Upload } from "lucide-react";
 import { uploadOwnerSignature } from "@/app/(app)/attendance/actions-hr";
 import {
@@ -26,19 +27,23 @@ function useAddForm(
 ) {
   const [state, formAction] = useFormState<ActionState, FormData>(action, {});
   const ref = useRef<HTMLFormElement>(null);
+  const [showConfetti, setShowConfetti] = useState(false);
   useEffect(() => {
     if (state.error) toast.error(state.error);
     if (state.ok) {
       toast.success(state.message ?? successMsg);
+      setShowConfetti(true);
       ref.current?.reset();
     }
   }, [state, successMsg]);
-  return { formAction, ref };
+  return { formAction, ref, showConfetti };
 }
 
 export function AddStaffForm() {
-  const { formAction, ref } = useAddForm(createStaff, "Staff added");
+  const { formAction, ref, showConfetti } = useAddForm(createStaff, "Staff added");
   return (
+    <>
+    <Confetti active={showConfetti} />
     <form ref={ref} action={formAction} className="space-y-3">
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="space-y-1.5">
@@ -65,12 +70,15 @@ export function AddStaffForm() {
         <Plus className="size-4" /> Add staff
       </SubmitButton>
     </form>
+    </>
   );
 }
 
 export function AddStockItemForm() {
-  const { formAction, ref } = useAddForm(addStockItem, "Item added");
+  const { formAction, ref, showConfetti } = useAddForm(addStockItem, "Item added");
   return (
+    <>
+    <Confetti active={showConfetti} />
     <form ref={ref} action={formAction} className="flex flex-wrap items-end gap-2">
       <div className="flex-1 space-y-1.5" style={{ minWidth: 160 }}>
         <Label htmlFor="i-name">Item name</Label>
@@ -84,12 +92,15 @@ export function AddStockItemForm() {
         <Plus className="size-4" /> Add
       </SubmitButton>
     </form>
+    </>
   );
 }
 
 export function AddVendorForm() {
-  const { formAction, ref } = useAddForm(addVendor, "Vendor added");
+  const { formAction, ref, showConfetti } = useAddForm(addVendor, "Vendor added");
   return (
+    <>
+    <Confetti active={showConfetti} />
     <form ref={ref} action={formAction} className="space-y-3">
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="space-y-1.5">
@@ -113,12 +124,15 @@ export function AddVendorForm() {
         <Plus className="size-4" /> Add vendor
       </SubmitButton>
     </form>
+    </>
   );
 }
 
 export function AddChecklistItemForm({ type }: { type: "opening" | "closing" }) {
-  const { formAction, ref } = useAddForm(addChecklistItem, "Checklist item added");
+  const { formAction, ref, showConfetti } = useAddForm(addChecklistItem, "Checklist item added");
   return (
+    <>
+    <Confetti active={showConfetti} />
     <form ref={ref} action={formAction} className="flex flex-wrap items-end gap-2">
       <input type="hidden" name="type" value={type} />
       <div className="space-y-1.5" style={{ minWidth: 140 }}>
@@ -133,12 +147,15 @@ export function AddChecklistItemForm({ type }: { type: "opening" | "closing" }) 
         <Plus className="size-4" /> Add
       </SubmitButton>
     </form>
+    </>
   );
 }
 
 export function WhatsAppForm({ current }: { current: string }) {
-  const { formAction, ref } = useAddForm(saveOwnerWhatsApp, "Saved");
+  const { formAction, ref, showConfetti } = useAddForm(saveOwnerWhatsApp, "Saved");
   return (
+    <>
+    <Confetti active={showConfetti} />
     <form ref={ref} action={formAction} className="flex flex-wrap items-end gap-2">
       <div className="flex-1 space-y-1.5" style={{ minWidth: 200 }}>
         <Label htmlFor="wa">Owner WhatsApp number</Label>
@@ -155,23 +172,28 @@ export function WhatsAppForm({ current }: { current: string }) {
         Save number
       </SubmitButton>
     </form>
+    </>
   );
 }
 
 export function OwnerSignatureForm({ initialSignature }: { initialSignature: string | null }) {
   const [state, formAction] = useFormState(uploadOwnerSignature, {});
   const ref = useRef<HTMLFormElement>(null);
+  const [showConfetti, setShowConfetti] = useState(false);
 
   useEffect(() => {
     if (state.error) toast.error(state.error);
     if (state.ok) {
       toast.success(state.message || "Signature uploaded successfully!");
+      setShowConfetti(true);
       ref.current?.reset();
       window.location.reload();
     }
   }, [state]);
 
   return (
+    <>
+    <Confetti active={showConfetti} />
     <form ref={ref} action={formAction} className="space-y-4 text-xs max-w-md">
       <div className="space-y-1.5">
         <Label htmlFor="owner-sig-file">Upload Signature Image</Label>
@@ -198,6 +220,7 @@ export function OwnerSignatureForm({ initialSignature }: { initialSignature: str
         Upload Signature
       </SubmitButton>
     </form>
+    </>
   );
 }
 
