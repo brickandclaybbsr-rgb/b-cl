@@ -24,6 +24,20 @@
     -webkit-tap-highlight-color: transparent;
   }
 
+  /* Eliminate 300ms tap delay on Android — biggest win for cheap phones */
+  a, button, [role="button"] {
+    touch-action: manipulation;
+    -webkit-touch-callout: none;
+    user-select: none;
+  }
+
+  /* Instant press feedback on all tappable elements */
+  a:active, button:active, [role="button"]:active {
+    opacity: 0.7;
+    transform: scale(0.97);
+    transition: opacity 0.05s, transform 0.05s;
+  }
+
   body {
     @apply bg-bg-primary text-content-primary font-sans antialiased;
     min-height: 100dvh;

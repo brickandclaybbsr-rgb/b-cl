@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Poppins, Montserrat } from "next/font/google";
 import { Toaster } from "@/components/ui/toaster";
+import NextTopLoader from "nextjs-toploader";
 import "./globals.css";
 
 // Body / UI — clean geometric sans
@@ -55,6 +56,14 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <body>
+        <NextTopLoader
+          color="#ffffff"
+          height={2}
+          showSpinner={false}
+          easing="ease"
+          speed={200}
+          shadow="0 0 8px rgba(255,255,255,0.4)"
+        />
         {children}
         <Toaster />
       </body>

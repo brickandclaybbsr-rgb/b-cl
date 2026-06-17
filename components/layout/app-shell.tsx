@@ -9,6 +9,7 @@ import { SignOutButton } from "./sign-out-button";
 import { Settings } from "lucide-react";
 import { OWNER_NAV, OWNER_MOBILE_NAV, STAFF_NAV, isActive, type NavItem } from "./nav-config";
 import { initials, cn } from "@/lib/utils";
+import { hapticLight } from "@/lib/native";
 
 export function AppShell({
   role,
@@ -105,6 +106,7 @@ function OwnerShell({
                 <Link
                   key={item.label}
                   href={item.href}
+                  onClick={() => void hapticLight()}
                   className={cn(
                     "relative flex flex-col items-center gap-1 py-3 text-[0.65rem] font-medium transition-colors duration-200",
                     active ? "text-white" : "text-content-secondary",
@@ -246,6 +248,7 @@ function StaffShell({
               <Link
                 key={item.label}
                 href={item.href}
+                onClick={() => void hapticLight()}
                 className={cn(
                   "relative flex flex-col items-center gap-1 py-3 text-[0.7rem] font-medium transition-colors duration-200",
                   active ? "text-white" : "text-content-secondary",

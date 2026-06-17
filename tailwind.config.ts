@@ -69,8 +69,8 @@ const config: Config = {
           to: { opacity: "1", transform: "translateY(0)" },
         },
         "fade-in": {
-          from: { opacity: "0" },
-          to: { opacity: "1" },
+          from: { opacity: "0", transform: "translateY(4px)" },
+          to: { opacity: "1", transform: "translateY(0)" },
         },
         "scale-in": {
           from: { opacity: "0", transform: "scale(0.97)" },
@@ -90,7 +90,7 @@ const config: Config = {
       },
       animation: {
         "fade-in-up": "fade-in-up 0.45s cubic-bezier(0.22,1,0.36,1) both",
-        "fade-in": "fade-in 0.4s ease-out both",
+        "fade-in": "fade-in 0.18s ease-out both",
         "scale-in": "scale-in 0.35s cubic-bezier(0.22,1,0.36,1) both",
         "slide-down": "slide-down 0.3s ease-out both",
         "pulse-soft": "pulse-soft 2s ease-in-out infinite",
