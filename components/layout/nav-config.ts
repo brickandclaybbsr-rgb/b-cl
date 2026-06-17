@@ -32,7 +32,7 @@ export const STAFF_NAV: NavItem[] = [
   },
   { label: "Sales", href: "/sales", icon: IndianRupee },
   { label: "Store", href: "/stock", icon: Package, match: ["/stock", "/vendors"] },
-  { label: "Profile", href: "/profile", icon: Settings, match: ["/profile", "/notifications"] },
+  { label: "Profile", href: "/profile", icon: Users, match: ["/profile", "/notifications"] },
 ];
 
 export const OWNER_NAV: NavItem[] = [

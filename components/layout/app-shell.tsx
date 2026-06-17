@@ -218,17 +218,6 @@ function StaffShell({
         <div className="container-app flex items-center justify-between py-3.5">
           <BrandLogo height={20} />
           <div className="flex items-center gap-2.5">
-            <Link
-              href="/profile"
-              className="flex items-center gap-2 hover:opacity-85 transition-all duration-200"
-            >
-              <span className="hidden text-sm text-content-secondary sm:inline">
-                {name}
-              </span>
-              <div className="flex size-8 items-center justify-center rounded-full bg-white text-xs font-bold text-black">
-                {initials(name)}
-              </div>
-            </Link>
             <SignOutButton label="" className="px-1.5" />
           </div>
         </div>
