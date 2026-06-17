@@ -167,7 +167,7 @@ function EntryRow({
               <select
                 name="category"
                 value={category}
-                onChange={(e) => setCategory(e.target.value)}
+                onChange={(e) => setCategory(e.target.value as "withdrawal" | "advance" | "expense" | "other")}
                 className="h-9 w-full rounded-lg border border-border bg-bg-elevated px-2.5 text-sm text-content-primary focus:outline-none focus:ring-2 focus:ring-fire/40"
               >
                 <option value="withdrawal">Withdrawal</option>
