@@ -63,7 +63,12 @@ export async function submitSales(
     discount_amount: toNumber(formData.get("discount_amount")),
     complimentary_count: toInt(formData.get("complimentary_count")),
     complimentary_value: toNumber(formData.get("complimentary_value")),
-    notes: String(formData.get("notes") ?? "").trim() || null,
+    notes: (() => {
+      const base = String(formData.get("notes") ?? "").trim();
+      const zeroReason = String(formData.get("_zero_closing_reason") ?? "").trim();
+      if (zeroReason) return [base, `[₹0 closing: ${zeroReason}]`].filter(Boolean).join(" — ");
+      return base || null;
+    })(),
   });
 
   if (error) {

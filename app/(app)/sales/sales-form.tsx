@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useFormState } from "react-dom";
 import { toast } from "sonner";
-import { Banknote, CreditCard, Smartphone, ShoppingBag } from "lucide-react";
+import { Banknote, CreditCard, Smartphone, ShoppingBag, AlertTriangle } from "lucide-react";
 import { submitSales, updateSales, type SalesFormState } from "./actions";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -26,6 +26,9 @@ export function SalesForm({
   const action = editMode ? updateSales : submitSales;
   const [state, formAction] = useFormState<SalesFormState, FormData>(action, {});
   const [showConfetti, setShowConfetti] = useState(false);
+  const [showZeroWarning, setShowZeroWarning] = useState(false);
+  const [zeroReason, setZeroReason] = useState("");
+  const formRef = useRef<HTMLFormElement>(null);
 
   const iv = initialValues;
   const [openingCash, setOpeningCash]         = useState(iv ? String(iv.opening_cash) : "");
@@ -51,10 +54,34 @@ export function SalesForm({
     num(cash) + num(card) + num(upi) +
     num(zomatoGold) + num(zomato) + num(swiggy) + num(swiggyDineout) + num(eazyDiner);
 
+  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    if (num(closingBalance) === 0 && !showZeroWarning) {
+      e.preventDefault();
+      setShowZeroWarning(true);
+    }
+  }
+
+  function confirmZeroAndSubmit() {
+    if (!zeroReason.trim()) {
+      toast.error("Please explain why the closing balance is ₹0");
+      return;
+    }
+    setShowZeroWarning(false);
+    // Append reason to notes by injecting a hidden field, then submit
+    const form = formRef.current;
+    if (!form) return;
+    const hidden = document.createElement("input");
+    hidden.type = "hidden";
+    hidden.name = "_zero_closing_reason";
+    hidden.value = zeroReason.trim();
+    form.appendChild(hidden);
+    form.requestSubmit();
+  }
+
   return (
     <>
     <Confetti active={showConfetti} />
-    <form action={formAction} className="space-y-4">
+    <form ref={formRef} action={formAction} onSubmit={handleSubmit} className="space-y-4">
       {date && <input type="hidden" name="_date" value={date} />}
 
       {/* Opening Cash */}
@@ -124,9 +151,47 @@ export function SalesForm({
           label="Closing Balance (Cash in Drawer)"
           name="closing_balance"
           value={closingBalance}
-          onChange={setClosingBalance}
+          onChange={(v) => { setClosingBalance(v); if (num(v) > 0) setShowZeroWarning(false); }}
         />
       </Card>
+
+      {/* Zero closing balance warning */}
+      {showZeroWarning && (
+        <div className="rounded-xl border-2 border-warning/50 bg-warning/10 p-4 space-y-3">
+          <div className="flex items-start gap-2.5">
+            <AlertTriangle className="size-5 shrink-0 text-warning mt-0.5" />
+            <div>
+              <p className="text-sm font-bold text-warning">Closing balance is ₹0 — how?</p>
+              <p className="text-xs text-content-secondary mt-0.5">
+                This is unusual. Please explain before submitting.
+              </p>
+            </div>
+          </div>
+          <Textarea
+            placeholder="e.g. All cash withdrawn by owner, no cash sales today…"
+            value={zeroReason}
+            onChange={(e) => setZeroReason(e.target.value)}
+            className="text-sm"
+            rows={2}
+          />
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setShowZeroWarning(false)}
+              className="flex-1 rounded-lg border border-border bg-bg-elevated px-3 py-2 text-sm font-semibold text-content-secondary"
+            >
+              Go back & fix
+            </button>
+            <button
+              type="button"
+              onClick={confirmZeroAndSubmit}
+              className="flex-1 rounded-lg bg-warning px-3 py-2 text-sm font-bold text-black"
+            >
+              Confirm & submit
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Discounts / Complimentary */}
       <Card className="space-y-3 p-4">
