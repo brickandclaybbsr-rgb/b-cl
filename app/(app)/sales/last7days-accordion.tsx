@@ -38,12 +38,6 @@ export function Last7DaysAccordion({ sales, today, yesterday, canEdit }: Props) 
         const total = salesTotal(s);
         const isOpen = openDate === s.date;
         const isEditable = canEdit && (s.date === today || s.date === yesterday);
-        const agg =
-          Number(s.zomato_gold_sales) +
-          Number(s.zomato_sales) +
-          Number(s.swiggy_sales) +
-          Number(s.swiggy_dineout_sales) +
-          Number(s.eazy_diner_sales);
 
         const detailRows = [
           { label: "Cash", value: Number(s.cash_sales) },
@@ -89,28 +83,7 @@ export function Last7DaysAccordion({ sales, today, yesterday, canEdit }: Props) 
             </button>
 
             {isOpen && (
-              <div className="px-4 pb-4 pt-1 bg-bg-elevated/30 space-y-3">
-                <div className="grid grid-cols-3 gap-1.5 text-[11px]">
-                  <div className="rounded-lg bg-bg-elevated px-2 py-1.5 text-center">
-                    <p className="text-content-secondary">Cash</p>
-                    <p className="font-mono font-semibold tabular-nums text-content-primary">
-                      {formatINR(s.cash_sales)}
-                    </p>
-                  </div>
-                  <div className="rounded-lg bg-bg-elevated px-2 py-1.5 text-center">
-                    <p className="text-content-secondary">UPI / Card</p>
-                    <p className="font-mono font-semibold tabular-nums text-content-primary">
-                      {formatINR(Number(s.upi_sales) + Number(s.card_sales))}
-                    </p>
-                  </div>
-                  <div className="rounded-lg bg-bg-elevated px-2 py-1.5 text-center">
-                    <p className="text-content-secondary">Aggregators</p>
-                    <p className="font-mono font-semibold tabular-nums text-content-primary">
-                      {formatINR(agg)}
-                    </p>
-                  </div>
-                </div>
-
+              <div className="px-4 pb-3 pt-1 bg-bg-elevated/30">
                 {detailRows.length > 0 && (
                   <div className="rounded-xl border border-border overflow-hidden divide-y divide-border">
                     {detailRows.map((r) => (

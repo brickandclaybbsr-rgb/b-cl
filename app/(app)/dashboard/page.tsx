@@ -392,19 +392,14 @@ export default async function StaffDashboard() {
             </Card>
           </Link>
 
-          {/* Yesterday's cash out */}
+          {/* Yesterday's cash out — total only */}
           {yesterdayCashOut.length > 0 && (
             <Link href={`/sales?tab=expenses&date=${yesterday}`} className="block">
-              <Card className="divide-y divide-border transition-colors hover:border-border-strong">
-                <div className="flex items-center justify-between px-4 py-3">
-                  <p className="text-sm font-semibold">Cash Out</p>
-                  <span className="font-mono text-sm font-bold tabular-nums text-danger">
-                    -{formatINR(yesterdayCashOut.reduce((s, e) => s + Number(e.amount), 0))}
-                  </span>
-                </div>
-                {yesterdayCashOut.map((entry) => (
-                  <YesterdayCashOutRow key={entry.id} entry={entry} />
-                ))}
+              <Card className="flex items-center justify-between px-4 py-3 transition-colors hover:border-border-strong">
+                <p className="text-sm font-semibold">Cash Out</p>
+                <span className="font-mono text-sm font-bold tabular-nums text-danger">
+                  -{formatINR(yesterdayCashOut.reduce((s, e) => s + Number(e.amount), 0))}
+                </span>
               </Card>
             </Link>
           )}
