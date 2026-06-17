@@ -24,7 +24,7 @@ export default async function SalesPage({
   const profile = await requireProfile();
   const isKitchenOnly = profile.team === "kitchen";
   const isHeadChef = profile.team === "head_chef";
-  const showLast7Days = profile.team === "kitchen" || profile.team === "head_chef";
+  const showLast7Days = profile.team === "front_desk" || profile.team === "head_chef";
 
   const canSeeYesterday = profile.team === "front_desk" || profile.team === "head_chef";
 
