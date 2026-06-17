@@ -280,11 +280,11 @@ export default async function SalesPage({
         <SalesForm date={requestedDate} />
       )}
 
-      {/* Last 7 days — kitchen and head_chef only */}
+      {/* Last 7 days — front_desk and head_chef only */}
       {showLast7Days && (() => {
         const cutoff = daysAgoIST(6);
         const recent = allSalesInWindow
-          .filter((s) => s.date >= cutoff)
+          .filter((s) => s.date >= cutoff && s.date !== yesterday) // yesterday shown separately below
           .sort((a, b) => b.date.localeCompare(a.date));
         if (recent.length === 0) return null;
         return (
@@ -300,7 +300,7 @@ export default async function SalesPage({
                 const total = salesTotal(s);
                 const agg = Number(s.zomato_gold_sales) + Number(s.zomato_sales) + Number(s.swiggy_sales) + Number(s.swiggy_dineout_sales) + Number(s.eazy_diner_sales);
                 return (
-                  <div key={s.date} className="px-4 py-3 space-y-2">
+                  <a key={s.date} href={`/sales?date=${s.date}`} className="block px-4 py-3 space-y-2 hover:bg-white/[0.02] active:bg-white/[0.04] transition-colors">
                     <div className="flex items-center justify-between">
                       <p className="text-sm font-semibold text-content-primary">{formatDateLabel(s.date)}</p>
                       <span className="font-mono text-sm font-bold tabular-nums text-warm">{formatINR(total)}</span>
@@ -319,7 +319,7 @@ export default async function SalesPage({
                         <p className="font-mono font-semibold tabular-nums text-content-primary">{formatINR(agg)}</p>
                       </div>
                     </div>
-                  </div>
+                  </a>
                 );
               })}
             </Card>
