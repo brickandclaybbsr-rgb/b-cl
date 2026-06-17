@@ -2,8 +2,9 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { requireProfile } from "@/lib/auth";
-import { todayIST, nowIST, formatDateLabel } from "@/lib/date";
+import { todayIST, daysAgoIST, nowIST, formatDateLabel } from "@/lib/date";
 import { APP_START_DATE } from "@/lib/constants";
 import { toNumber, toInt } from "@/lib/utils";
 import { whatsappNotify } from "@/lib/whatsapp-notify";
@@ -74,6 +75,66 @@ export async function submitSales(
 
   await whatsappNotify.salesSubmitted(profile.name, cash_sales, online_sales, aggregator_sales);
   await notifyOwner.salesSubmitted(cash_sales + online_sales + aggregator_sales);
+
+  revalidatePath("/sales");
+  revalidatePath("/dashboard");
+  revalidatePath("/owner");
+  return { ok: true };
+}
+
+export async function updateSales(
+  _prev: SalesFormState,
+  formData: FormData,
+): Promise<SalesFormState> {
+  const profile = await requireProfile();
+
+  if (profile.team !== "head_chef") {
+    return { error: "Only the head chef can edit sales." };
+  }
+
+  const today = todayIST();
+  const yesterday = daysAgoIST(1);
+  const date = String(formData.get("_date") ?? "").trim();
+
+  if (date !== today && date !== yesterday) {
+    return { error: "You can only edit sales for today or yesterday." };
+  }
+
+  const cash_sales          = toNumber(formData.get("cash_sales"));
+  const card_sales          = toNumber(formData.get("card_sales"));
+  const upi_sales           = toNumber(formData.get("upi_sales"));
+  const zomato_gold_sales   = toNumber(formData.get("zomato_gold_sales"));
+  const zomato_sales        = toNumber(formData.get("zomato_sales"));
+  const swiggy_sales        = toNumber(formData.get("swiggy_sales"));
+  const swiggy_dineout_sales = toNumber(formData.get("swiggy_dineout_sales"));
+  const eazy_diner_sales    = toNumber(formData.get("eazy_diner_sales"));
+
+  const online_sales     = card_sales + upi_sales;
+  const aggregator_sales = zomato_gold_sales + zomato_sales + swiggy_sales + swiggy_dineout_sales + eazy_diner_sales;
+
+  const admin = createAdminClient();
+  const { error } = await admin.from("daily_sales").upsert({
+    date,
+    submitted_by: profile.id,
+    opening_cash:        toNumber(formData.get("opening_cash")),
+    cash_sales,
+    card_sales,
+    upi_sales,
+    online_sales,
+    zomato_gold_sales,
+    zomato_sales,
+    swiggy_sales,
+    swiggy_dineout_sales,
+    eazy_diner_sales,
+    aggregator_sales,
+    closing_balance:     toNumber(formData.get("closing_balance")),
+    discount_amount:     toNumber(formData.get("discount_amount")),
+    complimentary_count: toInt(formData.get("complimentary_count")),
+    complimentary_value: toNumber(formData.get("complimentary_value")),
+    notes:               String(formData.get("notes") ?? "").trim() || null,
+  }, { onConflict: "date" });
+
+  if (error) return { error: error.message };
 
   revalidatePath("/sales");
   revalidatePath("/dashboard");

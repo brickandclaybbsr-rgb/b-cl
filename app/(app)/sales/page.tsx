@@ -19,10 +19,11 @@ export const metadata = { title: "Daily sales" };
 export default async function SalesPage({
   searchParams,
 }: {
-  searchParams: { tab?: string; date?: string };
+  searchParams: { tab?: string; date?: string; edit?: string };
 }) {
   const profile = await requireProfile();
   const isKitchenOnly = profile.team === "kitchen";
+  const isHeadChef = profile.team === "head_chef";
   const showLast7Days = profile.team === "kitchen" || profile.team === "head_chef";
 
   const canSeeYesterday = profile.team === "front_desk" || profile.team === "head_chef";
@@ -105,9 +106,12 @@ export default async function SalesPage({
   const isOwner = profile.role === "owner";
   const isSubmitter = existing?.submitted_by === profile.id;
   const viewingToday = requestedDate === today;
-
   const yesterday = daysAgoIST(1);
   const yesterdaySales = viewingToday ? (allSalesInWindow.find(s => s.date === yesterday) ?? null) : null;
+
+  // Head chef can edit today's or yesterday's sales
+  const canEdit = isHeadChef && !!existing && (requestedDate === today || requestedDate === yesterday);
+  const editMode = canEdit && searchParams.edit === "1";
 
   // Sales for today can only be filed after 9:00 PM IST.
   // The business day runs until 4 AM next calendar day, so midnight–4 AM is
@@ -131,7 +135,7 @@ export default async function SalesPage({
     : null;
 
   // ── Already submitted by someone else ───────────────────────────────────
-  if (existing && !isOwner && !isSubmitter) {
+  if (existing && !isOwner && !isSubmitter && !canEdit) {
     const nameMap = await getProfileNameMap();
     const submitterName = existing.submitted_by
       ? nameMap[existing.submitted_by] ?? "another staff member"
@@ -203,14 +207,30 @@ export default async function SalesPage({
       )}
 
       {existing ? (
-        <SalesView
-          sales={existing}
-          submitterName={
-            existing.submitted_by
-              ? (await getProfileNameMap())[existing.submitted_by] ?? "Staff"
-              : "Staff"
-          }
-        />
+        editMode ? (
+          <SalesForm date={requestedDate} editMode initialValues={existing} />
+        ) : (
+          <>
+            <SalesView
+              sales={existing}
+              submitterName={
+                existing.submitted_by
+                  ? (await getProfileNameMap())[existing.submitted_by] ?? "Staff"
+                  : "Staff"
+              }
+            />
+            {canEdit && (
+              <div className="mt-4 text-center">
+                <a
+                  href={`/sales?date=${requestedDate}&edit=1`}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-bg-elevated px-4 py-2 text-sm font-semibold text-content-primary hover:bg-white/[0.06] transition-colors"
+                >
+                  Edit Sales
+                </a>
+              </div>
+            )}
+          </>
+        )
       ) : gateForToday ? (
         <div className="mt-4 rounded-2xl border-2 border-amber-400/50 bg-gradient-to-b from-amber-400/15 to-amber-500/5 overflow-hidden">
           {/* Header strip */}

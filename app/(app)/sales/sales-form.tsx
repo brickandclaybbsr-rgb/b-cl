@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useFormState } from "react-dom";
 import { toast } from "sonner";
 import { Banknote, CreditCard, Smartphone, ShoppingBag } from "lucide-react";
-import { submitSales, type SalesFormState } from "./actions";
+import { submitSales, updateSales, type SalesFormState } from "./actions";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,29 +12,40 @@ import { Textarea } from "@/components/ui/textarea";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { Confetti } from "@/components/ui/confetti";
 import { formatINR } from "@/lib/utils";
+import type { DailySales } from "@/lib/database.types";
 
-export function SalesForm({ date }: { date?: string }) {
-  const [state, formAction] = useFormState<SalesFormState, FormData>(submitSales, {});
+export function SalesForm({
+  date,
+  editMode,
+  initialValues,
+}: {
+  date?: string;
+  editMode?: boolean;
+  initialValues?: DailySales;
+}) {
+  const action = editMode ? updateSales : submitSales;
+  const [state, formAction] = useFormState<SalesFormState, FormData>(action, {});
   const [showConfetti, setShowConfetti] = useState(false);
 
-  const [openingCash, setOpeningCash]         = useState("");
-  const [cash, setCash]                       = useState("");
-  const [card, setCard]                       = useState("");
-  const [upi, setUpi]                         = useState("");
-  const [zomatoGold, setZomatoGold]           = useState("");
-  const [zomato, setZomato]                   = useState("");
-  const [swiggy, setSwiggy]                   = useState("");
-  const [swiggyDineout, setSwiggyDineout]     = useState("");
-  const [eazyDiner, setEazyDiner]             = useState("");
-  const [closingBalance, setClosingBalance]   = useState("");
+  const iv = initialValues;
+  const [openingCash, setOpeningCash]         = useState(iv ? String(iv.opening_cash) : "");
+  const [cash, setCash]                       = useState(iv ? String(iv.cash_sales) : "");
+  const [card, setCard]                       = useState(iv ? String(iv.card_sales) : "");
+  const [upi, setUpi]                         = useState(iv ? String(iv.upi_sales) : "");
+  const [zomatoGold, setZomatoGold]           = useState(iv ? String(iv.zomato_gold_sales) : "");
+  const [zomato, setZomato]                   = useState(iv ? String(iv.zomato_sales) : "");
+  const [swiggy, setSwiggy]                   = useState(iv ? String(iv.swiggy_sales) : "");
+  const [swiggyDineout, setSwiggyDineout]     = useState(iv ? String(iv.swiggy_dineout_sales) : "");
+  const [eazyDiner, setEazyDiner]             = useState(iv ? String(iv.eazy_diner_sales) : "");
+  const [closingBalance, setClosingBalance]   = useState(iv ? String(iv.closing_balance) : "");
 
   useEffect(() => {
     if (state.error) toast.error(state.error);
     if (state.ok) {
-      toast.success("Sales saved ✓");
+      toast.success(editMode ? "Sales updated ✓" : "Sales saved ✓");
       setShowConfetti(true);
     }
-  }, [state]);
+  }, [state, editMode]);
 
   const totalSale =
     num(cash) + num(card) + num(upi) +
@@ -154,15 +165,22 @@ export function SalesForm({ date }: { date?: string }) {
 
       <Card className="space-y-1.5 p-4">
         <Label htmlFor="notes">Notes</Label>
-        <Textarea id="notes" name="notes" placeholder="Any context on today's sales" />
+        <Textarea
+          id="notes"
+          name="notes"
+          placeholder="Any context on today's sales"
+          defaultValue={iv?.notes ?? ""}
+        />
       </Card>
 
-      <SubmitButton className="w-full" size="lg" pendingText="Saving…">
-        Save Daily Sales
+      <SubmitButton className="w-full" size="lg" pendingText={editMode ? "Updating…" : "Saving…"}>
+        {editMode ? "Update Sales" : "Save Daily Sales"}
       </SubmitButton>
-      <p className="pb-2 text-center text-xs text-content-secondary">
-        One sales entry per day. This can&apos;t be edited after saving.
-      </p>
+      {!editMode && (
+        <p className="pb-2 text-center text-xs text-content-secondary">
+          One sales entry per day. This can&apos;t be edited after saving.
+        </p>
+      )}
     </form>
     </>
   );
