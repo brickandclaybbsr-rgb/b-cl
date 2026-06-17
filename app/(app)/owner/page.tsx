@@ -1,7 +1,6 @@
 import Link from "next/link";
 import {
   IndianRupee,
-  Receipt,
   Package,
   ShoppingCart,
   Sunrise,
@@ -9,23 +8,22 @@ import {
   CheckCircle2,
   XCircle,
   Activity,
-  ChevronRight,
   Wallet,
   AlertTriangle,
   CalendarClock,
   Check,
   X,
+  TrendingUp,
 } from "lucide-react";
 import { requireOwner } from "@/lib/auth";
 import { getTodaySnapshot } from "@/lib/data/dashboard";
 import { getSalesTrend, getSalesRange } from "@/lib/data/sales";
 import { getTodayActivity } from "@/lib/data/activity";
 import { getTodayCashExpenses } from "@/lib/data/expenses";
-import { daysAgoIST, formatDateLabel, formatTimeIST } from "@/lib/date";
+import { formatDateLabel, formatTimeIST } from "@/lib/date";
 import { APP_START_DATE } from "@/lib/constants";
 import { getProfileNameMap } from "@/lib/data/profiles";
-import { formatINR, formatNumber } from "@/lib/utils";
-import { PageHeader } from "@/components/page-header";
+import { formatINR } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
 import { SalesTrendChart } from "@/components/charts/sales-trend-chart";
 import { SendReportButton } from "@/components/send-report-button";
@@ -86,28 +84,32 @@ export default async function OwnerDashboard() {
   const online = Number(snap.sales?.online_sales ?? 0);
   const agg = Number(snap.sales?.aggregator_sales ?? 0);
   const salesSubmitter = snap.sales?.submitted_by ? nameMap[snap.sales.submitted_by] ?? "Staff" : null;
+  const cashOutTotal = cashExpenses.reduce((s, e) => s + Number(e.amount), 0);
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Owner Dashboard"
-        subtitle={formatDateLabel(snap.date)}
-        action={<SendReportButton size="sm" variant="secondary" />}
-      />
+    <div className="space-y-3">
+      {/* ── Header ──────────────────────────────────────────────────────────── */}
+      <div className="flex items-center justify-between pb-1">
+        <div>
+          <h1 className="text-xl font-bold tracking-tight">Dashboard</h1>
+          <p className="text-xs text-content-secondary mt-0.5">{formatDateLabel(snap.date)}</p>
+        </div>
+        <SendReportButton size="sm" variant="secondary" />
+      </div>
 
-      {/* Missing sales dates */}
+      {/* ── Missing sales alert ─────────────────────────────────────────────── */}
       {missingSalesDates.length > 0 && (
-        <div className="rounded-xl border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning space-y-1.5">
-          <div className="flex items-center gap-2 font-semibold">
-            <AlertTriangle className="size-4 shrink-0" />
-            Sales not filed for {missingSalesDates.length} day{missingSalesDates.length > 1 ? "s" : ""}
+        <div className="rounded-xl border border-warning/30 bg-warning/10 px-3 py-2.5 text-warning">
+          <div className="flex items-center gap-2 text-xs font-semibold mb-1.5">
+            <AlertTriangle className="size-3.5 shrink-0" />
+            {missingSalesDates.length} day{missingSalesDates.length > 1 ? "s" : ""} missing sales
           </div>
-          <div className="flex flex-wrap gap-2 pl-6">
+          <div className="flex flex-wrap gap-1.5 pl-5">
             {missingSalesDates.map((d) => (
               <Link
                 key={d}
                 href={`/sales?date=${d}`}
-                className="rounded-lg border border-warning/40 bg-warning/15 px-2.5 py-1 text-xs font-semibold hover:bg-warning/25"
+                className="rounded-md border border-warning/40 bg-warning/15 px-2 py-0.5 text-[10px] font-semibold hover:bg-warning/25"
               >
                 {formatDateLabel(d)}
               </Link>
@@ -118,80 +120,144 @@ export default async function OwnerDashboard() {
 
       {/* ── Today's Sales ───────────────────────────────────────────────────── */}
       <Card className="overflow-hidden">
-        <div className="flex items-center justify-between border-b border-border px-4 py-3">
-          <div className="flex items-center gap-2">
-            <IndianRupee className="size-4 text-fire" />
-            <h2 className="text-sm font-bold uppercase tracking-wider text-content-secondary">Today&apos;s Sales</h2>
+        <div className="px-4 pt-4 pb-3">
+          <div className="flex items-start justify-between mb-1">
+            <div>
+              <p className="text-[11px] font-bold uppercase tracking-wider text-content-secondary flex items-center gap-1.5">
+                <IndianRupee className="size-3 text-fire" />
+                Today&apos;s Sales
+              </p>
+              {salesSubmitter && (
+                <p className="text-[10px] text-content-secondary mt-0.5">
+                  {salesSubmitter} · {formatTimeIST(snap.sales!.submitted_at)}
+                </p>
+              )}
+            </div>
+            <Link href="/sales" className="text-[11px] font-semibold text-warm">
+              View →
+            </Link>
           </div>
-          {salesSubmitter && (
-            <p className="text-xs text-content-secondary">
-              By {salesSubmitter} · {formatTimeIST(snap.sales!.submitted_at)}
-            </p>
+
+          {snap.salesTotal > 0 ? (
+            <>
+              <p className="font-mono text-3xl font-bold tabular-nums text-warm mt-2 mb-3">
+                {formatINR(snap.salesTotal)}
+              </p>
+
+              {/* 3 metric chips */}
+              <div className="grid grid-cols-3 gap-2 mb-3">
+                <div className="rounded-xl bg-bg-elevated px-2.5 py-2">
+                  <p className="text-[10px] text-content-secondary">Cash</p>
+                  <p className="font-mono text-sm font-bold tabular-nums mt-0.5">{formatINR(cash)}</p>
+                </div>
+                <div className="rounded-xl bg-bg-elevated px-2.5 py-2">
+                  <p className="text-[10px] text-content-secondary">Online</p>
+                  <p className="font-mono text-sm font-bold tabular-nums mt-0.5">{formatINR(online)}</p>
+                </div>
+                <div className="rounded-xl bg-bg-elevated px-2.5 py-2">
+                  <p className="text-[10px] text-content-secondary">Aggregators</p>
+                  <p className="font-mono text-[11px] font-bold tabular-nums mt-0.5">{formatINR(agg)}</p>
+                </div>
+              </div>
+
+              {/* Split bars */}
+              <div className="space-y-1.5">
+                <SplitBar label="Cash" value={cash} total={snap.salesTotal} color="var(--color-fire, #e85d2f)" />
+                <SplitBar label="Online (Card + UPI)" value={online} total={snap.salesTotal} color="#9A9AA2" />
+                <SplitBar label="Aggregators" value={agg} total={snap.salesTotal} color="#4D4D55" />
+              </div>
+            </>
+          ) : (
+            <p className="mt-3 text-sm text-content-secondary">Not filed yet today.</p>
           )}
         </div>
-
-        {snap.salesTotal > 0 ? (
-          <>
-            <div className="flex items-center justify-between bg-fire/10 px-4 py-4">
-              <span className="text-sm font-semibold text-warm">Total</span>
-              <span className="font-mono text-2xl font-bold tabular-nums text-warm">
-                {formatINR(snap.salesTotal)}
-              </span>
-            </div>
-            <div className="space-y-2.5 p-4">
-              <SplitBar label="Cash" value={cash} total={snap.salesTotal} color="var(--color-fire, #e85d2f)" />
-              <SplitBar label="Online (Card + UPI)" value={online} total={snap.salesTotal} color="#9A9AA2" />
-              <SplitBar label="Aggregators" value={agg} total={snap.salesTotal} color="#4D4D55" />
-            </div>
-          </>
-        ) : (
-          <div className="px-4 py-6 text-center text-sm text-content-secondary">
-            Sales not entered yet for today.
-          </div>
-        )}
       </Card>
 
       {/* ── Stock Alerts + Pending Orders ───────────────────────────────────── */}
       <div className="grid grid-cols-2 gap-3">
-        {/* Stock alerts */}
         <Link href="/stock">
-          <Card className={`p-4 transition-colors hover:border-border-strong ${alerts > 0 ? "border-warning/40" : ""}`}>
-            <div className="flex items-center justify-between mb-2">
-              <Package className={`size-5 ${alerts > 0 ? "text-warning" : "text-success"}`} />
-              {alerts > 0 && <AlertTriangle className="size-3.5 text-warning" />}
+          <Card className={`p-3 transition-colors hover:border-border-strong ${alerts > 0 ? "border-warning/40" : ""}`}>
+            <div className="flex items-center justify-between mb-1.5">
+              <Package className={`size-4 ${alerts > 0 ? "text-warning" : "text-success"}`} />
+              {alerts > 0 && <span className="size-1.5 rounded-full bg-warning" />}
             </div>
-            <p className="font-mono text-2xl font-bold tabular-nums text-content-primary">{alerts}</p>
-            <p className="mt-1 text-xs font-semibold text-content-secondary">Stock Alerts</p>
-            <p className="mt-0.5 text-[11px] text-content-secondary">
-              {snap.outItems.length} out · {snap.lowItems.length} low
-            </p>
+            <p className="font-mono text-2xl font-bold tabular-nums">{alerts}</p>
+            <p className="text-xs font-semibold text-content-secondary mt-0.5">Stock Alerts</p>
+            <p className="text-[10px] text-content-secondary">{snap.outItems.length} out · {snap.lowItems.length} low</p>
           </Card>
         </Link>
 
-        {/* Pending orders */}
         <Link href="/vendors">
-          <Card className={`p-4 transition-colors hover:border-border-strong ${snap.pendingOrders > 0 ? "border-warning/40" : ""}`}>
-            <div className="flex items-center justify-between mb-2">
-              <ShoppingCart className={`size-5 ${snap.pendingOrders > 0 ? "text-warning" : "text-success"}`} />
-              {snap.pendingOrders > 0 && <AlertTriangle className="size-3.5 text-warning" />}
+          <Card className={`p-3 transition-colors hover:border-border-strong ${snap.pendingOrders > 0 ? "border-warning/40" : ""}`}>
+            <div className="flex items-center justify-between mb-1.5">
+              <ShoppingCart className={`size-4 ${snap.pendingOrders > 0 ? "text-warning" : "text-success"}`} />
+              {snap.pendingOrders > 0 && <span className="size-1.5 rounded-full bg-warning" />}
             </div>
-            <p className="font-mono text-2xl font-bold tabular-nums text-content-primary">{snap.pendingOrders}</p>
-            <p className="mt-1 text-xs font-semibold text-content-secondary">Pending Orders</p>
-            <p className="mt-0.5 text-[11px] text-content-secondary">awaiting action</p>
+            <p className="font-mono text-2xl font-bold tabular-nums">{snap.pendingOrders}</p>
+            <p className="text-xs font-semibold text-content-secondary mt-0.5">Pending Orders</p>
+            <p className="text-[10px] text-content-secondary">awaiting action</p>
           </Card>
         </Link>
       </div>
 
-      {/* ── Leave Approvals ─────────────────────────────────────────────────── */}
+      {/* ── Checklists — compact table layout ──────────────────────────────── */}
+      <Card className="overflow-hidden">
+        <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
+          <h2 className="text-xs font-bold uppercase tracking-wider text-content-secondary">Checklists</h2>
+          <Link href="/checklist/opening" className="text-[11px] font-semibold text-warm">View →</Link>
+        </div>
+        {/* Column headers */}
+        <div className="grid grid-cols-[5rem_1fr_1fr] border-b border-border/50 bg-bg-elevated/40 px-4 py-1.5 text-[10px] font-bold uppercase tracking-wider text-content-secondary/50">
+          <span />
+          <span className="text-center">Kitchen</span>
+          <span className="text-center">Dining</span>
+        </div>
+        {/* Opening */}
+        <div className="grid grid-cols-[5rem_1fr_1fr] items-center border-b border-border/40 px-4 py-3">
+          <div className="flex items-center gap-1.5">
+            <Sunrise className="size-3.5 text-warm" />
+            <span className="text-xs font-semibold">Opening</span>
+          </div>
+          <ChecklistCell
+            done={Boolean(snap.openingKitchen)}
+            time={snap.openingKitchen ? formatTimeIST(snap.openingKitchen.submitted_at) : null}
+            name={snap.openingKitchen?.submitted_by ? nameMap[snap.openingKitchen.submitted_by] ?? null : null}
+          />
+          <ChecklistCell
+            done={Boolean(snap.openingFrontDesk)}
+            time={snap.openingFrontDesk ? formatTimeIST(snap.openingFrontDesk.submitted_at) : null}
+            name={snap.openingFrontDesk?.submitted_by ? nameMap[snap.openingFrontDesk.submitted_by] ?? null : null}
+          />
+        </div>
+        {/* Closing */}
+        <div className="grid grid-cols-[5rem_1fr_1fr] items-center px-4 py-3">
+          <div className="flex items-center gap-1.5">
+            <Sunset className="size-3.5 text-content-secondary" />
+            <span className="text-xs font-semibold">Closing</span>
+          </div>
+          <ChecklistCell
+            done={Boolean(snap.closingKitchen)}
+            time={snap.closingKitchen ? formatTimeIST(snap.closingKitchen.submitted_at) : null}
+            name={snap.closingKitchen?.submitted_by ? nameMap[snap.closingKitchen.submitted_by] ?? null : null}
+            cash={snap.closingKitchen?.closing_cash}
+          />
+          <ChecklistCell
+            done={Boolean(snap.closingFrontDesk)}
+            time={snap.closingFrontDesk ? formatTimeIST(snap.closingFrontDesk.submitted_at) : null}
+            name={snap.closingFrontDesk?.submitted_by ? nameMap[snap.closingFrontDesk.submitted_by] ?? null : null}
+            cash={snap.closingFrontDesk?.closing_cash}
+          />
+        </div>
+      </Card>
+
+      {/* ── Leave Requests ──────────────────────────────────────────────────── */}
       {pendingLeaves.length > 0 && (
         <Card className="overflow-hidden">
-          <div className="flex items-center gap-2 border-b border-border px-4 py-3">
-            <CalendarClock className="size-4 text-warning" />
-            <h2 className="text-sm font-bold uppercase tracking-wider text-content-secondary">
-              Leave Requests
-            </h2>
-            <span className="ml-auto rounded-full bg-warning/20 px-2 py-0.5 text-xs font-bold text-warning">
-              {pendingLeaves.length} pending
+          <div className="flex items-center gap-2 border-b border-border px-4 py-2.5">
+            <CalendarClock className="size-3.5 text-warning" />
+            <h2 className="text-xs font-bold uppercase tracking-wider text-content-secondary">Leave Requests</h2>
+            <span className="ml-auto rounded-full bg-warning/20 px-2 py-0.5 text-[10px] font-bold text-warning">
+              {pendingLeaves.length}
             </span>
           </div>
           <div className="divide-y divide-border">
@@ -202,36 +268,33 @@ export default async function OwnerDashboard() {
                 ? formatDateLabel(leave.start_date)
                 : `${formatDateLabel(leave.start_date)} – ${formatDateLabel(leave.end_date)}`;
               return (
-                <div key={leave.id} className="p-4 space-y-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="space-y-0.5">
-                      <p className="text-sm font-semibold text-content-primary">{staffName}</p>
-                      <p className="text-xs text-warm">{LEAVE_TYPE_LABELS[leave.leave_type] ?? leave.leave_type}</p>
-                      <p className="text-xs text-content-secondary">{dateRange}</p>
-                      {leave.reason && (
-                        <p className="text-xs text-content-secondary mt-1 italic">&ldquo;{leave.reason}&rdquo;</p>
-                      )}
-                    </div>
+                <div key={leave.id} className="px-4 py-3 space-y-2.5">
+                  <div>
+                    <p className="text-sm font-semibold">{staffName}</p>
+                    <p className="text-xs text-warm mt-0.5">
+                      {LEAVE_TYPE_LABELS[leave.leave_type] ?? leave.leave_type} · {dateRange}
+                    </p>
+                    {leave.reason && (
+                      <p className="text-[11px] text-content-secondary mt-1 italic">&ldquo;{leave.reason}&rdquo;</p>
+                    )}
                   </div>
                   <div className="flex gap-2">
                     <form action={approveLeave} className="flex-1">
                       <input type="hidden" name="id" value={leave.id} />
                       <button
                         type="submit"
-                        className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-success/15 px-3 py-2 text-xs font-bold text-success transition-colors hover:bg-success/25"
+                        className="flex w-full items-center justify-center gap-1 rounded-lg bg-success/15 px-3 py-1.5 text-xs font-bold text-success transition-colors hover:bg-success/25"
                       >
-                        <Check className="size-3.5" strokeWidth={3} />
-                        Approve
+                        <Check className="size-3" strokeWidth={3} /> Approve
                       </button>
                     </form>
                     <form action={rejectLeave} className="flex-1">
                       <input type="hidden" name="id" value={leave.id} />
                       <button
                         type="submit"
-                        className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-danger/10 px-3 py-2 text-xs font-bold text-danger transition-colors hover:bg-danger/20"
+                        className="flex w-full items-center justify-center gap-1 rounded-lg bg-danger/10 px-3 py-1.5 text-xs font-bold text-danger transition-colors hover:bg-danger/20"
                       >
-                        <X className="size-3.5" strokeWidth={3} />
-                        Reject
+                        <X className="size-3" strokeWidth={3} /> Reject
                       </button>
                     </form>
                   </div>
@@ -242,196 +305,120 @@ export default async function OwnerDashboard() {
         </Card>
       )}
 
-      {/* ── Checklists ──────────────────────────────────────────────────────── */}
-      <Card className="p-4">
-        <h2 className="mb-3 text-sm font-bold uppercase tracking-wider text-content-secondary">
-          Checklists
-        </h2>
-
-        <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-warm flex items-center gap-1.5">
-          <Sunrise className="size-3" /> Opening
-        </p>
-        <div className="mb-4 grid grid-cols-2 gap-3">
-          <ChecklistStatus
-            label="Kitchen"
-            done={Boolean(snap.openingKitchen)}
-            time={snap.openingKitchen ? formatTimeIST(snap.openingKitchen.submitted_at) : null}
-            submitterName={snap.openingKitchen?.submitted_by ? nameMap[snap.openingKitchen.submitted_by] ?? "Staff" : null}
-          />
-          <ChecklistStatus
-            label="Dining"
-            done={Boolean(snap.openingFrontDesk)}
-            time={snap.openingFrontDesk ? formatTimeIST(snap.openingFrontDesk.submitted_at) : null}
-            submitterName={snap.openingFrontDesk?.submitted_by ? nameMap[snap.openingFrontDesk.submitted_by] ?? "Staff" : null}
-          />
+      {/* ── 7-day trend ─────────────────────────────────────────────────────── */}
+      <Card className="p-3">
+        <div className="flex items-center justify-between mb-1">
+          <div className="flex items-center gap-1.5">
+            <TrendingUp className="size-3.5 text-content-secondary" />
+            <h2 className="text-xs font-bold uppercase tracking-wider text-content-secondary">7-day trend</h2>
+          </div>
+          <Link href="/reports" className="text-[11px] font-semibold text-warm">Reports →</Link>
         </div>
-
-        <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-warm flex items-center gap-1.5">
-          <Sunset className="size-3" /> Closing
-        </p>
-        <div className="grid grid-cols-2 gap-3">
-          <ChecklistStatus
-            label="Kitchen"
-            done={Boolean(snap.closingKitchen)}
-            time={snap.closingKitchen ? formatTimeIST(snap.closingKitchen.submitted_at) : null}
-            submitterName={snap.closingKitchen?.submitted_by ? nameMap[snap.closingKitchen.submitted_by] ?? "Staff" : null}
-            closingCash={snap.closingKitchen?.closing_cash}
-          />
-          <ChecklistStatus
-            label="Dining"
-            done={Boolean(snap.closingFrontDesk)}
-            time={snap.closingFrontDesk ? formatTimeIST(snap.closingFrontDesk.submitted_at) : null}
-            submitterName={snap.closingFrontDesk?.submitted_by ? nameMap[snap.closingFrontDesk.submitted_by] ?? "Staff" : null}
-            closingCash={snap.closingFrontDesk?.closing_cash}
-          />
-        </div>
+        <SalesTrendChart data={trend} />
       </Card>
 
-      {/* ── Cash vs Online + 7-day trend ────────────────────────────────────── */}
-      <div className="grid gap-3 lg:grid-cols-2">
-        <Card className="p-4">
-          <h2 className="mb-3 text-sm font-bold uppercase tracking-wider text-content-secondary">
-            Cash vs Online (today)
-          </h2>
-          {snap.salesTotal > 0 ? (
-            <div className="space-y-2.5">
-              <SplitBar label="Cash" value={cash} total={snap.salesTotal} color="#FFFFFF" />
-              <SplitBar label="Online" value={online} total={snap.salesTotal} color="#9A9AA2" />
-              <SplitBar label="Swiggy/Zomato" value={agg} total={snap.salesTotal} color="#4D4D55" />
-            </div>
+      {/* ── Cash Out — compact summary row ──────────────────────────────────── */}
+      <Card className="px-4 py-3">
+        <div className="flex items-center gap-2.5">
+          <Wallet className="size-4 text-content-secondary shrink-0" />
+          <span className="text-sm font-semibold flex-1">Cash Out Today</span>
+          {cashExpenses.length > 0 ? (
+            <span className="text-[11px] text-content-secondary">
+              {cashExpenses.length} expense{cashExpenses.length !== 1 ? "s" : ""}
+            </span>
           ) : (
-            <p className="py-4 text-sm text-content-secondary">No sales recorded yet.</p>
+            <span className="text-xs text-content-secondary">None today</span>
           )}
-        </Card>
-
-        <Card className="p-4">
-          <h2 className="mb-1 text-sm font-bold uppercase tracking-wider text-content-secondary">
-            Last 7 days
-          </h2>
-          <SalesTrendChart data={trend} />
-        </Card>
-      </div>
+          {cashExpenses.length > 0 && (
+            <span className="font-mono text-sm font-bold text-danger">
+              -{formatINR(cashOutTotal)}
+            </span>
+          )}
+          <Link href="/owner/cashout" className="text-[11px] font-semibold text-warm shrink-0">
+            View →
+          </Link>
+        </div>
+      </Card>
 
       {/* ── Activity ────────────────────────────────────────────────────────── */}
-      <Card className="p-4">
-        <h2 className="mb-3 flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-content-secondary">
-          <Activity className="size-4" /> Today&apos;s activity
+      <Card className="p-3">
+        <h2 className="mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-content-secondary">
+          <Activity className="size-3.5" /> Today&apos;s Activity
         </h2>
         {activity.length === 0 ? (
-          <p className="py-4 text-sm text-content-secondary">No activity yet today.</p>
+          <p className="py-2 text-xs text-content-secondary">No activity yet today.</p>
         ) : (
-          <ul className="space-y-3">
+          <ul className="space-y-2">
             {activity.map((e, i) => (
-              <li key={i} className="flex gap-3 text-sm">
-                <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-fire" />
-                <div className="flex-1">
-                  <span className="font-medium">{e.actor}</span>{" "}
+              <li key={i} className="flex gap-2.5 text-xs">
+                <span className="mt-1.5 size-1 shrink-0 rounded-full bg-fire" />
+                <div className="flex-1 min-w-0">
+                  <span className="font-semibold">{e.actor}</span>{" "}
                   <span className="text-content-secondary">{e.action}</span>
                 </div>
-                <span className="shrink-0 text-xs text-content-secondary">{formatTimeIST(e.at)}</span>
+                <span className="shrink-0 text-[10px] text-content-secondary">{formatTimeIST(e.at)}</span>
               </li>
             ))}
           </ul>
         )}
       </Card>
-
-      {/* ── Cash Out ────────────────────────────────────────────────────────── */}
-      <Card className="p-4">
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-content-secondary">
-            <Wallet className="size-4" /> Cash Out Today
-          </h2>
-          <div className="flex items-center gap-3">
-            {cashExpenses.length > 0 && (
-              <span className="font-mono text-sm font-bold text-danger">
-                -{formatINR(cashExpenses.reduce((s, e) => s + Number(e.amount), 0))}
-              </span>
-            )}
-            <Link href="/owner/cashout" className="text-xs font-semibold text-warm hover:underline">
-              View all
-            </Link>
-          </div>
-        </div>
-        {cashExpenses.length === 0 ? (
-          <p className="py-2 text-sm text-content-secondary">No cash expenses logged today.</p>
-        ) : (
-          <ul className="divide-y divide-border">
-            {cashExpenses.map((e) => (
-              <li key={e.id} className="flex items-center justify-between gap-3 py-2.5 text-sm">
-                <div className="min-w-0 flex-1">
-                  <span className="font-medium">{e.person_name}</span>
-                  {e.notes && <span className="ml-1.5 text-xs text-content-secondary">· {e.notes}</span>}
-                </div>
-                <span className="shrink-0 font-mono font-semibold tabular-nums text-danger">
-                  -{formatINR(Number(e.amount))}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </Card>
-
-      {/* ── Quick actions ───────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <QuickAction href="/stock" icon={Package} label="Stock status" />
-        <QuickAction href="/vendors" icon={ShoppingCart} label="Vendor orders" />
-        <QuickAction href="/reports" icon={Receipt} label="Reports" />
-      </div>
     </div>
   );
 }
 
-function ChecklistStatus({
-  label, done, time, submitterName, closingCash,
+/* ─────────────────────────── Sub-components ─────────────────────────── */
+
+function ChecklistCell({
+  done, time, name, cash,
 }: {
-  label: string;
   done: boolean;
   time: string | null;
-  submitterName?: string | null;
-  closingCash?: number | null;
+  name: string | null;
+  cash?: number | null;
 }) {
   return (
-    <div className={`rounded-xl border bg-bg-elevated p-3 transition-colors ${done ? "border-success/30" : "border-border"}`}>
-      <div className="flex items-center justify-between">
-        <p className="text-sm font-semibold">{label}</p>
-        {done ? <CheckCircle2 className="size-4 text-success" /> : <XCircle className="size-4 text-danger" />}
-      </div>
-      <p className="mt-1 text-xs text-content-secondary font-mono">{done ? time : "Pending"}</p>
-      {done && submitterName && (
-        <p className="mt-1 text-[11px] font-medium text-warm truncate">By {submitterName}</p>
-      )}
-      {done && closingCash != null && (
-        <p className="mt-1 text-[11px] font-mono font-semibold text-content-primary">Cash: {formatINR(closingCash)}</p>
+    <div className="flex flex-col items-center gap-0.5 py-0.5">
+      {done ? (
+        <>
+          <CheckCircle2 className="size-4 text-success" />
+          <span className="text-[10px] font-mono text-content-secondary leading-tight">{time}</span>
+          {name && (
+            <span className="text-[10px] text-warm leading-tight truncate max-w-[5rem]">
+              {name.split(" ")[0]}
+            </span>
+          )}
+          {cash != null && (
+            <span className="text-[10px] font-mono font-semibold text-content-primary">{formatINR(cash)}</span>
+          )}
+        </>
+      ) : (
+        <>
+          <XCircle className="size-4 text-danger/50" />
+          <span className="text-[10px] text-content-secondary/50 leading-tight">Pending</span>
+        </>
       )}
     </div>
   );
 }
 
-function SplitBar({ label, value, total, color }: { label: string; value: number; total: number; color: string }) {
+function SplitBar({
+  label, value, total, color,
+}: {
+  label: string;
+  value: number;
+  total: number;
+  color: string;
+}) {
   const pct = total > 0 ? Math.round((value / total) * 100) : 0;
   return (
     <div>
-      <div className="mb-1 flex items-center justify-between text-xs">
+      <div className="mb-1 flex items-center justify-between text-[11px]">
         <span className="text-content-secondary">{label}</span>
         <span className="font-mono tabular-nums">{formatINR(value)} · {pct}%</span>
       </div>
-      <div className="h-2 overflow-hidden rounded-full bg-bg-elevated">
-        <div className="h-full rounded-full" style={{ width: `${pct}%`, background: color }} />
+      <div className="h-1.5 overflow-hidden rounded-full bg-bg-elevated">
+        <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: color }} />
       </div>
     </div>
-  );
-}
-
-function QuickAction({ href, icon: Icon, label }: { href: string; icon: typeof Package; label: string }) {
-  return (
-    <Link href={href}>
-      <Card className="flex items-center gap-3 p-4 transition-colors hover:border-border-strong">
-        <div className="flex size-9 items-center justify-center rounded-xl bg-fire/15 text-fire">
-          <Icon className="size-4" />
-        </div>
-        <span className="flex-1 text-sm font-semibold">{label}</span>
-        <ChevronRight className="size-4 text-content-secondary" />
-      </Card>
-    </Link>
   );
 }
