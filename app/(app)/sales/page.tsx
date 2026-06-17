@@ -12,7 +12,7 @@ import { SalesForm } from "./sales-form";
 import { SalesView } from "./sales-view";
 import { ExpenseClient } from "@/components/expenses/expense-client";
 import { Card } from "@/components/ui/card";
-import { CheckCircle2, Info, AlertTriangle, ArrowRight, History } from "lucide-react";
+import { CheckCircle2, Info, AlertTriangle, ArrowRight, History, CalendarDays } from "lucide-react";
 
 export const metadata = { title: "Daily sales" };
 
@@ -23,6 +23,7 @@ export default async function SalesPage({
 }) {
   const profile = await requireProfile();
   const isKitchenOnly = profile.team === "kitchen";
+  const showLast7Days = profile.team === "kitchen" || profile.team === "head_chef";
 
   const canSeeYesterday = profile.team === "front_desk" || profile.team === "head_chef";
 
@@ -258,6 +259,53 @@ export default async function SalesPage({
       ) : (
         <SalesForm date={requestedDate} />
       )}
+
+      {/* Last 7 days — kitchen and head_chef only */}
+      {showLast7Days && (() => {
+        const cutoff = daysAgoIST(6);
+        const recent = allSalesInWindow
+          .filter((s) => s.date >= cutoff)
+          .sort((a, b) => b.date.localeCompare(a.date));
+        if (recent.length === 0) return null;
+        return (
+          <div className="mt-8">
+            <div className="mb-3 flex items-center gap-2">
+              <CalendarDays className="size-4 text-content-secondary" />
+              <p className="text-xs font-bold uppercase tracking-wider text-content-secondary">
+                Last 7 days
+              </p>
+            </div>
+            <Card className="divide-y divide-border overflow-hidden">
+              {recent.map((s) => {
+                const total = salesTotal(s);
+                const agg = Number(s.zomato_gold_sales) + Number(s.zomato_sales) + Number(s.swiggy_sales) + Number(s.swiggy_dineout_sales) + Number(s.eazy_diner_sales);
+                return (
+                  <div key={s.date} className="px-4 py-3 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-semibold text-content-primary">{formatDateLabel(s.date)}</p>
+                      <span className="font-mono text-sm font-bold tabular-nums text-warm">{formatINR(total)}</span>
+                    </div>
+                    <div className="grid grid-cols-3 gap-1.5 text-[11px]">
+                      <div className="rounded-lg bg-bg-elevated px-2 py-1.5 text-center">
+                        <p className="text-content-secondary">Cash</p>
+                        <p className="font-mono font-semibold tabular-nums text-content-primary">{formatINR(s.cash_sales)}</p>
+                      </div>
+                      <div className="rounded-lg bg-bg-elevated px-2 py-1.5 text-center">
+                        <p className="text-content-secondary">UPI / Card</p>
+                        <p className="font-mono font-semibold tabular-nums text-content-primary">{formatINR(Number(s.upi_sales) + Number(s.card_sales))}</p>
+                      </div>
+                      <div className="rounded-lg bg-bg-elevated px-2 py-1.5 text-center">
+                        <p className="text-content-secondary">Aggregators</p>
+                        <p className="font-mono font-semibold tabular-nums text-content-primary">{formatINR(agg)}</p>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </Card>
+          </div>
+        );
+      })()}
 
       {/* Yesterday's sales reference — front_desk and head_chef only */}
       {viewingToday && canSeeYesterday && (
