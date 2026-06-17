@@ -10,9 +10,6 @@ import {
   Activity,
   Wallet,
   AlertTriangle,
-  CalendarClock,
-  Check,
-  X,
   TrendingUp,
 } from "lucide-react";
 import { requireOwner } from "@/lib/auth";
@@ -27,6 +24,7 @@ import { formatINR } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
 import { SalesTrendChart } from "@/components/charts/sales-trend-chart";
 import { SendReportButton } from "@/components/send-report-button";
+import { LeaveApprovalCards } from "@/components/owner/leave-approval-cards";
 import { createClient } from "@/lib/supabase/server";
 import { updateLeaveStatus } from "@/app/(app)/attendance/actions-hr";
 import { revalidatePath } from "next/cache";
@@ -47,12 +45,6 @@ async function rejectLeave(formData: FormData) {
   await updateLeaveStatus(id, "rejected");
   revalidatePath("/owner");
 }
-
-const LEAVE_TYPE_LABELS: Record<string, string> = {
-  cl: "Weekly Leave / CL",
-  sl: "Sick Leave",
-  lwp: "Leave Without Pay",
-};
 
 export default async function OwnerDashboard() {
   await requireOwner();
@@ -252,57 +244,12 @@ export default async function OwnerDashboard() {
 
       {/* ── Leave Requests ──────────────────────────────────────────────────── */}
       {pendingLeaves.length > 0 && (
-        <Card className="overflow-hidden">
-          <div className="flex items-center gap-2 border-b border-border px-4 py-2.5">
-            <CalendarClock className="size-3.5 text-warning" />
-            <h2 className="text-xs font-bold uppercase tracking-wider text-content-secondary">Leave Requests</h2>
-            <span className="ml-auto rounded-full bg-warning/20 px-2 py-0.5 text-[10px] font-bold text-warning">
-              {pendingLeaves.length}
-            </span>
-          </div>
-          <div className="divide-y divide-border">
-            {pendingLeaves.map((leave) => {
-              const staffName = nameMap[leave.profile_id] ?? "Staff";
-              const isSingleDay = leave.start_date === leave.end_date;
-              const dateRange = isSingleDay
-                ? formatDateLabel(leave.start_date)
-                : `${formatDateLabel(leave.start_date)} – ${formatDateLabel(leave.end_date)}`;
-              return (
-                <div key={leave.id} className="px-4 py-3 space-y-2.5">
-                  <div>
-                    <p className="text-sm font-semibold">{staffName}</p>
-                    <p className="text-xs text-warm mt-0.5">
-                      {LEAVE_TYPE_LABELS[leave.leave_type] ?? leave.leave_type} · {dateRange}
-                    </p>
-                    {leave.reason && (
-                      <p className="text-[11px] text-content-secondary mt-1 italic">&ldquo;{leave.reason}&rdquo;</p>
-                    )}
-                  </div>
-                  <div className="flex gap-2">
-                    <form action={approveLeave} className="flex-1">
-                      <input type="hidden" name="id" value={leave.id} />
-                      <button
-                        type="submit"
-                        className="flex w-full items-center justify-center gap-1 rounded-lg bg-success/15 px-3 py-1.5 text-xs font-bold text-success transition-colors hover:bg-success/25"
-                      >
-                        <Check className="size-3" strokeWidth={3} /> Approve
-                      </button>
-                    </form>
-                    <form action={rejectLeave} className="flex-1">
-                      <input type="hidden" name="id" value={leave.id} />
-                      <button
-                        type="submit"
-                        className="flex w-full items-center justify-center gap-1 rounded-lg bg-danger/10 px-3 py-1.5 text-xs font-bold text-danger transition-colors hover:bg-danger/20"
-                      >
-                        <X className="size-3" strokeWidth={3} /> Reject
-                      </button>
-                    </form>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </Card>
+        <LeaveApprovalCards
+          leaves={pendingLeaves}
+          nameMap={nameMap}
+          approveAction={approveLeave}
+          rejectAction={rejectLeave}
+        />
       )}
 
       {/* ── 7-day trend ─────────────────────────────────────────────────────── */}

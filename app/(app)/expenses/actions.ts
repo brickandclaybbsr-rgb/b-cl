@@ -49,6 +49,38 @@ export async function addCashExpense(
   return { ok: true };
 }
 
+export async function updateCashExpense(
+  _prev: ExpenseFormState,
+  formData: FormData,
+): Promise<ExpenseFormState> {
+  await requireProfile();
+  const id = String(formData.get("id") ?? "").trim();
+  if (!id) return { error: "Missing id." };
+
+  const person_name = String(formData.get("person_name") ?? "").trim();
+  const amountRaw   = String(formData.get("amount") ?? "").trim();
+  const categoryRaw = String(formData.get("category") ?? "withdrawal").trim();
+  const category = (["withdrawal", "advance", "expense", "other"].includes(categoryRaw)
+    ? categoryRaw : "withdrawal") as "withdrawal" | "advance" | "expense" | "other";
+  const notes = String(formData.get("notes") ?? "").trim();
+
+  if (!person_name) return { error: "Please enter the person's name." };
+  const amount = parseFloat(amountRaw);
+  if (!amountRaw || isNaN(amount) || amount <= 0) return { error: "Please enter a valid amount." };
+
+  const supabase = createClient();
+  const { error } = await supabase
+    .from("cash_expenses")
+    .update({ person_name, amount, category, notes: notes || null })
+    .eq("id", id);
+
+  if (error) return { error: error.message };
+  revalidatePath("/sales");
+  revalidatePath("/owner");
+  revalidatePath("/owner/cashout");
+  return { ok: true };
+}
+
 export async function deleteCashExpense(
   _prev: ExpenseFormState,
   formData: FormData,
