@@ -124,6 +124,14 @@ export function Last7DaysAccordion({ sales, today, yesterday, canEdit }: Props) 
                         </span>
                       </div>
                     ))}
+                    {Number(s.closing_balance) > 0 && (
+                      <div className="flex items-center justify-between px-3 py-2 text-sm bg-bg-elevated/60">
+                        <span className="font-semibold text-content-primary">Closing Balance</span>
+                        <span className="font-mono font-bold tabular-nums text-content-primary">
+                          {formatINR(s.closing_balance)}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
