@@ -1,11 +1,18 @@
 "use client";
 
 import { useState } from "react";
-import { Check, ChevronDown, ChevronUp } from "lucide-react";
+import { Check, ChevronDown, ChevronUp, Wallet } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { formatDateLabel } from "@/lib/date";
 import { formatINR } from "@/lib/utils";
 import type { DaySummary } from "@/lib/data/reports";
+
+const CATEGORY_LABELS: Record<string, string> = {
+  withdrawal: "Withdrawal",
+  advance: "Advance",
+  expense: "Expense",
+  other: "Other",
+};
 
 export function DailyList({ days }: { days: DaySummary[] }) {
   const [expandedDate, setExpandedDate] = useState<string | null>(null);
@@ -28,6 +35,9 @@ export function DailyList({ days }: { days: DaySummary[] }) {
                 <p className="text-sm font-medium">{formatDateLabel(d.date)}</p>
                 <p className="text-xs text-content-secondary">
                   {d.hasSales ? "Sales recorded" : "No sales entry"}
+                  {d.cashOutTotal > 0 && (
+                    <span className="ml-1.5 text-danger">· -{formatINR(d.cashOutTotal)} out</span>
+                  )}
                 </p>
               </div>
               <div className="flex items-center gap-1.5">
@@ -105,6 +115,36 @@ export function DailyList({ days }: { days: DaySummary[] }) {
                     {formatINR(d.total)}
                   </span>
                 </div>
+
+                {/* Cash Out */}
+                {d.cashOut.length > 0 && (
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-content-secondary flex items-center gap-1">
+                        <Wallet className="size-3" /> Cash Out
+                      </p>
+                      <span className="font-mono text-xs font-bold text-danger">
+                        -{formatINR(d.cashOutTotal)}
+                      </span>
+                    </div>
+                    <div className="rounded-lg border border-border/30 divide-y divide-border/20 overflow-hidden">
+                      {d.cashOut.map((e) => (
+                        <div key={e.id} className="flex items-center justify-between px-3 py-2 text-xs">
+                          <div className="min-w-0 flex-1">
+                            <span className="font-medium text-content-primary">{e.person_name}</span>
+                            <span className="ml-1.5 text-content-secondary">
+                              · {CATEGORY_LABELS[e.category] ?? e.category}
+                              {e.notes ? ` · ${e.notes}` : ""}
+                            </span>
+                          </div>
+                          <span className="ml-3 shrink-0 font-mono font-semibold tabular-nums text-danger">
+                            -{formatINR(Number(e.amount))}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
