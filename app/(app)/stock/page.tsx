@@ -28,22 +28,20 @@ export default async function StockPage() {
         subtitle={formatDateLabel(todayIST())}
       />
 
-      {isOwner && (
-        <div className="mb-4 flex gap-1 border-b border-border pb-px">
-          <Link
-            href="/stock"
-            className="relative flex items-center gap-1.5 pb-3 text-sm font-semibold text-white after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-full after:bg-white"
-          >
-            <Package className="size-4" /> Stock
-          </Link>
-          <Link
-            href="/vendors"
-            className="flex items-center gap-1.5 pb-3 px-3 text-sm font-semibold text-content-secondary hover:text-content-primary transition-colors"
-          >
-            <ShoppingCart className="size-4" /> Vendors
-          </Link>
-        </div>
-      )}
+      <div className="mb-4 flex gap-1 border-b border-border pb-px">
+        <Link
+          href="/stock"
+          className="relative flex items-center gap-1.5 pb-3 text-sm font-semibold text-white after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-full after:bg-white"
+        >
+          <Package className="size-4" /> Stock
+        </Link>
+        <Link
+          href="/vendors"
+          className="flex items-center gap-1.5 pb-3 px-3 text-sm font-semibold text-content-secondary hover:text-content-primary transition-colors"
+        >
+          <ShoppingCart className="size-4" /> {isOwner ? "Vendors" : "Orders"}
+        </Link>
+      </div>
       {items.length === 0 ? (
         <EmptyState
           icon={Package}
