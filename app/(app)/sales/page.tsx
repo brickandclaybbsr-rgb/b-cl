@@ -1,11 +1,11 @@
 import { requireProfile } from "@/lib/auth";
 import { todayIST, daysAgoIST, nowIST, formatDateLabel, formatTimeIST } from "@/lib/date";
 import { APP_START_DATE } from "@/lib/constants";
-import { getSales, getSalesRange, salesTotal } from "@/lib/data/sales";
+import { getSales, getSalesRange } from "@/lib/data/sales";
 import { getProfileNameMap, getStaff } from "@/lib/data/profiles";
 import { getCashExpensesByDate } from "@/lib/data/expenses";
 import { formatINR } from "@/lib/utils";
-import type { CashExpense, DailySales } from "@/lib/database.types";
+import type { CashExpense } from "@/lib/database.types";
 import { PageHeader } from "@/components/page-header";
 import { SalesTabs } from "./sales-tabs";
 import { SalesForm } from "./sales-form";
@@ -13,6 +13,7 @@ import { SalesView } from "./sales-view";
 import { ExpenseClient } from "@/components/expenses/expense-client";
 import { Card } from "@/components/ui/card";
 import { CheckCircle2, Info, AlertTriangle, ArrowRight, History, CalendarDays } from "lucide-react";
+import { Last7DaysAccordion } from "./last7days-accordion";
 
 export const metadata = { title: "Daily sales" };
 
@@ -27,6 +28,7 @@ export default async function SalesPage({
   const showLast7Days = profile.team === "front_desk" || profile.team === "head_chef";
 
   const canSeeYesterday = profile.team === "front_desk" || profile.team === "head_chef";
+  const canEditSales = profile.team === "front_desk" || profile.team === "head_chef";
 
   if (searchParams.tab === "expenses") {
     const isOwner = profile.role === "owner";
@@ -107,10 +109,8 @@ export default async function SalesPage({
   const isSubmitter = existing?.submitted_by === profile.id;
   const viewingToday = requestedDate === today;
   const yesterday = daysAgoIST(1);
-  const yesterdaySales = viewingToday ? (allSalesInWindow.find(s => s.date === yesterday) ?? null) : null;
-
-  // Head chef can edit today's or yesterday's sales
-  const canEdit = isHeadChef && !!existing && (requestedDate === today || requestedDate === yesterday);
+  // front_desk and head_chef can edit today's or yesterday's sales
+  const canEdit = canEditSales && !!existing && (requestedDate === today || requestedDate === yesterday);
   const editMode = canEdit && searchParams.edit === "1";
 
   // Sales for today can only be filed after 9:00 PM IST.
@@ -280,11 +280,11 @@ export default async function SalesPage({
         <SalesForm date={requestedDate} />
       )}
 
-      {/* Last 7 days — front_desk and head_chef only */}
+      {/* Last 7 days accordion — front_desk and head_chef only */}
       {showLast7Days && (() => {
         const cutoff = daysAgoIST(6);
         const recent = allSalesInWindow
-          .filter((s) => s.date >= cutoff && s.date !== yesterday) // yesterday shown separately below
+          .filter((s) => s.date >= cutoff)
           .sort((a, b) => b.date.localeCompare(a.date));
         if (recent.length === 0) return null;
         return (
@@ -295,54 +295,15 @@ export default async function SalesPage({
                 Last 7 days
               </p>
             </div>
-            <Card className="divide-y divide-border overflow-hidden">
-              {recent.map((s) => {
-                const total = salesTotal(s);
-                const agg = Number(s.zomato_gold_sales) + Number(s.zomato_sales) + Number(s.swiggy_sales) + Number(s.swiggy_dineout_sales) + Number(s.eazy_diner_sales);
-                return (
-                  <a key={s.date} href={`/sales?date=${s.date}`} className="block px-4 py-3 space-y-2 hover:bg-white/[0.02] active:bg-white/[0.04] transition-colors">
-                    <div className="flex items-center justify-between">
-                      <p className="text-sm font-semibold text-content-primary">{formatDateLabel(s.date)}</p>
-                      <span className="font-mono text-sm font-bold tabular-nums text-warm">{formatINR(total)}</span>
-                    </div>
-                    <div className="grid grid-cols-3 gap-1.5 text-[11px]">
-                      <div className="rounded-lg bg-bg-elevated px-2 py-1.5 text-center">
-                        <p className="text-content-secondary">Cash</p>
-                        <p className="font-mono font-semibold tabular-nums text-content-primary">{formatINR(s.cash_sales)}</p>
-                      </div>
-                      <div className="rounded-lg bg-bg-elevated px-2 py-1.5 text-center">
-                        <p className="text-content-secondary">UPI / Card</p>
-                        <p className="font-mono font-semibold tabular-nums text-content-primary">{formatINR(Number(s.upi_sales) + Number(s.card_sales))}</p>
-                      </div>
-                      <div className="rounded-lg bg-bg-elevated px-2 py-1.5 text-center">
-                        <p className="text-content-secondary">Aggregators</p>
-                        <p className="font-mono font-semibold tabular-nums text-content-primary">{formatINR(agg)}</p>
-                      </div>
-                    </div>
-                  </a>
-                );
-              })}
-            </Card>
+            <Last7DaysAccordion
+              sales={recent}
+              today={today}
+              yesterday={yesterday}
+              canEdit={canEditSales}
+            />
           </div>
         );
       })()}
-
-      {/* Yesterday's sales reference — front_desk and head_chef only */}
-      {viewingToday && canSeeYesterday && (
-        <div className="mt-8">
-          <div className="mb-3 flex items-center gap-2">
-            <History className="size-4 text-content-secondary" />
-            <p className="text-xs font-bold uppercase tracking-wider text-content-secondary">
-              Yesterday · {formatDateLabel(yesterday)}
-            </p>
-          </div>
-          {yesterdaySales ? (
-            <YesterdaySalesSummary sales={yesterdaySales} />
-          ) : (
-            <p className="text-center text-xs text-content-secondary py-2">Sales not filed for yesterday</p>
-          )}
-        </div>
-      )}
     </div>
   );
 }
@@ -396,39 +357,6 @@ const CASH_CATEGORY_COLORS: Record<string, string> = {
   expense: "text-warm",
   other: "text-content-secondary",
 };
-
-function YesterdaySalesSummary({ sales }: { sales: DailySales }) {
-  const total = salesTotal(sales);
-  const aggregators = Number(sales.zomato_gold_sales) + Number(sales.zomato_sales) + Number(sales.swiggy_sales) + Number(sales.swiggy_dineout_sales) + Number(sales.eazy_diner_sales);
-  const online = Number(sales.card_sales) + Number(sales.upi_sales);
-  const rows = [
-    { label: "Cash", value: sales.cash_sales },
-    { label: "UPI", value: sales.upi_sales },
-    ...(sales.card_sales > 0 ? [{ label: "Card", value: sales.card_sales }] : []),
-    { label: "Zomato Gold", value: sales.zomato_gold_sales },
-    { label: "Zomato", value: sales.zomato_sales },
-    { label: "Swiggy", value: sales.swiggy_sales },
-    ...(sales.swiggy_dineout_sales > 0 ? [{ label: "Swiggy Dineout", value: sales.swiggy_dineout_sales }] : []),
-    ...(sales.eazy_diner_sales > 0 ? [{ label: "EazyDiner", value: sales.eazy_diner_sales }] : []),
-  ].filter((r) => r.value > 0);
-
-  return (
-    <Card className="overflow-hidden">
-      <div className="flex items-center justify-between bg-fire/10 px-4 py-3">
-        <span className="text-sm font-semibold text-warm">Total Sales</span>
-        <span className="font-mono text-base font-bold tabular-nums text-warm">{formatINR(total)}</span>
-      </div>
-      <div className="grid grid-cols-2 divide-x divide-y divide-border">
-        {rows.map((r) => (
-          <div key={r.label} className="flex flex-col px-3 py-2">
-            <span className="text-[10px] text-content-secondary">{r.label}</span>
-            <span className="font-mono text-sm font-semibold tabular-nums text-content-primary">{formatINR(r.value)}</span>
-          </div>
-        ))}
-      </div>
-    </Card>
-  );
-}
 
 function YesterdayCashRow({ entry }: { entry: CashExpense }) {
   return (

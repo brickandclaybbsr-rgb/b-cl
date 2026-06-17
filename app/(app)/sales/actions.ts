@@ -88,8 +88,8 @@ export async function updateSales(
 ): Promise<SalesFormState> {
   const profile = await requireProfile();
 
-  if (profile.team !== "head_chef") {
-    return { error: "Only the head chef can edit sales." };
+  if (profile.team !== "head_chef" && profile.team !== "front_desk") {
+    return { error: "Only the head chef or front desk can edit sales." };
   }
 
   const today = todayIST();
