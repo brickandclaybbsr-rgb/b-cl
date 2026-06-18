@@ -3,10 +3,9 @@
   "appName": "B&CL Ops",
   "webDir": "out",
   "server": {
-    "url": "https://ops.brickandclay.in",
+    "url": "https://b-cl.vercel.app",
     "cleartext": false,
-    "androidScheme": "https",
-    "allowNavigation": ["ops.brickandclay.in"]
+    "androidScheme": "https"
   },
   "plugins": {
     "SplashScreen": {
