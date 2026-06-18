@@ -3,8 +3,7 @@ import { todayIST, daysAgoIST, nowIST, formatDateLabel, formatTimeIST } from "@/
 import { APP_START_DATE } from "@/lib/constants";
 import { getSales, getSalesRange } from "@/lib/data/sales";
 import { getProfileNameMap, getStaff } from "@/lib/data/profiles";
-import { getCashExpensesByDate } from "@/lib/data/expenses";
-import { formatINR } from "@/lib/utils";
+import { getCashExpensesByDate, getRecentCashExpenses } from "@/lib/data/expenses";
 import type { CashExpense } from "@/lib/database.types";
 import { PageHeader } from "@/components/page-header";
 import { SalesTabs } from "./sales-tabs";
@@ -12,7 +11,7 @@ import { SalesForm } from "./sales-form";
 import { SalesView } from "./sales-view";
 import { ExpenseClient } from "@/components/expenses/expense-client";
 import { Card } from "@/components/ui/card";
-import { CheckCircle2, Info, AlertTriangle, ArrowRight, History, CalendarDays } from "lucide-react";
+import { CheckCircle2, Info, AlertTriangle, ArrowRight, CalendarDays } from "lucide-react";
 import { Last7DaysAccordion } from "./last7days-accordion";
 
 export const metadata = { title: "Daily sales" };
@@ -36,13 +35,39 @@ export default async function SalesPage({
     const rawDate = String(searchParams.date ?? "").trim();
     const expenseDate = (rawDate >= APP_START_DATE && rawDate <= today) ? rawDate : today;
     const isViewingToday = expenseDate === today;
-    const yesterday = daysAgoIST(1);
 
-    const [entries, yesterdayEntries] = await Promise.all([
-      getCashExpensesByDate(expenseDate),
-      isViewingToday && canSeeYesterday ? getCashExpensesByDate(yesterday) : Promise.resolve([] as CashExpense[]),
-    ]);
+    if (isViewingToday) {
+      const allRecent = await getRecentCashExpenses(7);
+      const todayEntries = allRecent.filter((e) => e.date === today);
+      const prevMap = new Map<string, CashExpense[]>();
+      for (const e of allRecent) {
+        if (e.date === today) continue;
+        if (!prevMap.has(e.date)) prevMap.set(e.date, []);
+        prevMap.get(e.date)!.push(e);
+      }
+      const previousGroups = Array.from(prevMap.entries())
+        .map(([date, entries]) => ({ date, entries }))
+        .sort((a, b) => b.date.localeCompare(a.date));
 
+      return (
+        <div className="space-y-5">
+          <PageHeader
+            title="Daily Sales"
+            subtitle={isOwner ? "Today's cash out" : "Log cash withdrawals & expenses"}
+          />
+          <SalesTabs />
+          <ExpenseClient
+            entries={todayEntries}
+            isOwner={isOwner}
+            viewingDate={today}
+            canDelete={canSeeYesterday}
+            previousGroups={previousGroups}
+          />
+        </div>
+      );
+    }
+
+    const entries = await getCashExpensesByDate(expenseDate);
     return (
       <div className="space-y-5">
         <PageHeader
@@ -50,29 +75,6 @@ export default async function SalesPage({
           subtitle={isOwner ? "Today's cash out" : "Log cash withdrawals & expenses"}
         />
         <SalesTabs />
-
-
-        {isViewingToday && canSeeYesterday && yesterdayEntries.length > 0 && (
-          <div>
-            <div className="mb-3 flex items-center gap-2">
-              <History className="size-4 text-content-secondary" />
-              <p className="text-xs font-bold uppercase tracking-wider text-content-secondary">
-                Yesterday · {formatDateLabel(yesterday)}
-              </p>
-            </div>
-            <Card className="divide-y divide-border">
-              <div className="flex items-center justify-between px-4 py-3">
-                <p className="text-sm font-semibold">Cash Out Total</p>
-                <span className="font-mono text-sm font-bold tabular-nums text-danger">
-                  -{formatINR(yesterdayEntries.reduce((s, e) => s + Number(e.amount), 0))}
-                </span>
-              </div>
-              {yesterdayEntries.map((entry) => (
-                <YesterdayCashRow key={entry.id} entry={entry} />
-              ))}
-            </Card>
-          </div>
-        )}
         <ExpenseClient entries={entries} isOwner={isOwner} viewingDate={expenseDate} canDelete={canSeeYesterday} />
       </div>
     );
@@ -345,34 +347,3 @@ function MissingDatesBanner({ missing }: { missing: string[] }) {
   );
 }
 
-const CASH_CATEGORY_LABELS: Record<string, string> = {
-  withdrawal: "Withdrawal",
-  advance: "Advance",
-  expense: "Expense",
-  other: "Other",
-};
-const CASH_CATEGORY_COLORS: Record<string, string> = {
-  withdrawal: "text-danger",
-  advance: "text-warning",
-  expense: "text-warm",
-  other: "text-content-secondary",
-};
-
-function YesterdayCashRow({ entry }: { entry: CashExpense }) {
-  return (
-    <div className="flex items-center gap-3 px-4 py-3">
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-semibold text-content-primary">{entry.person_name}</p>
-        <p className="text-xs text-content-secondary">
-          <span className={CASH_CATEGORY_COLORS[entry.category] ?? "text-content-secondary"}>
-            {CASH_CATEGORY_LABELS[entry.category] ?? entry.category}
-          </span>
-          {entry.notes && <> · {entry.notes}</>}
-        </p>
-      </div>
-      <span className="shrink-0 font-mono text-sm font-bold tabular-nums text-danger">
-        -{formatINR(Number(entry.amount))}
-      </span>
-    </div>
-  );
-}

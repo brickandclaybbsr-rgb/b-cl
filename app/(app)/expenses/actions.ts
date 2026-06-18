@@ -81,6 +81,40 @@ export async function updateCashExpense(
   return { ok: true };
 }
 
+export async function addMultipleCashExpenses(
+  rows: Array<{ person_name: string; amount: string; category: string; notes: string }>,
+  date: string,
+): Promise<ExpenseFormState> {
+  const profile = await requireProfile();
+  const supabase = createClient();
+  const today = todayIST();
+  const safeDate = date && date <= today ? date : today;
+
+  const inserts: Array<{
+    date: string; person_name: string; amount: number;
+    category: "withdrawal" | "advance" | "expense" | "other";
+    notes: string | null; submitted_by: string;
+  }> = [];
+
+  for (const row of rows) {
+    const person_name = row.person_name.trim();
+    const amount = parseFloat(row.amount);
+    const categoryRaw = row.category;
+    const category = (["withdrawal", "advance", "expense", "other"].includes(categoryRaw)
+      ? categoryRaw : "withdrawal") as "withdrawal" | "advance" | "expense" | "other";
+    const notes = row.notes.trim();
+    if (!person_name || isNaN(amount) || amount <= 0) continue;
+    inserts.push({ date: safeDate, person_name, amount, category, notes: notes || null, submitted_by: profile.id });
+  }
+
+  if (!inserts.length) return { error: "No valid entries to save." };
+  const { error } = await supabase.from("cash_expenses").insert(inserts);
+  if (error) return { error: error.message };
+  revalidatePath("/sales");
+  revalidatePath("/owner");
+  return { ok: true };
+}
+
 export async function deleteCashExpense(
   _prev: ExpenseFormState,
   formData: FormData,
