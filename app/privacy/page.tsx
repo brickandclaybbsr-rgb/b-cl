@@ -201,8 +201,12 @@ export default function PrivacyPage() {
           Bhubaneswar, Odisha, India
           <br />
           Email:{" "}
-          <a href="mailto:mps.suryaprasad@gmail.com" style={{ color: "#1a73e8" }}>
-            mps.suryaprasad@gmail.com
+          <a href="mailto:contact@brickandclay.in" style={{ color: "#1a73e8" }}>
+            contact@brickandclay.in
+          </a>{" "}
+          /{" "}
+          <a href="mailto:surya@brickandclay.in" style={{ color: "#1a73e8" }}>
+            surya@brickandclay.in
           </a>
         </p>
       </Section>
