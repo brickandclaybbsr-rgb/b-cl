@@ -228,18 +228,18 @@ function ExpenseRow({ entry, isOwner, canDelete }: { entry: CashExpense; isOwner
       <div className="flex items-center gap-3 px-4 py-3">
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-semibold text-content-primary">
-            {entry.person_name}
+            {personName}
           </p>
           <p className="text-xs text-content-secondary">
-            <span className={CATEGORY_COLORS[entry.category] ?? "text-content-secondary"}>
-              {CATEGORY_LABELS[entry.category] ?? entry.category}
+            <span className={CATEGORY_COLORS[category] ?? "text-content-secondary"}>
+              {CATEGORY_LABELS[category] ?? category}
             </span>
-            {entry.notes && <> · {entry.notes}</>}
+            {notes && <> · {notes}</>}
             <span className="ml-1 opacity-60">· {time}</span>
           </p>
         </div>
         <span className="shrink-0 font-mono text-base font-bold tabular-nums text-danger">
-          -{formatINR(Number(entry.amount))}
+          -{formatINR(Number(amount))}
         </span>
         {isOwner && (
           <button
