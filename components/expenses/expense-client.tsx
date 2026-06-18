@@ -207,7 +207,6 @@ function ExpenseRow({ entry, isOwner, canDelete }: { entry: CashExpense; isOwner
       toast.success("Entry updated ✓");
       setShowConfetti(true);
       setEditing(false);
-      router.refresh();
     }
   }, [editState]);
 
@@ -340,7 +339,7 @@ function ExpenseRow({ entry, isOwner, canDelete }: { entry: CashExpense; isOwner
             </button>
             <button
               type="submit"
-              className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-fire py-2 text-xs font-bold text-white transition-opacity hover:opacity-90"
+              className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-white py-2 text-xs font-bold text-black transition-opacity hover:opacity-90"
             >
               <Check className="size-3.5" strokeWidth={3} /> Save changes
             </button>
