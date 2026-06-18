@@ -12,9 +12,10 @@ export async function middleware(request: NextRequest) {
   const path = request.nextUrl.pathname;
   const isLogin = path === "/login";
 
-  // Unauthenticated → force to login (except the login page itself).
+  // Public routes — accessible without login.
+  const PUBLIC_PATHS = ["/login", "/privacy"];
   if (!user) {
-    if (isLogin) return response;
+    if (PUBLIC_PATHS.includes(path)) return response;
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     url.searchParams.set("next", path);
