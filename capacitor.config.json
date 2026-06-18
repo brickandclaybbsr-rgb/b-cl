@@ -3,7 +3,7 @@
   "appName": "B&CL Ops",
   "webDir": "out",
   "server": {
-    "url": "https://b-cl.vercel.app",
+    "url": "https://ops.brickandclay.in",
     "cleartext": false,
     "androidScheme": "https"
   },
