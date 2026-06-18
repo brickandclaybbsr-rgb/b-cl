@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useFormState } from "react-dom";
 import { toast } from "sonner";
 import { Trash2, Pencil, X, Check } from "lucide-react";
@@ -51,6 +52,7 @@ function EntryRow({
   entry: CashExpense;
   deleteAction: (prev: ExpenseFormState, formData: FormData) => Promise<ExpenseFormState>;
 }) {
+  const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [showConfetti, setShowConfetti] = useState(false);
 
@@ -73,6 +75,7 @@ function EntryRow({
       toast.success("Entry updated ✓");
       setShowConfetti(true);
       setEditing(false);
+      router.refresh();
     }
   }, [editState]);
 
