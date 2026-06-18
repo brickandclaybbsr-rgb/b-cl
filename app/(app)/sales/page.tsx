@@ -294,7 +294,7 @@ export default async function SalesPage({
             <div className="mb-3 flex items-center gap-2">
               <CalendarDays className="size-4 text-content-secondary" />
               <p className="text-xs font-bold uppercase tracking-wider text-content-secondary">
-                Last 7 days
+                Sales history
               </p>
             </div>
             <Last7DaysAccordion
