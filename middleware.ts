@@ -13,7 +13,7 @@ export async function middleware(request: NextRequest) {
   const isLogin = path === "/login";
 
   // Public routes — accessible without login.
-  const PUBLIC_PATHS = ["/login", "/privacy"];
+  const PUBLIC_PATHS = ["/login", "/privacy", "/delete-data"];
   if (!user) {
     if (PUBLIC_PATHS.includes(path)) return response;
     const url = request.nextUrl.clone();
