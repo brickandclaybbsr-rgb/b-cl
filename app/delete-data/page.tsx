@@ -22,6 +22,29 @@ export default function DeleteDataPage() {
 
         <div className="space-y-6">
 
+          {/* Current employee notice */}
+          <div className="rounded-2xl border border-border bg-bg-card overflow-hidden">
+            <div className="border-b border-border bg-bg-elevated px-5 py-3">
+              <h2 className="font-display text-sm font-bold uppercase tracking-wider text-content-secondary">
+                Important — current employees
+              </h2>
+            </div>
+            <div className="px-5 py-4 space-y-3">
+              <p className="text-sm text-content-secondary leading-relaxed">
+                If you are currently employed at Brick and Clay, we are <span className="font-semibold text-content-primary">unable to delete your data</span> while your employment is active. This is not a discretionary decision — it is a legal requirement.
+              </p>
+              <p className="text-sm text-content-secondary leading-relaxed">
+                Under Indian labour law, including the Shops and Commercial Establishments Act (Odisha) and applicable wage and payroll regulations, employers are required to maintain accurate records of attendance, wages, and staff information for a minimum period during and after employment. Deleting this data while you are an active employee would put the organisation in violation of these obligations.
+              </p>
+              <div className="rounded-xl border border-border bg-bg-elevated px-4 py-3">
+                <p className="text-sm font-bold text-content-primary mb-1">When can you request deletion?</p>
+                <p className="text-sm text-content-secondary leading-relaxed">
+                  Once you have formally left Brick and Clay and your employment has ended, you may submit a deletion request. We will process it within 7 business days. Operational records such as attendance logs and sales entries will be retained for up to 12 months after your departure for accounting and compliance purposes, after which they will be permanently deleted.
+                </p>
+              </div>
+            </div>
+          </div>
+
           <div className="rounded-2xl border border-border bg-bg-card overflow-hidden">
             <div className="border-b border-border bg-bg-elevated px-5 py-3">
               <h2 className="font-display text-sm font-bold uppercase tracking-wider text-content-secondary">
