@@ -168,7 +168,10 @@
   scrollbar-width: none;
 }
 
-/* Safe-area helpers for the staff bottom nav */
+/* Safe-area helpers */
+.pt-safe {
+  padding-top: env(safe-area-inset-top, 0px);
+}
 .pb-safe {
   padding-bottom: calc(env(safe-area-inset-bottom, 0px));
 }

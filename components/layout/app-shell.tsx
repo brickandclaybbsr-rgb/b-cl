@@ -58,7 +58,7 @@ function OwnerShell({
 
       {/* Mobile: top bar with brand + settings icon + profile avatar */}
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-20 border-b border-border bg-bg-primary/80 backdrop-blur-xl md:hidden">
+        <header className="sticky top-0 z-20 border-b border-border bg-bg-primary/80 backdrop-blur-xl md:hidden pt-safe">
           <div className="flex items-center justify-between px-4 py-3">
             <BrandLogo height={22} />
             <div className="flex items-center gap-1.5">
@@ -214,7 +214,7 @@ function StaffShell({
   const nav = STAFF_NAV;
   return (
     <div className="flex min-h-dvh flex-col">
-      <header className="sticky top-0 z-20 border-b border-border bg-bg-primary/80 backdrop-blur-xl">
+      <header className="sticky top-0 z-20 border-b border-border bg-bg-primary/80 backdrop-blur-xl pt-safe">
         <div className="container-app flex items-center justify-between py-3.5">
           <BrandLogo height={20} />
           <div className="flex items-center gap-2.5">
