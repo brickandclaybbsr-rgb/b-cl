@@ -187,6 +187,7 @@ export function ExpenseClient({
 }
 
 function ExpenseRow({ entry, isOwner, canDelete }: { entry: CashExpense; isOwner: boolean; canDelete?: boolean }) {
+  const router = useRouter();
   const [deleteState, deleteAction] = useFormState<ExpenseFormState, FormData>(deleteCashExpense, {});
   const [editState, editFormAction] = useFormState<ExpenseFormState, FormData>(updateCashExpense, {});
   const [editing, setEditing] = useState(false);
@@ -206,6 +207,7 @@ function ExpenseRow({ entry, isOwner, canDelete }: { entry: CashExpense; isOwner
       toast.success("Entry updated ✓");
       setShowConfetti(true);
       setEditing(false);
+      router.refresh();
     }
   }, [editState]);
 
