@@ -5,7 +5,8 @@
   "server": {
     "url": "https://ops.brickandclay.in",
     "cleartext": false,
-    "androidScheme": "https"
+    "androidScheme": "https",
+    "allowNavigation": ["ops.brickandclay.in"]
   },
   "plugins": {
     "SplashScreen": {
