@@ -3,8 +3,9 @@
 import { useEffect, useRef, useState } from "react";
 import { useFormState } from "react-dom";
 import { toast } from "sonner";
-import { Banknote, CreditCard, Smartphone, ShoppingBag, AlertTriangle } from "lucide-react";
+import { Banknote, CreditCard, Smartphone, ShoppingBag, AlertTriangle, ClipboardList, ArrowRight } from "lucide-react";
 import { submitSales, updateSales, type SalesFormState } from "./actions";
+import { createClient } from "@/lib/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,20 +15,31 @@ import { Confetti } from "@/components/ui/confetti";
 import { formatINR } from "@/lib/utils";
 import type { DailySales } from "@/lib/database.types";
 
+function getTodayIST(): string {
+  const now = new Date();
+  const istMs = now.getTime() + 5.5 * 60 * 60 * 1000;
+  const ist = new Date(istMs);
+  if (ist.getUTCHours() < 4) ist.setUTCDate(ist.getUTCDate() - 1);
+  return ist.toISOString().slice(0, 10);
+}
+
 export function SalesForm({
   date,
   editMode,
   initialValues,
+  profileTeam,
 }: {
   date?: string;
   editMode?: boolean;
   initialValues?: DailySales;
+  profileTeam?: string | null;
 }) {
   const action = editMode ? updateSales : submitSales;
   const [state, formAction] = useFormState<SalesFormState, FormData>(action, {});
   const [showConfetti, setShowConfetti] = useState(false);
   const [showZeroWarning, setShowZeroWarning] = useState(false);
   const [zeroReason, setZeroReason] = useState("");
+  const [showReminder, setShowReminder] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
 
   const iv = initialValues;
@@ -47,8 +59,29 @@ export function SalesForm({
     if (state.ok) {
       toast.success(editMode ? "Sales updated ✓" : "Sales saved ✓");
       setShowConfetti(true);
+
+      const checklistTeam =
+        profileTeam === "front_desk" ? "front_desk"
+        : profileTeam === "head_chef" ? "kitchen"
+        : null;
+
+      if (checklistTeam && !editMode) {
+        const timer = setTimeout(async () => {
+          const today = getTodayIST();
+          const db = createClient();
+          const { data } = await db
+            .from("closing_checklists")
+            .select("id")
+            .eq("date", today)
+            .eq("team", checklistTeam)
+            .maybeSingle();
+          if (!data) setShowReminder(true);
+        }, 3000);
+        return () => clearTimeout(timer);
+      }
     }
-  }, [state, editMode]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state]);
 
   const totalSale =
     num(cash) + num(card) + num(upi) +
@@ -81,6 +114,44 @@ export function SalesForm({
   return (
     <>
     <Confetti active={showConfetti} />
+
+    {showReminder && (
+      <div
+        className="fixed inset-0 z-[200] flex items-end justify-center p-4 pb-10"
+        onClick={() => setShowReminder(false)}
+      >
+        <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+        <div
+          className="relative w-full max-w-sm rounded-2xl border border-border bg-bg-card p-5 shadow-2xl"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="mb-3 flex size-10 items-center justify-center rounded-full bg-warning/15">
+            <ClipboardList className="size-5 text-warning" />
+          </div>
+          <p className="text-base font-bold text-content-primary">Quick reminder</p>
+          <p className="mt-1 text-sm text-content-secondary leading-relaxed">
+            Today&apos;s <span className="font-semibold text-content-primary">closing checklist</span> hasn&apos;t been submitted yet. Fill it in before you leave!
+          </p>
+          <div className="mt-4 flex gap-2">
+            <button
+              type="button"
+              onClick={() => setShowReminder(false)}
+              className="rounded-xl border border-border px-4 py-2.5 text-sm font-semibold text-content-secondary"
+            >
+              Dismiss
+            </button>
+            <a
+              href="/checklist/closing"
+              className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-fire px-4 py-2.5 text-sm font-bold text-white"
+            >
+              Go fill it now
+              <ArrowRight className="size-4" />
+            </a>
+          </div>
+        </div>
+      </div>
+    )}
+
     <form ref={formRef} action={formAction} onSubmit={handleSubmit} className="space-y-4">
       {date && <input type="hidden" name="_date" value={date} />}
 

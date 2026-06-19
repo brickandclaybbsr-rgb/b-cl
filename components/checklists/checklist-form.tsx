@@ -3,11 +3,12 @@
 import { useEffect, useRef, useState } from "react";
 import { useFormState } from "react-dom";
 import { toast } from "sonner";
-import { Camera, Check, X, TrendingDown, TrendingUp, CheckCircle2 } from "lucide-react";
+import { Camera, Check, X, TrendingDown, TrendingUp, CheckCircle2, Banknote, ArrowRight } from "lucide-react";
 import type { ChecklistItemDef } from "@/lib/constants";
 import {
   type ChecklistFormState,
 } from "@/app/(app)/checklist/actions";
+import { createClient } from "@/lib/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,6 +16,14 @@ import { Textarea } from "@/components/ui/textarea";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { Confetti } from "@/components/ui/confetti";
 import { cn, formatINR } from "@/lib/utils";
+
+function getTodayIST(): string {
+  const now = new Date();
+  const istMs = now.getTime() + 5.5 * 60 * 60 * 1000;
+  const ist = new Date(istMs);
+  if (ist.getUTCHours() < 4) ist.setUTCDate(ist.getUTCDate() - 1);
+  return ist.toISOString().slice(0, 10);
+}
 
 type Action = (
   prev: ChecklistFormState,
@@ -28,6 +37,7 @@ export function ChecklistForm({
   team,
   hiddenFields,
   prevClosingBalance,
+  reminderSales,
 }: {
   variant: "opening" | "closing";
   config: ChecklistItemDef[];
@@ -35,6 +45,7 @@ export function ChecklistForm({
   team?: "kitchen" | "front_desk" | null;
   hiddenFields?: Record<string, string>;
   prevClosingBalance?: number;
+  reminderSales?: boolean;
 }) {
   // Kitchen team (incl. head chef, who maps to "kitchen") doesn't handle cash
   const showCashFields = team !== "kitchen";
@@ -43,6 +54,7 @@ export function ChecklistForm({
     {},
   );
   const [showConfetti, setShowConfetti] = useState(false);
+  const [showReminder, setShowReminder] = useState(false);
   const [openingCashRaw, setOpeningCashRaw] = useState("");
 
   useEffect(() => {
@@ -50,7 +62,22 @@ export function ChecklistForm({
     if (state.ok) {
       toast.success("Checklist submitted ✓");
       setShowConfetti(true);
+
+      if (variant === "closing" && reminderSales) {
+        const timer = setTimeout(async () => {
+          const today = getTodayIST();
+          const db = createClient();
+          const { data } = await db
+            .from("daily_sales")
+            .select("id")
+            .eq("date", today)
+            .maybeSingle();
+          if (!data) setShowReminder(true);
+        }, 3000);
+        return () => clearTimeout(timer);
+      }
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state]);
 
   // Discrepancy logic
@@ -77,6 +104,44 @@ export function ChecklistForm({
   return (
     <>
     <Confetti active={showConfetti} />
+
+    {showReminder && (
+      <div
+        className="fixed inset-0 z-[200] flex items-end justify-center p-4 pb-10"
+        onClick={() => setShowReminder(false)}
+      >
+        <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+        <div
+          className="relative w-full max-w-sm rounded-2xl border border-border bg-bg-card p-5 shadow-2xl"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="mb-3 flex size-10 items-center justify-center rounded-full bg-warning/15">
+            <Banknote className="size-5 text-warning" />
+          </div>
+          <p className="text-base font-bold text-content-primary">Quick reminder</p>
+          <p className="mt-1 text-sm text-content-secondary leading-relaxed">
+            Today&apos;s <span className="font-semibold text-content-primary">daily sales</span> haven&apos;t been filed yet. Don&apos;t forget to file them before closing!
+          </p>
+          <div className="mt-4 flex gap-2">
+            <button
+              type="button"
+              onClick={() => setShowReminder(false)}
+              className="rounded-xl border border-border px-4 py-2.5 text-sm font-semibold text-content-secondary"
+            >
+              Dismiss
+            </button>
+            <a
+              href="/sales"
+              className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-fire px-4 py-2.5 text-sm font-bold text-white"
+            >
+              Go file it now
+              <ArrowRight className="size-4" />
+            </a>
+          </div>
+        </div>
+      </div>
+    )}
+
     <form action={formAction} className="space-y-4" encType="multipart/form-data">
       {hiddenFields && Object.entries(hiddenFields).map(([k, v]) => (
         <input key={k} type="hidden" name={k} value={v} />

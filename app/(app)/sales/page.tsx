@@ -210,7 +210,7 @@ export default async function SalesPage({
 
       {existing ? (
         editMode ? (
-          <SalesForm date={requestedDate} editMode initialValues={existing} />
+          <SalesForm date={requestedDate} editMode initialValues={existing} profileTeam={profile.team} />
         ) : (
           <>
             <SalesView
@@ -279,7 +279,7 @@ export default async function SalesPage({
           </p>
         </Card>
       ) : (
-        <SalesForm date={requestedDate} />
+        <SalesForm date={requestedDate} profileTeam={profile.team} />
       )}
 
       {/* Last 7 days accordion — front_desk and head_chef only */}

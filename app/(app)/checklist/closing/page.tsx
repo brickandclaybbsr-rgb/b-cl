@@ -97,6 +97,7 @@ export default async function ClosingChecklistPage({
             action={submitClosingChecklist}
             team="kitchen"
             hiddenFields={kitchenEditMode ? { _edit_mode: "1" } : undefined}
+            reminderSales
           />
         )}
 
@@ -250,6 +251,7 @@ export default async function ClosingChecklistPage({
           config={config}
           action={submitClosingChecklist}
           team={myTeam}
+          reminderSales={myTeam === "front_desk"}
         />
       )}
 
