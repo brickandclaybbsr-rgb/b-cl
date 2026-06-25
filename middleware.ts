@@ -32,11 +32,14 @@ export async function middleware(request: NextRequest) {
 
   // Determine if a role check is needed before doing a DB query.
   const isOwnerRoute = OWNER_PREFIXES.some((p) => path === p || path.startsWith(p + "/"));
-  const isStockRoute = path === "/stock" || path.startsWith("/stock/");
+  // Routes inventory managers are allowed to visit
+  const isInventoryManagerRoute =
+    path === "/stock" || path.startsWith("/stock/") ||
+    path === "/vendors" || path.startsWith("/vendors/");
 
   // Only fetch the role when we actually need to enforce a restriction,
-  // so non-restricted staff routes skip the DB round-trip.
-  if (isOwnerRoute || !isStockRoute) {
+  // so unrestricted staff routes skip the DB round-trip.
+  if (isOwnerRoute || !isInventoryManagerRoute) {
     const { data: profile } = await supabase
       .from("profiles")
       .select("role")
@@ -52,8 +55,8 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(url);
     }
 
-    // Inventory manager: stock page is the only page they can access.
-    if (role === "inventory_manager" && !isStockRoute) {
+    // Inventory manager: only stock + vendors allowed, everything else → /stock.
+    if (role === "inventory_manager" && !isInventoryManagerRoute) {
       const url = request.nextUrl.clone();
       url.pathname = "/stock";
       url.search = "";

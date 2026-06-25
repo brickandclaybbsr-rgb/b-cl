@@ -8,5 +8,7 @@ export default async function Home() {
   const profile = await getCurrentProfile();
   if (!profile) redirect("/login");
 
-  redirect(profile.role === "owner" ? "/owner" : "/dashboard");
+  if (profile.role === "owner") redirect("/owner");
+  if (profile.role === "inventory_manager") redirect("/stock");
+  redirect("/dashboard");
 }

@@ -7,7 +7,7 @@ import type { Role } from "@/lib/database.types";
 import { BrandLogo } from "@/components/brand-logo";
 import { SignOutButton } from "./sign-out-button";
 import { Settings } from "lucide-react";
-import { OWNER_NAV, OWNER_MOBILE_NAV, STAFF_NAV, isActive, type NavItem } from "./nav-config";
+import { OWNER_NAV, OWNER_MOBILE_NAV, STAFF_NAV, INVENTORY_MANAGER_NAV, isActive, type NavItem } from "./nav-config";
 import { initials, cn } from "@/lib/utils";
 import { hapticLight } from "@/lib/native";
 
@@ -204,28 +204,74 @@ function InventoryManagerShell({
   name: string;
   children: React.ReactNode;
 }) {
+  const pathname = usePathname();
+  const nav = INVENTORY_MANAGER_NAV;
+
   return (
     <div className="flex min-h-dvh flex-col">
+      {/* Header: logo on left, name + role + sign-out on right */}
       <header className="sticky top-0 z-20 border-b border-border bg-bg-primary/80 backdrop-blur-xl pt-safe">
-        <div className="container-app flex items-center justify-between py-3.5">
-          <div className="flex items-center gap-3">
-            <BrandLogo height={20} />
-            <span className="hidden sm:block text-[11px] font-medium text-content-secondary border-l border-border pl-3">
-              Inventory Manager
-            </span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="flex size-7 items-center justify-center rounded-full bg-white/10 text-xs font-bold text-white select-none">
-              {initials(name)}
+        <div className="container-app flex items-center justify-between py-3">
+          <BrandLogo height={20} />
+
+          <div className="flex items-center gap-2.5">
+            {/* Avatar + name (name hidden on very small screens) */}
+            <div className="flex items-center gap-2">
+              <div className="flex size-8 items-center justify-center rounded-full bg-warm/20 text-xs font-bold text-warm select-none">
+                {initials(name)}
+              </div>
+              <div className="hidden xs:block leading-tight text-right">
+                <p className="text-xs font-semibold text-content-primary">{name}</p>
+                <p className="text-[10px] text-content-secondary">Inventory Manager</p>
+              </div>
             </div>
             <SignOutButton label="" className="px-1.5" />
           </div>
         </div>
       </header>
 
-      <main className="container-app flex-1 animate-fade-in pt-6 pb-8">
+      {/* Page content — pb-24 clears the fixed bottom nav */}
+      <main key={pathname} className="container-app flex-1 animate-fade-in pt-6 pb-24">
         {children}
       </main>
+
+      {/* Bottom nav: Stock + Orders only, no profile */}
+      <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-bg-card/90 pb-safe backdrop-blur-xl">
+        <div
+          className="mx-auto grid max-w-2xl"
+          style={{ gridTemplateColumns: `repeat(${nav.length}, minmax(0, 1fr))` }}
+        >
+          {nav.map((item) => {
+            const active = isActive(item, pathname);
+            const Icon = item.icon;
+            return (
+              <Link
+                key={item.label}
+                href={item.href}
+                onClick={() => void hapticLight()}
+                className={cn(
+                  "relative flex flex-col items-center gap-1 py-3 text-[0.7rem] font-medium transition-colors duration-200",
+                  active ? "text-white" : "text-content-secondary",
+                )}
+              >
+                <span
+                  className={cn(
+                    "absolute top-0 h-0.5 w-8 rounded-full bg-white transition-all duration-300",
+                    active ? "opacity-100" : "opacity-0",
+                  )}
+                />
+                <Icon
+                  className={cn(
+                    "size-5 transition-transform duration-200",
+                    active && "-translate-y-px scale-105",
+                  )}
+                />
+                {item.label}
+              </Link>
+            );
+          })}
+        </div>
+      </nav>
     </div>
   );
 }
