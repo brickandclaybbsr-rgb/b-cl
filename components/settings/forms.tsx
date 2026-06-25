@@ -62,6 +62,7 @@ export function AddStaffForm() {
           <Label htmlFor="s-role">Role</Label>
           <Select id="s-role" name="role" defaultValue="staff">
             <option value="staff">Staff</option>
+            <option value="inventory_manager">Inventory Manager</option>
             <option value="owner">Owner</option>
           </Select>
         </div>
