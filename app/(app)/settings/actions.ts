@@ -25,7 +25,12 @@ export async function createStaff(
   const name = String(formData.get("name") ?? "").trim();
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const password = String(formData.get("password") ?? "");
-  const role = String(formData.get("role") ?? "staff") === "owner" ? "owner" : "staff";
+  const VALID_ROLES = ["owner", "staff", "inventory_manager"] as const;
+  type ValidRole = typeof VALID_ROLES[number];
+  const rawRole = String(formData.get("role") ?? "staff");
+  const role: ValidRole = (VALID_ROLES as readonly string[]).includes(rawRole)
+    ? (rawRole as ValidRole)
+    : "staff";
 
   if (!name || !email || password.length < 6) {
     return { error: "Name, email and a 6+ char password are required." };
