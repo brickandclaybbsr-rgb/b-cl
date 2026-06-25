@@ -30,17 +30,32 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // Owner-only areas: bounce staff back to their dashboard.
-  if (OWNER_PREFIXES.some((p) => path === p || path.startsWith(p + "/"))) {
+  // Determine if a role check is needed before doing a DB query.
+  const isOwnerRoute = OWNER_PREFIXES.some((p) => path === p || path.startsWith(p + "/"));
+  const isStockRoute = path === "/stock" || path.startsWith("/stock/");
+
+  // Only fetch the role when we actually need to enforce a restriction,
+  // so non-restricted staff routes skip the DB round-trip.
+  if (isOwnerRoute || !isStockRoute) {
     const { data: profile } = await supabase
       .from("profiles")
       .select("role")
       .eq("id", user.id)
       .single();
+    const role = profile?.role;
 
-    if (profile?.role !== "owner") {
+    // Owner-only areas: bounce everyone else.
+    if (isOwnerRoute && role !== "owner") {
       const url = request.nextUrl.clone();
-      url.pathname = "/dashboard";
+      url.pathname = role === "inventory_manager" ? "/stock" : "/dashboard";
+      url.search = "";
+      return NextResponse.redirect(url);
+    }
+
+    // Inventory manager: stock page is the only page they can access.
+    if (role === "inventory_manager" && !isStockRoute) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/stock";
       url.search = "";
       return NextResponse.redirect(url);
     }

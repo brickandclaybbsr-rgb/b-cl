@@ -45,6 +45,11 @@ export const OWNER_NAV: NavItem[] = [
   { label: "Settings", href: "/profile", icon: Settings, match: ["/profile", "/notifications"] },
 ];
 
+/** Inventory manager: stock page only. */
+export const INVENTORY_MANAGER_NAV: NavItem[] = [
+  { label: "Stock", href: "/stock", icon: Package },
+];
+
 /** Condensed nav for the mobile bottom bar — 4 items only. */
 export const OWNER_MOBILE_NAV: NavItem[] = [
   { label: "Dashboard", href: "/owner", icon: LayoutDashboard },

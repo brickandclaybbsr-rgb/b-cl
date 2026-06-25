@@ -8,7 +8,7 @@
  * signature. Using `interface` here silently breaks query result typing.
  */
 
-export type Role = "owner" | "staff";
+export type Role = "owner" | "staff" | "inventory_manager";
 export type Urgency = "normal" | "urgent";
 export type OrderStatus = "pending" | "placed" | "received";
 export type ReportStatus = "sent" | "failed";
@@ -125,6 +125,9 @@ export type StockItem = {
   category: string | null;
   is_active: boolean;
   created_at: string;
+  min_qty: number | null;
+  min_unit: string | null;
+  price_per_unit: number | null;
 };
 
 export type StockSnapshot = {

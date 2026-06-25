@@ -7,6 +7,11 @@ export function isHeadChef(profile: Profile): boolean {
   return profile.team === "head_chef";
 }
 
+/** Inventory manager — can only access the stock/inventory page. */
+export function isInventoryManager(profile: Profile): boolean {
+  return profile.role === "inventory_manager";
+}
+
 /** Current authenticated profile, or null. Safe to call anywhere server-side. */
 export async function getCurrentProfile(): Promise<Profile | null> {
   const supabase = createClient();

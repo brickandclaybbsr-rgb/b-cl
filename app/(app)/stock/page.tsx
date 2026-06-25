@@ -16,6 +16,7 @@ export const metadata = { title: "Stock" };
 export default async function StockPage() {
   const profile = await requireProfile();
   const isOwner = profile.role === "owner";
+  const isInventoryManager = profile.role === "inventory_manager";
   const [items, latest] = await Promise.all([
     getStockItems(),
     getLatestStockSnapshot(),
@@ -24,24 +25,27 @@ export default async function StockPage() {
   return (
     <div>
       <PageHeader
-        title="Stock Status"
+        title="Stock Inventory"
         subtitle={formatDateLabel(todayIST())}
       />
 
-      <div className="mb-4 flex gap-1 border-b border-border pb-px">
-        <Link
-          href="/stock"
-          className="relative flex items-center gap-1.5 pb-3 text-sm font-semibold text-white after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-full after:bg-white"
-        >
-          <Package className="size-4" /> Stock
-        </Link>
-        <Link
-          href="/vendors"
-          className="flex items-center gap-1.5 pb-3 px-3 text-sm font-semibold text-content-secondary hover:text-content-primary transition-colors"
-        >
-          <ShoppingCart className="size-4" /> {isOwner ? "Vendors" : "Orders"}
-        </Link>
-      </div>
+      {!isInventoryManager && (
+        <div className="mb-4 flex gap-1 border-b border-border pb-px">
+          <Link
+            href="/stock"
+            className="relative flex items-center gap-1.5 pb-3 text-sm font-semibold text-white after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-full after:bg-white"
+          >
+            <Package className="size-4" /> Stock
+          </Link>
+          <Link
+            href="/vendors"
+            className="flex items-center gap-1.5 pb-3 px-3 text-sm font-semibold text-content-secondary hover:text-content-primary transition-colors"
+          >
+            <ShoppingCart className="size-4" /> {isOwner ? "Vendors" : "Orders"}
+          </Link>
+        </div>
+      )}
+
       {items.length === 0 ? (
         <EmptyState
           icon={Package}
@@ -49,7 +53,7 @@ export default async function StockPage() {
           description="The owner needs to add stock items in Settings before you can track them."
         />
       ) : (
-        <StockForm items={items} initial={statusMap(latest)} />
+        <StockForm items={items} initial={statusMap(latest)} lastSnapshot={latest} />
       )}
     </div>
   );

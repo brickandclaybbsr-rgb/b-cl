@@ -24,11 +24,9 @@ export function AppShell({
   isHeadChef: boolean;
   children: React.ReactNode;
 }) {
-  return role === "owner" ? (
-    <OwnerShell name={name}>{children}</OwnerShell>
-  ) : (
-    <StaffShell name={name} team={team} isHeadChef={isHeadChef}>{children}</StaffShell>
-  );
+  if (role === "owner") return <OwnerShell name={name}>{children}</OwnerShell>;
+  if (role === "inventory_manager") return <InventoryManagerShell name={name}>{children}</InventoryManagerShell>;
+  return <StaffShell name={name} team={team} isHeadChef={isHeadChef}>{children}</StaffShell>;
 }
 
 /* ─────────────────────────── Owner ─────────────────────────── */
@@ -193,6 +191,41 @@ function UserChip({ name, role }: { name: string; role: string }) {
         </div>
       </Link>
       <SignOutButton className="mt-1 w-full" />
+    </div>
+  );
+}
+
+/* ─────────────────────── Inventory Manager ──────────────────── */
+
+function InventoryManagerShell({
+  name,
+  children,
+}: {
+  name: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex min-h-dvh flex-col">
+      <header className="sticky top-0 z-20 border-b border-border bg-bg-primary/80 backdrop-blur-xl pt-safe">
+        <div className="container-app flex items-center justify-between py-3.5">
+          <div className="flex items-center gap-3">
+            <BrandLogo height={20} />
+            <span className="hidden sm:block text-[11px] font-medium text-content-secondary border-l border-border pl-3">
+              Inventory Manager
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="flex size-7 items-center justify-center rounded-full bg-white/10 text-xs font-bold text-white select-none">
+              {initials(name)}
+            </div>
+            <SignOutButton label="" className="px-1.5" />
+          </div>
+        </div>
+      </header>
+
+      <main className="container-app flex-1 animate-fade-in pt-6 pb-8">
+        {children}
+      </main>
     </div>
   );
 }
