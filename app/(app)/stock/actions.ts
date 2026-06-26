@@ -64,7 +64,11 @@ export async function submitStock(
   return { ok: true };
 }
 
-export async function addStockItemInline(name: string, category: string) {
+export async function addStockItemInline(
+  name: string,
+  category: string,
+  opts?: { min_qty?: number; min_unit?: string; price_per_unit?: number },
+) {
   await requireProfile();
   const supabase = createClient();
 
@@ -76,6 +80,9 @@ export async function addStockItemInline(name: string, category: string) {
       name: name.trim(),
       category: category.trim() || "Other",
       is_active: true,
+      ...(opts?.min_qty      != null && { min_qty: opts.min_qty }),
+      ...(opts?.min_unit               && { min_unit: opts.min_unit }),
+      ...(opts?.price_per_unit != null && { price_per_unit: opts.price_per_unit }),
     })
     .select()
     .single();

@@ -121,12 +121,26 @@ export function StockForm({
   }, [items]);
 
   const [search, setSearch]             = useState("");
-  const [newItemName, setNewItemName]   = useState("");
-  const [newItemCat, setNewItemCat]     = useState("");
   const [isAdding, startAdding]         = useTransition();
   const [showConfetti, setShowConfetti] = useState(false);
   const [activeTab, setActiveTab]       = useState<Tab>("all");
   const [collapsedCats, setCollapsedCats] = useState<Set<string>>(new Set());
+
+  // Add-item modal state
+  const [showAddModal, setShowAddModal]         = useState(false);
+  const [newItemName, setNewItemName]           = useState("");
+  const [newItemCat, setNewItemCat]             = useState("");
+  const [newItemCustomCat, setNewItemCustomCat] = useState("");
+  const [newItemMinQty, setNewItemMinQty]       = useState("");
+  const [newItemMinUnit, setNewItemMinUnit]     = useState("kg");
+  const [newItemPrice, setNewItemPrice]         = useState("");
+
+  function openAddModal() {
+    setNewItemName(""); setNewItemCat(""); setNewItemCustomCat("");
+    setNewItemMinQty(""); setNewItemMinUnit("kg"); setNewItemPrice("");
+    setShowAddModal(true);
+  }
+  function closeAddModal() { setShowAddModal(false); }
 
   useEffect(() => {
     if (state.error) toast.error(state.error);
@@ -255,10 +269,20 @@ export function StockForm({
   async function handleAddInline(e: React.FormEvent) {
     e.preventDefault();
     if (!newItemName.trim()) return;
+    const category = newItemCat === "__new__" ? newItemCustomCat : newItemCat;
+    const minQty   = newItemMinQty  ? parseFloat(newItemMinQty)  : undefined;
+    const price    = newItemPrice   ? parseFloat(newItemPrice)   : undefined;
     startAdding(async () => {
-      const res = await addStockItemInline(newItemName, newItemCat);
+      const res = await addStockItemInline(newItemName, category, {
+        min_qty: isNaN(minQty!) ? undefined : minQty,
+        min_unit: newItemMinQty ? newItemMinUnit : undefined,
+        price_per_unit: isNaN(price!) ? undefined : price,
+      });
       if (res?.error) toast.error(res.error);
-      else { toast.success(`"${newItemName}" added ✓`); setNewItemName(""); setNewItemCat(""); }
+      else {
+        toast.success(`"${newItemName}" added ✓`);
+        closeAddModal();
+      }
     });
   }
 
@@ -294,41 +318,15 @@ export function StockForm({
         </div>
       )}
 
-      {/* ── Search + Quick Add ── */}
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-        <div className="md:col-span-2 relative">
-          <Search className="absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-content-secondary" />
-          <Input
-            placeholder="Search by name or category…"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="pl-10 h-10 text-sm bg-bg-card border-border"
-          />
-        </div>
-        <Card className="p-2 border-dashed border-warm/40 bg-warm/5 flex items-center">
-          <form onSubmit={handleAddInline} className="flex w-full gap-2 items-center">
-            <Input
-              placeholder="+ Quick add item…"
-              value={newItemName}
-              onChange={e => setNewItemName(e.target.value)}
-              className="h-8 text-xs flex-1"
-              required
-            />
-            <select
-              value={newItemCat}
-              onChange={e => setNewItemCat(e.target.value)}
-              className="h-8 text-xs bg-bg-elevated border border-border rounded-lg px-2 max-w-[100px]"
-            >
-              <option value="">Category…</option>
-              {categories.map(c => <option key={c} value={c}>{c}</option>)}
-              <option value="Other">Other</option>
-            </select>
-            <Button type="submit" size="sm" disabled={isAdding}
-              className="h-8 px-3 bg-warm text-black hover:bg-warm/80 font-bold shrink-0 text-xs">
-              Add
-            </Button>
-          </form>
-        </Card>
+      {/* ── Search ── */}
+      <div className="relative">
+        <Search className="absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-content-secondary" />
+        <Input
+          placeholder="Search by name or category…"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          className="pl-10 h-10 text-sm bg-bg-card border-border"
+        />
       </div>
 
       {/* ── Metrics ── */}
@@ -677,6 +675,133 @@ export function StockForm({
           Save Stock Snapshot
         </SubmitButton>
       </form>
+
+      {/* ── Floating Add Item button ── */}
+      <button
+        type="button"
+        onClick={openAddModal}
+        className="fixed bottom-24 right-4 z-40 flex items-center gap-2 rounded-full bg-warm px-4 py-3 text-sm font-bold text-black shadow-lg shadow-warm/30 transition-transform active:scale-95 hover:bg-warm/90"
+        aria-label="Add new stock item"
+      >
+        <Plus className="size-4" />
+        Add Item
+      </button>
+
+      {/* ── Add Item bottom-sheet modal ── */}
+      {showAddModal && (
+        <>
+          {/* Backdrop */}
+          <div
+            className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm"
+            onClick={closeAddModal}
+          />
+          {/* Sheet */}
+          <div className="fixed inset-x-0 bottom-0 z-50 rounded-t-2xl border-t border-border bg-bg-card shadow-2xl animate-slide-up">
+            {/* Drag handle */}
+            <div className="mx-auto mt-3 h-1 w-10 rounded-full bg-border" />
+
+            <div className="px-5 pt-4 pb-2 flex items-center justify-between">
+              <h2 className="text-base font-bold">Add New Stock Item</h2>
+              <button type="button" onClick={closeAddModal}
+                className="flex size-8 items-center justify-center rounded-full bg-bg-elevated text-content-secondary hover:text-content-primary transition-colors">
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleAddInline} className="px-5 pb-8 pt-2 space-y-4">
+              {/* Item name */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold uppercase tracking-wider text-content-secondary">
+                  Item Name <span className="text-danger">*</span>
+                </label>
+                <Input
+                  autoFocus
+                  placeholder="e.g. Mozzarella, Olive Oil, Flour…"
+                  value={newItemName}
+                  onChange={e => setNewItemName(e.target.value)}
+                  className="h-12 text-base"
+                  required
+                />
+              </div>
+
+              {/* Category */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold uppercase tracking-wider text-content-secondary">Category</label>
+                <select
+                  value={newItemCat}
+                  onChange={e => setNewItemCat(e.target.value)}
+                  className="h-12 w-full rounded-xl border border-border bg-bg-elevated px-3 text-sm text-content-primary"
+                >
+                  <option value="">Select category…</option>
+                  {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                  <option value="__new__">+ Type new category…</option>
+                </select>
+                {newItemCat === "__new__" && (
+                  <Input
+                    autoFocus
+                    placeholder="New category name…"
+                    value={newItemCustomCat}
+                    onChange={e => setNewItemCustomCat(e.target.value)}
+                    className="h-11 text-sm"
+                  />
+                )}
+              </div>
+
+              {/* Min stock threshold */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold uppercase tracking-wider text-content-secondary">
+                  Min Stock Threshold <span className="text-content-secondary font-normal">(optional — triggers "low" alert)</span>
+                </label>
+                <div className="flex gap-2">
+                  <Input
+                    type="number" min="0" step="any"
+                    placeholder="e.g. 5"
+                    value={newItemMinQty}
+                    onChange={e => setNewItemMinQty(e.target.value)}
+                    className="h-11 flex-1 text-sm"
+                  />
+                  <select
+                    value={newItemMinUnit}
+                    onChange={e => setNewItemMinUnit(e.target.value)}
+                    className="h-11 rounded-xl border border-border bg-bg-elevated px-3 text-sm text-content-primary"
+                  >
+                    {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              {/* Price per unit */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold uppercase tracking-wider text-content-secondary">
+                  Price per Unit <span className="text-content-secondary font-normal">(optional — for stock value)</span>
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-semibold text-content-secondary">₹</span>
+                  <Input
+                    type="number" min="0" step="any"
+                    placeholder="0.00"
+                    value={newItemPrice}
+                    onChange={e => setNewItemPrice(e.target.value)}
+                    className="h-11 pl-8 text-sm"
+                  />
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="flex gap-3 pt-1">
+                <Button type="button" variant="secondary" onClick={closeAddModal}
+                  className="flex-1 h-12 text-sm">
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={isAdding || !newItemName.trim()}
+                  className="flex-1 h-12 text-sm font-bold bg-warm text-black hover:bg-warm/90">
+                  {isAdding ? "Adding…" : "Add Item"}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </>
+      )}
     </div>
   );
 }
