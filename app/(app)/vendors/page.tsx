@@ -3,6 +3,7 @@ import Link from "next/link";
 import { requireProfile } from "@/lib/auth";
 import { getVendors, getAllVendors, getOrders } from "@/lib/data/vendors";
 import { getPurchases } from "@/lib/data/purchases";
+import { getStockItems } from "@/lib/data/stock";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { Button } from "@/components/ui/button";
@@ -11,7 +12,7 @@ import { RaiseOrderForm } from "./raise-order-form";
 import { OrderCard } from "./order-card";
 import { RecordPurchaseForm } from "./record-purchase-form";
 import { VendorManageClient } from "./vendor-manage-client";
-import { formatTimestampIST, formatDateLabel } from "@/lib/date";
+import { formatDateLabel } from "@/lib/date";
 import { cn } from "@/lib/utils";
 
 export const metadata = { title: "Vendor & Bills" };
@@ -26,16 +27,17 @@ export default async function VendorsPage({ searchParams }: Props) {
   const isInventoryManager = profile.role === "inventory_manager";
 
   const currentTab = searchParams.tab ?? "orders";
-  
-  const [vendors, allVendors, orders, purchases] = await Promise.all([
+
+  const [vendors, allVendors, orders, purchases, stockItems] = await Promise.all([
     getVendors(),
     isOwner ? getAllVendors() : Promise.resolve([]),
     getOrders(),
     getPurchases(),
+    getStockItems(),
   ]);
 
-  const activeOrders = orders.filter((o) => o.status !== "received");
-  const recentOrders = orders.filter((o) => o.status === "received").slice(0, 10);
+  const activeOrders  = orders.filter(o => o.status !== "received");
+  const recentOrders  = orders.filter(o => o.status === "received").slice(0, 10);
 
   return (
     <div>
@@ -44,11 +46,11 @@ export default async function VendorsPage({ searchParams }: Props) {
         subtitle={
           isOwner
             ? "Manage vendors, track orders, and audit purchase bills"
-            : "Raise order requests and log vendor purchase invoices"
+            : "Raise order requests and log purchase invoices"
         }
       />
 
-      {/* Top Stock/Vendors strip — hidden for inventory manager (they use bottom nav) */}
+      {/* Top Stock ↔ Vendors strip — hidden for inventory manager (bottom nav handles it) */}
       {!isInventoryManager && (
         <div className="mb-4 flex gap-1 border-b border-border pb-px">
           <Link
@@ -66,56 +68,60 @@ export default async function VendorsPage({ searchParams }: Props) {
         </div>
       )}
 
-      {/* Inner tabs */}
-      <div className="mb-6 flex gap-4 border-b border-border pb-px">
-        <Link
-          href="/vendors?tab=orders"
-          className={cn(
-            "relative pb-3 text-sm font-semibold transition-all duration-200",
-            currentTab === "orders"
-              ? "text-white after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-full after:bg-white"
-              : "text-content-secondary hover:text-content-primary"
-          )}
-        >
-          <span className="flex items-center gap-1.5">
-            <ShoppingCart className="size-4" />
-            Order Requests
-          </span>
-        </Link>
-        <Link
-          href="/vendors?tab=purchases"
-          className={cn(
-            "relative pb-3 text-sm font-semibold transition-all duration-200",
-            currentTab === "purchases"
-              ? "text-white after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-full after:bg-white"
-              : "text-content-secondary hover:text-content-primary"
-          )}
-        >
-          <span className="flex items-center gap-1.5">
-            <Receipt className="size-4" />
-            Purchases & Bills
-          </span>
-        </Link>
-        {isOwner && (
+      {/* Inner sub-tabs — hidden for inventory manager (they navigate via bottom nav already) */}
+      {!isInventoryManager && (
+        <div className="mb-6 flex gap-4 border-b border-border pb-px">
           <Link
-            href="/vendors?tab=manage"
+            href="/vendors?tab=orders"
             className={cn(
               "relative pb-3 text-sm font-semibold transition-all duration-200",
-              currentTab === "manage"
+              currentTab === "orders"
                 ? "text-white after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-full after:bg-white"
-                : "text-content-secondary hover:text-content-primary"
+                : "text-content-secondary hover:text-content-primary",
             )}
           >
             <span className="flex items-center gap-1.5">
-              <Store className="size-4" />
-              Vendors
+              <ShoppingCart className="size-4" />
+              Order Requests
             </span>
           </Link>
-        )}
-      </div>
+          <Link
+            href="/vendors?tab=purchases"
+            className={cn(
+              "relative pb-3 text-sm font-semibold transition-all duration-200",
+              currentTab === "purchases"
+                ? "text-white after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-full after:bg-white"
+                : "text-content-secondary hover:text-content-primary",
+            )}
+          >
+            <span className="flex items-center gap-1.5">
+              <Receipt className="size-4" />
+              Purchases & Bills
+            </span>
+          </Link>
+          {isOwner && (
+            <Link
+              href="/vendors?tab=manage"
+              className={cn(
+                "relative pb-3 text-sm font-semibold transition-all duration-200",
+                currentTab === "manage"
+                  ? "text-white after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-full after:bg-white"
+                  : "text-content-secondary hover:text-content-primary",
+              )}
+            >
+              <span className="flex items-center gap-1.5">
+                <Store className="size-4" />
+                Vendors
+              </span>
+            </Link>
+          )}
+        </div>
+      )}
+
+      {/* ── Tab content ── */}
 
       {currentTab === "orders" ? (
-        // Tab 1: Orders (Existing Flow)
+        /* Orders tab */
         <div className="space-y-6">
           {vendors.length === 0 ? (
             <EmptyState
@@ -134,9 +140,7 @@ export default async function VendorsPage({ searchParams }: Props) {
               )}
             </EmptyState>
           ) : (
-            <div>
-              <RaiseOrderForm vendors={vendors} />
-            </div>
+            <RaiseOrderForm vendors={vendors} />
           )}
 
           <section className="space-y-3">
@@ -151,7 +155,7 @@ export default async function VendorsPage({ searchParams }: Props) {
                 description="New order requests will show up here."
               />
             ) : (
-              activeOrders.map((o) => <OrderCard key={o.id} order={o} isOwner={isOwner} />)
+              activeOrders.map(o => <OrderCard key={o.id} order={o} isOwner={isOwner} />)
             )}
           </section>
 
@@ -160,29 +164,19 @@ export default async function VendorsPage({ searchParams }: Props) {
               <h2 className="text-xs font-bold uppercase tracking-wider text-content-secondary">
                 Recently received
               </h2>
-              {recentOrders.map((o) => (
-                <OrderCard key={o.id} order={o} isOwner={isOwner} />
-              ))}
+              {recentOrders.map(o => <OrderCard key={o.id} order={o} isOwner={isOwner} />)}
             </section>
           )}
         </div>
+
       ) : currentTab === "manage" && isOwner ? (
-        // Tab 3: Vendor Management (Owner only)
+        /* Vendor management (owner only) */
         <VendorManageClient vendors={allVendors} />
+
       ) : (
-        // Tab 2: Purchases & Bills (New Flow)
+        /* Purchases & Bills tab */
         <div className="space-y-6">
-          {vendors.length === 0 ? (
-            <EmptyState
-              icon={Store}
-              title="No vendors configured"
-              description="Add vendors in settings before you can record purchases."
-            />
-          ) : (
-            <div>
-              <RecordPurchaseForm vendors={vendors} />
-            </div>
-          )}
+          <RecordPurchaseForm vendors={vendors} stockItems={stockItems} />
 
           <section className="space-y-3">
             <h2 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-content-secondary">
@@ -193,29 +187,26 @@ export default async function VendorsPage({ searchParams }: Props) {
               <EmptyState
                 icon={Receipt}
                 title="No purchases recorded yet"
-                description="Upload bills and record items purchased above."
+                description="Fill in the form above to log your first purchase."
               />
             ) : (
               <div className="space-y-3">
-                {purchases.map((p) => (
+                {purchases.map(p => (
                   <Card key={p.id} className="p-4">
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                       <div>
-                        <div className="flex items-center gap-2">
-                          <h3 className="font-semibold text-content-primary">
-                            {p.vendor_name}
-                          </h3>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h3 className="font-semibold text-content-primary">{p.vendor_name}</h3>
                           <span className="text-sm font-bold text-success">
                             ₹{p.amount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
                           </span>
                         </div>
                         <p className="mt-0.5 text-xs text-content-secondary">
-                          Recorded by {p.submitted_by_name} · Purchase Date: {formatDateLabel(p.purchased_at)}
+                          {p.submitted_by_name} · {formatDateLabel(p.purchased_at)}
                         </p>
                       </div>
-
                       {p.bill_url && (
-                        <Button asChild size="sm" variant="secondary" className="self-start sm:self-auto gap-1">
+                        <Button asChild size="sm" variant="secondary" className="self-start gap-1">
                           <Link href={p.bill_url} target="_blank">
                             <Download className="size-3.5" />
                             View Bill
@@ -223,17 +214,11 @@ export default async function VendorsPage({ searchParams }: Props) {
                         </Button>
                       )}
                     </div>
-
                     <div className="mt-3 rounded-lg bg-bg-elevated/40 p-3">
-                      <p className="whitespace-pre-wrap text-sm text-content-primary font-medium">
-                        {p.items}
-                      </p>
+                      <p className="whitespace-pre-wrap text-sm text-content-primary">{p.items}</p>
                     </div>
-
                     {p.notes && (
-                      <p className="mt-2 text-xs text-content-secondary italic">
-                        Note: {p.notes}
-                      </p>
+                      <p className="mt-2 text-xs text-content-secondary italic">Note: {p.notes}</p>
                     )}
                   </Card>
                 ))}
