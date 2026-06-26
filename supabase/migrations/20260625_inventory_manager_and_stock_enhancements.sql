@@ -37,7 +37,9 @@ CREATE POLICY stock_snap_select ON public.stock_snapshots
 --    (quick-add on the stock form). Owner retains full CRUD.
 -- ═══════════════════════════════════════════════════════════════════════════
 
-DROP POLICY IF EXISTS stock_items_write ON public.stock_items;
+DROP POLICY IF EXISTS stock_items_write         ON public.stock_items;
+DROP POLICY IF EXISTS stock_items_owner_write   ON public.stock_items;
+DROP POLICY IF EXISTS stock_items_staff_insert  ON public.stock_items;
 
 -- Owner: full CRUD
 CREATE POLICY stock_items_owner_write ON public.stock_items

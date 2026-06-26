@@ -1,7 +1,8 @@
 "use client";
 
+import { Suspense } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 
 import type { Role } from "@/lib/database.types";
 import { BrandLogo } from "@/components/brand-logo";
@@ -235,44 +236,63 @@ function InventoryManagerShell({
         {children}
       </main>
 
-      {/* Bottom nav: Stock + Orders only, no profile */}
-      <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-bg-card/90 pb-safe backdrop-blur-xl">
-        <div
-          className="mx-auto grid max-w-2xl"
-          style={{ gridTemplateColumns: `repeat(${nav.length}, minmax(0, 1fr))` }}
-        >
-          {nav.map((item) => {
-            const active = isActive(item, pathname);
-            const Icon = item.icon;
-            return (
-              <Link
-                key={item.label}
-                href={item.href}
-                onClick={() => void hapticLight()}
-                className={cn(
-                  "relative flex flex-col items-center gap-1 py-3 text-[0.7rem] font-medium transition-colors duration-200",
-                  active ? "text-white" : "text-content-secondary",
-                )}
-              >
-                <span
-                  className={cn(
-                    "absolute top-0 h-0.5 w-8 rounded-full bg-white transition-all duration-300",
-                    active ? "opacity-100" : "opacity-0",
-                  )}
-                />
-                <Icon
-                  className={cn(
-                    "size-5 transition-transform duration-200",
-                    active && "-translate-y-px scale-105",
-                  )}
-                />
-                {item.label}
-              </Link>
-            );
-          })}
-        </div>
-      </nav>
+      {/* Bottom nav: Stock | Orders | Purchases — Suspense required for useSearchParams */}
+      <Suspense fallback={<div className="fixed inset-x-0 bottom-0 h-16 border-t border-border bg-bg-card/90 pb-safe" />}>
+        <InventoryManagerBottomNav items={nav} />
+      </Suspense>
     </div>
+  );
+}
+
+function InventoryManagerBottomNav({ items }: { items: NavItem[] }) {
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const tab = searchParams.get("tab");
+
+  function isNavItemActive(item: NavItem): boolean {
+    if (item.href === "/stock") return pathname === "/stock" || pathname.startsWith("/stock/");
+    if (item.href.includes("tab=purchases")) return pathname === "/vendors" && tab === "purchases";
+    if (item.href === "/vendors") return pathname === "/vendors" && tab !== "purchases";
+    return isActive(item, pathname);
+  }
+
+  return (
+    <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-bg-card/90 pb-safe backdrop-blur-xl">
+      <div
+        className="mx-auto grid max-w-2xl"
+        style={{ gridTemplateColumns: `repeat(${items.length}, minmax(0, 1fr))` }}
+      >
+        {items.map((item) => {
+          const active = isNavItemActive(item);
+          const Icon = item.icon;
+          return (
+            <Link
+              key={item.label}
+              href={item.href}
+              onClick={() => void hapticLight()}
+              className={cn(
+                "relative flex flex-col items-center gap-1 py-3 text-[0.7rem] font-medium transition-colors duration-200",
+                active ? "text-white" : "text-content-secondary",
+              )}
+            >
+              <span
+                className={cn(
+                  "absolute top-0 h-0.5 w-8 rounded-full bg-white transition-all duration-300",
+                  active ? "opacity-100" : "opacity-0",
+                )}
+              />
+              <Icon
+                className={cn(
+                  "size-5 transition-transform duration-200",
+                  active && "-translate-y-px scale-105",
+                )}
+              />
+              {item.label}
+            </Link>
+          );
+        })}
+      </div>
+    </nav>
   );
 }
 

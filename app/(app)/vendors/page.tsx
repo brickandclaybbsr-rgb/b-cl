@@ -23,7 +23,8 @@ interface Props {
 export default async function VendorsPage({ searchParams }: Props) {
   const profile = await requireProfile();
   const isOwner = profile.role === "owner";
-  
+  const isInventoryManager = profile.role === "inventory_manager";
+
   const currentTab = searchParams.tab ?? "orders";
   
   const [vendors, allVendors, orders, purchases] = await Promise.all([
@@ -39,7 +40,7 @@ export default async function VendorsPage({ searchParams }: Props) {
   return (
     <div>
       <PageHeader
-        title={isOwner ? "Vendor & Purchases" : "Vendors & Bills"}
+        title={isOwner ? "Vendor & Purchases" : "Orders & Bills"}
         subtitle={
           isOwner
             ? "Manage vendors, track orders, and audit purchase bills"
@@ -47,22 +48,25 @@ export default async function VendorsPage({ searchParams }: Props) {
         }
       />
 
-      <div className="mb-4 flex gap-1 border-b border-border pb-px">
-        <Link
-          href="/stock"
-          className="flex items-center gap-1.5 pb-3 px-3 text-sm font-semibold text-content-secondary hover:text-content-primary transition-colors"
-        >
-          <Package className="size-4" /> Stock
-        </Link>
-        <Link
-          href="/vendors"
-          className="relative flex items-center gap-1.5 pb-3 text-sm font-semibold text-white after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-full after:bg-white"
-        >
-          <ShoppingCart className="size-4" /> {isOwner ? "Vendors" : "Orders"}
-        </Link>
-      </div>
+      {/* Top Stock/Vendors strip — hidden for inventory manager (they use bottom nav) */}
+      {!isInventoryManager && (
+        <div className="mb-4 flex gap-1 border-b border-border pb-px">
+          <Link
+            href="/stock"
+            className="flex items-center gap-1.5 pb-3 px-3 text-sm font-semibold text-content-secondary hover:text-content-primary transition-colors"
+          >
+            <Package className="size-4" /> Stock
+          </Link>
+          <Link
+            href="/vendors"
+            className="relative flex items-center gap-1.5 pb-3 text-sm font-semibold text-white after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-full after:bg-white"
+          >
+            <ShoppingCart className="size-4" /> {isOwner ? "Vendors" : "Orders"}
+          </Link>
+        </div>
+      )}
 
-      {/* Modern Tabs */}
+      {/* Inner tabs */}
       <div className="mb-6 flex gap-4 border-b border-border pb-px">
         <Link
           href="/vendors?tab=orders"

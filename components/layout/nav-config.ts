@@ -11,6 +11,7 @@ import {
   Users,
   Bell,
   Wallet,
+  Receipt,
   type LucideIcon,
 } from "lucide-react";
 
@@ -45,10 +46,11 @@ export const OWNER_NAV: NavItem[] = [
   { label: "Settings", href: "/profile", icon: Settings, match: ["/profile", "/notifications"] },
 ];
 
-/** Inventory manager: stock + orders/purchases only. */
+/** Inventory manager: stock, orders, and purchases. */
 export const INVENTORY_MANAGER_NAV: NavItem[] = [
   { label: "Stock", href: "/stock", icon: Package },
-  { label: "Orders", href: "/vendors", icon: ShoppingCart, match: ["/vendors"] },
+  { label: "Orders", href: "/vendors", icon: ShoppingCart },
+  { label: "Purchases", href: "/vendors?tab=purchases", icon: Receipt },
 ];
 
 /** Condensed nav for the mobile bottom bar — 4 items only. */

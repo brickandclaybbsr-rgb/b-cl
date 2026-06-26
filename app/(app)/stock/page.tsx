@@ -5,6 +5,8 @@ import { formatDateLabel, todayIST } from "@/lib/date";
 import {
   getStockItems,
   getLatestStockSnapshot,
+  getRecentSnapshots,
+  computeConsumptionMap,
   statusMap,
 } from "@/lib/data/stock";
 import { PageHeader } from "@/components/page-header";
@@ -17,10 +19,14 @@ export default async function StockPage() {
   const profile = await requireProfile();
   const isOwner = profile.role === "owner";
   const isInventoryManager = profile.role === "inventory_manager";
-  const [items, latest] = await Promise.all([
+
+  const [items, latest, recentSnaps] = await Promise.all([
     getStockItems(),
     getLatestStockSnapshot(),
+    getRecentSnapshots(7),
   ]);
+
+  const consumptionMap = computeConsumptionMap(recentSnaps);
 
   return (
     <div>
@@ -53,7 +59,12 @@ export default async function StockPage() {
           description="The owner needs to add stock items in Settings before you can track them."
         />
       ) : (
-        <StockForm items={items} initial={statusMap(latest)} lastSnapshot={latest} />
+        <StockForm
+          items={items}
+          initial={statusMap(latest)}
+          lastSnapshot={latest}
+          consumptionMap={consumptionMap}
+        />
       )}
     </div>
   );
