@@ -73,6 +73,6 @@ export const config = {
      * Run on everything except Next internals, the API (handles its own auth),
      * and static asset/PWA files.
      */
-    "/((?!_next/static|_next/image|api|favicon.ico|manifest.json|sw.js|workbox-|fallback-|icons/|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
+    "/((?!_next/static|_next/image|api|favicon.ico|manifest.json|sw.js|workbox-|fallback-|icons/|uploads/|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
   ],
 };
