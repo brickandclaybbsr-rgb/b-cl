@@ -800,7 +800,7 @@ export function AttendanceHRClient({ staffList, initialLeaves, initialDocuments,
                                 {isVisible ? <Eye className="size-4" /> : <EyeOff className="size-4" />}
                               </button>
                               <a
-                                href={doc.file_url}
+                                href={`/api/payslip/${doc.id}`}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="p-1 rounded text-content-secondary hover:text-content-primary transition-colors"
@@ -1266,7 +1266,7 @@ export function AttendanceHRClient({ staffList, initialLeaves, initialDocuments,
 
                               <div className="flex items-center gap-2">
                                 <Button asChild size="sm" variant="secondary" className="h-8 px-2.5 gap-1">
-                                  <a href={doc.file_url} target="_blank" rel="noopener noreferrer">
+                                  <a href={doc.type === "salary_slip" ? `/api/payslip/${doc.id}` : doc.file_url} target="_blank" rel="noopener noreferrer">
                                     <Eye className="size-3.5" />
                                     View
                                   </a>
