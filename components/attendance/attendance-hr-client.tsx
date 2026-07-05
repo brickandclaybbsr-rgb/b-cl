@@ -153,8 +153,8 @@ export function AttendanceHRClient({ staffList, initialLeaves, initialDocuments,
   const fileFormRef = useRef<HTMLFormElement>(null);
   const [docType, setDocType] = useState<"appointment_letter" | "salary_slip" | "aadhar_card" | "pan_card">("appointment_letter");
 
-  // Document generating sub-tab state
-  const [docSubTab, setDocSubTab] = useState<"upload" | "generate" | "signature">("upload");
+  // Document sub-tab state
+  const [docSubTab, setDocSubTab] = useState<"upload" | "signature">("upload");
 
   // States for generating payslip
   const [selectedStaffId, setSelectedStaffId] = useState<string>("");
@@ -241,6 +241,12 @@ export function AttendanceHRClient({ staffList, initialLeaves, initialDocuments,
 
   // Payroll Advance state
   const [advanceFilterMonth, setAdvanceFilterMonth] = useState<string>(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  });
+
+  // Payslip month filter (Generated Payslips list)
+  const [payslipFilterMonth, setPayslipFilterMonth] = useState<string>(() => {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   });
@@ -669,17 +675,40 @@ export function AttendanceHRClient({ staffList, initialLeaves, initialDocuments,
 
             {/* ── GENERATED PAYSLIPS (with visibility toggle) ── */}
             <div className="space-y-3 pt-4 border-t border-border/40">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-content-secondary flex items-center gap-1.5">
-                <FileText className="size-3.5" />
-                Generated Payslips
-              </h3>
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-content-secondary flex items-center gap-1.5">
+                  <FileText className="size-3.5" />
+                  Generated Payslips
+                </h3>
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="slip-filter" className="text-[11px] shrink-0 text-content-secondary">Month:</Label>
+                  <Input
+                    id="slip-filter"
+                    type="month"
+                    value={payslipFilterMonth}
+                    onChange={(e) => setPayslipFilterMonth(e.target.value)}
+                    style={{ colorScheme: "dark" }}
+                    className="text-xs py-1 h-7 max-w-[150px]"
+                  />
+                </div>
+              </div>
               <p className="text-[11px] text-content-secondary">Toggle the eye icon to make a payslip visible or hidden for staff on their profile page.</p>
               {(() => {
-                const payslips = initialDocuments.filter((d) => d.type === "salary_slip");
-                if (payslips.length === 0) {
+                const allPayslips = initialDocuments.filter((d) => d.type === "salary_slip");
+                const payslips = payslipFilterMonth
+                  ? allPayslips.filter((d) => d.month === payslipFilterMonth)
+                  : allPayslips;
+                if (allPayslips.length === 0) {
                   return (
                     <Card className="p-4 text-center text-xs text-content-secondary bg-white/[0.01]">
                       No payslips generated yet.
+                    </Card>
+                  );
+                }
+                if (payslips.length === 0) {
+                  return (
+                    <Card className="p-4 text-center text-xs text-content-secondary bg-white/[0.01]">
+                      No payslips for {formatMonth(payslipFilterMonth)}. <button type="button" onClick={() => setPayslipFilterMonth("")} className="text-warm underline ml-1">Show all</button>
                     </Card>
                   );
                 }
@@ -1003,16 +1032,6 @@ export function AttendanceHRClient({ staffList, initialLeaves, initialDocuments,
                   </button>
                   <button
                     type="button"
-                    onClick={() => setDocSubTab("generate")}
-                    className={cn(
-                      "px-2 py-1 text-[10px] font-bold rounded transition-colors",
-                      docSubTab === "generate" ? "bg-white text-black" : "text-content-secondary hover:text-content-primary"
-                    )}
-                  >
-                    Generate Payslip
-                  </button>
-                  <button
-                    type="button"
                     onClick={() => setDocSubTab("signature")}
                     className={cn(
                       "px-2 py-1 text-[10px] font-bold rounded transition-colors",
@@ -1073,209 +1092,6 @@ export function AttendanceHRClient({ staffList, initialLeaves, initialDocuments,
                     Upload Document
                   </SubmitButton>
                 </form>
-              )}
-
-              {docSubTab === "generate" && (
-                <div className="space-y-3 animate-fade-in text-xs">
-                  {/* Mode Selector Toggle */}
-                  <div className="flex rounded-md bg-white/5 p-0.5 border border-border/20 mb-2">
-                    <button
-                      type="button"
-                      className={cn(
-                        "flex-1 py-1 rounded text-center transition-all",
-                        !isBatchMode ? "bg-fire text-white font-semibold" : "text-content-secondary hover:text-content-primary"
-                      )}
-                      onClick={() => setIsBatchMode(false)}
-                      disabled={pending}
-                    >
-                      Single Staff
-                    </button>
-                    <button
-                      type="button"
-                      className={cn(
-                        "flex-1 py-1 rounded text-center transition-all",
-                        isBatchMode ? "bg-fire text-white font-semibold" : "text-content-secondary hover:text-content-primary"
-                      )}
-                      onClick={() => setIsBatchMode(true)}
-                      disabled={pending}
-                    >
-                      Batch Generate
-                    </button>
-                  </div>
-
-                  {!isBatchMode ? (
-                    <form ref={payslipFormRef} action={payslipFormAction} className="space-y-3">
-                      <div className="space-y-1">
-                        <Label htmlFor="pay-profile">Staff Member</Label>
-                        <Select 
-                          id="pay-profile" 
-                          name="profileId" 
-                          required 
-                          value={selectedStaffId}
-                          onChange={(e) => setSelectedStaffId(e.target.value)}
-                        >
-                          <option value="">-- Select Staff --</option>
-                          {activeStaffList.map((s) => (
-                            <option key={s.id} value={s.id}>
-                              {s.name}
-                            </option>
-                          ))}
-                        </Select>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-2">
-                        <div className="space-y-1">
-                          <Label htmlFor="pay-month">Select Month</Label>
-                          <Input id="pay-month" name="month" type="month" required />
-                        </div>
-                        <div className="space-y-1">
-                          <Label htmlFor="pay-code">Employee Code</Label>
-                          <Input 
-                            id="pay-code" 
-                            name="employeeCode" 
-                            placeholder="e.g. BC001" 
-                            required 
-                            value={employeeCode}
-                            onChange={(e) => setEmployeeCode(e.target.value)}
-                          />
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-2">
-                        <div className="space-y-1">
-                          <Label htmlFor="pay-dob">Date of Birth</Label>
-                          <Input 
-                            id="pay-dob" 
-                            name="dob" 
-                            type="date" 
-                            required 
-                            style={{ colorScheme: "dark" }}
-                            value={dob}
-                            onChange={(e) => setDob(e.target.value)}
-                          />
-                        </div>
-                        <div className="space-y-1">
-                          <Label htmlFor="pay-pan">PAN Number</Label>
-                          <Input 
-                            id="pay-pan" 
-                            name="pan" 
-                            placeholder="ABCDE1234F" 
-                            required 
-                            value={pan}
-                            onChange={(e) => setPan(e.target.value)}
-                          />
-                        </div>
-                      </div>
-
-                      <div className="space-y-1">
-                        <Label htmlFor="pay-aadhar">Aadhar Number</Label>
-                        <Input 
-                          id="pay-aadhar" 
-                          name="aadhar" 
-                          placeholder="1234 5678 9012" 
-                          required 
-                          value={aadhar}
-                          onChange={(e) => setAadhar(e.target.value)}
-                        />
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-2">
-                        <div className="space-y-1">
-                          <Label htmlFor="pay-basic">Basic Salary (₹)</Label>
-                          <Input 
-                            id="pay-basic" 
-                            name="basicPay" 
-                            type="number" 
-                            step="0.01" 
-                            placeholder="15000" 
-                            required 
-                            value={basicPay}
-                            onChange={(e) => {
-                              setBasicPay(e.target.value);
-                              setAmountPaid(e.target.value);
-                            }}
-                          />
-                        </div>
-                        <div className="space-y-1">
-                          <Label htmlFor="pay-amount">Amount Paid (₹)</Label>
-                          <Input 
-                            id="pay-amount" 
-                            name="amountPaid" 
-                            type="number" 
-                            step="0.01" 
-                            placeholder="15000" 
-                            required 
-                            value={amountPaid}
-                            onChange={(e) => setAmountPaid(e.target.value)}
-                          />
-                        </div>
-                      </div>
-
-                      <div className="space-y-1">
-                        <Label htmlFor="pay-through">Paid Through</Label>
-                        <Input 
-                          id="pay-through" 
-                          name="paidThrough" 
-                          placeholder="e.g. Bank Transfer / UPI / Cash" 
-                          required 
-                          value={paidThrough}
-                          onChange={(e) => setPaidThrough(e.target.value)}
-                        />
-                      </div>
-
-                      <SubmitButton pendingText="Generating..." className="w-full mt-2">
-                        <Plus className="size-4" />
-                        Generate Payslip
-                      </SubmitButton>
-                    </form>
-                  ) : (
-                    <form action={batchFormAction} className="space-y-3">
-                      <div className="space-y-1">
-                        <Label htmlFor="batch-month">Select Month</Label>
-                        <Input id="batch-month" name="month" type="month" required disabled={pending} />
-                      </div>
-                      <div className="space-y-1">
-                        <Label htmlFor="batch-through">Paid Through</Label>
-                        <Input 
-                          id="batch-through" 
-                          name="paidThrough" 
-                          placeholder="e.g. Bank Transfer / UPI / Cash" 
-                          required 
-                          disabled={pending}
-                        />
-                      </div>
-                      
-                      {/* Active Staff List Preview */}
-                      <div className="rounded-lg border border-border/30 bg-white/[0.015] p-3 space-y-2">
-                        <h4 className="font-semibold text-content-primary mb-1">Staff Included in Batch:</h4>
-                        <div className="space-y-1 max-h-40 overflow-y-auto pr-1">
-                          {activeStaffList
-                            .map((s) => {
-                              const isMissing = !s.employee_code || !s.basic_pay || !s.aadhar_number || !s.pan_number;
-                              return (
-                                <div key={s.id} className="flex items-center justify-between text-[11px] py-1 border-b border-border/10 last:border-0">
-                                  <span className="font-medium text-content-secondary">{s.name}</span>
-                                  {isMissing ? (
-                                    <span className="text-[10px] text-red-400 italic">Missing Profile Info</span>
-                                  ) : (
-                                    <span className="text-[10px] text-green-400">Ready (₹{s.basic_pay})</span>
-                                  )}
-                                </div>
-                              );
-                            })}
-                        </div>
-                        <p className="text-[10px] text-content-secondary italic mt-1 border-t border-border/10 pt-2">
-                          * Owners are automatically excluded. Make sure all staff show "Ready" before generating.
-                        </p>
-                      </div>
-
-                      <SubmitButton pendingText="Generating Batch..." className="w-full mt-2">
-                        <Plus className="size-4" />
-                        Generate Slips for All Staff
-                      </SubmitButton>
-                    </form>
-                  )}
-                </div>
               )}
 
               {docSubTab === "signature" && (

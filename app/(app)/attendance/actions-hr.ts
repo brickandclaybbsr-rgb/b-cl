@@ -620,6 +620,26 @@ async function generatePayslipInternal(
     // Table may not exist yet — silently skip
   }
 
+  // 2c. Fetch next month advances (shown as "upcoming deductions" in the slip)
+  const nextMonthNum = monthNum === 12 ? 1 : monthNum + 1;
+  const nextYear = monthNum === 12 ? year + 1 : year;
+  const nextMonthStr = `${nextYear}-${String(nextMonthNum).padStart(2, "0")}`;
+  let nextMonthAdvances: Array<{ amount: number; notes: string | null; advance_date: string | null }> = [];
+  let totalNextMonthAdvance = 0;
+  try {
+    const { data: nextAdvs } = await supabase
+      .from("payroll_advances")
+      .select("amount, notes, advance_date")
+      .eq("profile_id", profileId)
+      .eq("month", nextMonthStr);
+    if (nextAdvs && nextAdvs.length > 0) {
+      nextMonthAdvances = nextAdvs;
+      totalNextMonthAdvance = nextAdvs.reduce((sum: number, a: any) => sum + Number(a.amount), 0);
+    }
+  } catch {
+    // silently skip
+  }
+
   // 3. Build Daily Calendar & Count Stats
   const isBiswajeetJune2026 = 
     (employee.name.toLowerCase().includes("biswajeet") || employee.name.toLowerCase().includes("kandi")) && 
@@ -975,6 +995,19 @@ async function generatePayslipInternal(
         <td>${adv.advance_date ? new Date(adv.advance_date + "T00:00:00").toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "Advance"}</td>
         <td class="deduct">&#8722; ₹${formatCurr(Number(adv.amount))}</td>
       </tr>`).join("") : ""}
+      ${nextMonthAdvances.length > 0 ? `
+      <tr style="background:#fffbeb;">
+        <td colspan="3" style="padding:6px 14px;font-size:10px;font-weight:600;color:#92400e;letter-spacing:.3px;">
+          &#9432; Upcoming Deductions — will be recovered in next month's salary
+        </td>
+      </tr>
+      ${nextMonthAdvances.map((adv: any) => `
+      <tr style="background:#fffbeb;opacity:.85;">
+        <td style="color:#92400e;">Advance (${nextMonthStr}) ${adv.notes ? `— ${adv.notes}` : ""}</td>
+        <td style="color:#92400e;">${adv.advance_date ? new Date(adv.advance_date + "T00:00:00").toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "—"}</td>
+        <td style="color:#92400e;font-style:italic;">&#8722; ₹${formatCurr(Number(adv.amount))} *</td>
+      </tr>`).join("")}
+      ` : ""}
     </tbody>
     <tfoot>
       <tr class="net-row">
@@ -992,6 +1025,7 @@ async function generatePayslipInternal(
   <div class="note">
     * This is a system-generated salary slip and does not require a physical signature unless disputed.
     Payment Method: ${paidThrough} | Amount Disbursed: ₹${formatCurr(amountPaidNum)}
+    ${nextMonthAdvances.length > 0 ? `<br>* Upcoming advance of ₹${formatCurr(totalNextMonthAdvance)} (${nextMonthStr}) is shown for transparency and will be recovered from the next month's salary.` : ""}
   </div>
 
   <div class="sig-row" style="align-items: flex-end;">
