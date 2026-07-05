@@ -521,12 +521,81 @@ export async function generateBatchPayslips(
   }
 }
 
+/** Finalize a draft payslip by providing payment date and reference number */
+export async function finalizePayslip(
+  _prev: HRActionState,
+  formData: FormData
+): Promise<HRActionState> {
+  try {
+    const owner = await requireOwner();
+    const supabase = createClient();
+
+    const docId = String(formData.get("docId") ?? "").trim();
+    const paymentDate = String(formData.get("paymentDate") ?? "").trim();
+    const paymentReference = String(formData.get("paymentReference") ?? "").trim();
+
+    if (!docId || !paymentDate || !paymentReference) {
+      return { error: "Payment date and reference number are required to finalize." };
+    }
+
+    // Fetch the document record to get profile_id and month
+    const { data: doc, error: docErr } = await supabase
+      .from("staff_documents")
+      .select("*")
+      .eq("id", docId)
+      .single();
+
+    if (docErr || !doc) {
+      return { error: "Payslip record not found." };
+    }
+
+    // Fetch the employee's full profile
+    const { data: employee, error: empErr } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("id", doc.profile_id)
+      .single();
+
+    if (empErr || !employee) {
+      return { error: "Employee profile not found." };
+    }
+
+    // Build FormData for the internal generator
+    const subFormData = new FormData();
+    subFormData.append("profileId", employee.id);
+    subFormData.append("month", doc.month || "");
+    subFormData.append("employeeCode", employee.employee_code || "");
+    subFormData.append("dob", employee.dob || "");
+    subFormData.append("aadhar", employee.aadhar_number || "");
+    subFormData.append("pan", employee.pan_number || "");
+    subFormData.append("basicPay", String(employee.basic_pay || 0));
+    subFormData.append("amountPaid", String(employee.basic_pay || 0));
+    subFormData.append("paidThrough", employee.paid_through || "Cash");
+
+    const res = await generatePayslipInternal(supabase, owner, employee, subFormData, {
+      isDraft: false,
+      paymentDate,
+      paymentReference,
+    });
+
+    if (res.error) return { error: res.error };
+
+    revalidatePath("/profile");
+    revalidatePath("/attendance");
+    return { ok: true, message: res.message };
+  } catch (err: any) {
+    console.error("finalizePayslip exception:", err);
+    return { error: err.message || "An unexpected error occurred." };
+  }
+}
+
 /** Private helper function to handle payslip generation logic for a single staff member */
 async function generatePayslipInternal(
   supabase: any,
   owner: any,
   employee: any,
-  formData: FormData
+  formData: FormData,
+  opts: { isDraft?: boolean; paymentDate?: string; paymentReference?: string } = {}
 ): Promise<HRActionState> {
   const profileId = String(formData.get("profileId") ?? "").trim();
   const month = String(formData.get("month") ?? "").trim();
@@ -537,6 +606,13 @@ async function generatePayslipInternal(
   const basicPay = String(formData.get("basicPay") ?? "").trim();
   const amountPaid = String(formData.get("amountPaid") ?? "").trim();
   const paidThrough = String(formData.get("paidThrough") ?? "").trim();
+
+  // Read payment fields from formData if not passed directly via opts
+  const isDraft = opts.isDraft !== false
+    ? (String(formData.get("paymentDate") ?? "").trim() === "" || String(formData.get("paymentReference") ?? "").trim() === "")
+    : false;
+  const paymentDate = opts.paymentDate || String(formData.get("paymentDate") ?? "").trim();
+  const paymentReference = opts.paymentReference || String(formData.get("paymentReference") ?? "").trim();
 
   if (!profileId || !month || !employeeCode || !aadhar || !pan || !basicPay || !paidThrough) {
     return { error: "Please fill in all required fields." };
@@ -604,14 +680,20 @@ async function generatePayslipInternal(
   const punchDates = new Set((punches ?? []).map((p: any) => p.date));
 
   // 2b. Fetch advance deductions for this staff member and month
+  // In final mode: only deduct advances with advance_date <= paymentDate
+  // In draft mode: deduct all current-month advances
   let totalAdvance = 0;
   let advanceRows: Array<{ amount: number; notes: string | null; advance_date: string | null }> = [];
   try {
-    const { data: advances } = await supabase
+    let advQuery = supabase
       .from("payroll_advances")
       .select("amount, notes, advance_date")
       .eq("profile_id", profileId)
       .eq("month", month);
+    if (!isDraft && paymentDate) {
+      advQuery = advQuery.lte("advance_date", paymentDate);
+    }
+    const { data: advances } = await advQuery;
     if (advances && advances.length > 0) {
       advanceRows = advances;
       totalAdvance = advances.reduce((sum: number, a: any) => sum + Number(a.amount), 0);
@@ -620,11 +702,15 @@ async function generatePayslipInternal(
     // Table may not exist yet — silently skip
   }
 
-  // 2c. Fetch next month advances (shown as "upcoming deductions" in the slip)
+  // 2c. Fetch next month advances
+  // Draft: these are ALSO deducted from net pay (salary paid next month means these are already taken)
+  // Final: filter by advance_date <= paymentDate; show remainder as upcoming
   const nextMonthNum = monthNum === 12 ? 1 : monthNum + 1;
   const nextYear = monthNum === 12 ? year + 1 : year;
   const nextMonthStr = `${nextYear}-${String(nextMonthNum).padStart(2, "0")}`;
-  let nextMonthAdvances: Array<{ amount: number; notes: string | null; advance_date: string | null }> = [];
+  let nextMonthAdvancesAll: Array<{ amount: number; notes: string | null; advance_date: string | null }> = [];
+  let nextMonthAdvancesDeducted: Array<{ amount: number; notes: string | null; advance_date: string | null }> = [];
+  let nextMonthAdvancesUpcoming: Array<{ amount: number; notes: string | null; advance_date: string | null }> = [];
   let totalNextMonthAdvance = 0;
   try {
     const { data: nextAdvs } = await supabase
@@ -633,8 +719,19 @@ async function generatePayslipInternal(
       .eq("profile_id", profileId)
       .eq("month", nextMonthStr);
     if (nextAdvs && nextAdvs.length > 0) {
-      nextMonthAdvances = nextAdvs;
-      totalNextMonthAdvance = nextAdvs.reduce((sum: number, a: any) => sum + Number(a.amount), 0);
+      nextMonthAdvancesAll = nextAdvs;
+      if (isDraft) {
+        // All next-month advances deducted in draft
+        nextMonthAdvancesDeducted = nextAdvs;
+        totalNextMonthAdvance = nextAdvs.reduce((sum: number, a: any) => sum + Number(a.amount), 0);
+      } else if (paymentDate) {
+        // Final: split by advance_date vs paymentDate
+        nextMonthAdvancesDeducted = nextAdvs.filter((a: any) => a.advance_date && a.advance_date <= paymentDate);
+        nextMonthAdvancesUpcoming = nextAdvs.filter((a: any) => !a.advance_date || a.advance_date > paymentDate);
+        totalNextMonthAdvance = nextMonthAdvancesDeducted.reduce((sum: number, a: any) => sum + Number(a.amount), 0);
+      } else {
+        nextMonthAdvancesUpcoming = nextAdvs;
+      }
     }
   } catch {
     // silently skip
@@ -703,8 +800,9 @@ async function generatePayslipInternal(
   const extraDutyPayment = isBiswajeetJune2026 ? 13 * dailyRate : 0;
   const lwpDeduction = lwpCount * dailyRate;
   const grossBeforeAdvance = Math.max(0, parseFloat(basicPay) + extraDutyPayment - lwpDeduction);
-  const netSalary = Math.max(0, grossBeforeAdvance - totalAdvance);
-  const amountPaidNum = amountPaid ? Math.max(0, parseFloat(amountPaid) - totalAdvance) : netSalary;
+  const totalAllAdvances = totalAdvance + totalNextMonthAdvance;
+  const netSalary = Math.max(0, grossBeforeAdvance - totalAllAdvances);
+  const amountPaidNum = amountPaid ? Math.max(0, parseFloat(amountPaid) - totalAllAdvances) : netSalary;
   const cfCount = isBiswajeetJune2026 ? 2 : Math.max(0, 4 - clCount);
 
   // Build calendar grid HTML table rows
@@ -897,9 +995,18 @@ async function generatePayslipInternal(
       body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
       .page-break{page-break-before:always;}
     }
+    ${isDraft ? `
+    .draft-banner{background:#fef3c7;border-top:4px solid #f59e0b;border-bottom:4px solid #f59e0b;padding:8px 40px;text-align:center;font-size:12px;font-weight:700;color:#92400e;letter-spacing:2px;text-transform:uppercase;}
+    .draft-watermark{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-35deg);font-size:100px;font-weight:900;color:rgba(239,68,68,0.08);letter-spacing:8px;pointer-events:none;z-index:0;text-transform:uppercase;}
+    ` : ""}
   </style>
 </head>
 <body>
+
+${isDraft ? `
+<div class="draft-watermark">DRAFT</div>
+<div class="draft-banner">&#9888;&nbsp; DRAFT PAYSLIP — For Internal Review Only &nbsp;&#9888;&nbsp; Advance Deductions Are Estimates Until Final Payment Is Confirmed</div>
+` : ""}
 
 <!-- PAGE 1 ─ SALARY SLIP -->
 <div class="header">
@@ -995,15 +1102,28 @@ async function generatePayslipInternal(
         <td>${adv.advance_date ? new Date(adv.advance_date + "T00:00:00").toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "Advance"}</td>
         <td class="deduct">&#8722; ₹${formatCurr(Number(adv.amount))}</td>
       </tr>`).join("") : ""}
-      ${nextMonthAdvances.length > 0 ? `
-      <tr style="background:#fffbeb;">
-        <td colspan="3" style="padding:6px 14px;font-size:10px;font-weight:600;color:#92400e;letter-spacing:.3px;">
-          &#9432; Upcoming Deductions — will be recovered in next month's salary
+      ${nextMonthAdvancesDeducted.length > 0 ? `
+      <tr style="background:#fee2e2;">
+        <td colspan="3" style="padding:6px 14px;font-size:10px;font-weight:600;color:#991b1b;letter-spacing:.3px;">
+          &#8595; Next Month Advances — Deducted (taken before salary credit)
         </td>
       </tr>
-      ${nextMonthAdvances.map((adv: any) => `
+      ${nextMonthAdvancesDeducted.map((adv: any) => `
+      <tr style="background:#fee2e2;">
+        <td style="color:#991b1b;">Advance (${nextMonthStr})${adv.notes ? ` — ${adv.notes}` : ""}</td>
+        <td style="color:#991b1b;">${adv.advance_date ? new Date(adv.advance_date + "T00:00:00").toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "—"}</td>
+        <td style="color:#991b1b;" class="deduct">&#8722; ₹${formatCurr(Number(adv.amount))}</td>
+      </tr>`).join("")}
+      ` : ""}
+      ${nextMonthAdvancesUpcoming.length > 0 ? `
+      <tr style="background:#fffbeb;">
+        <td colspan="3" style="padding:6px 14px;font-size:10px;font-weight:600;color:#92400e;letter-spacing:.3px;">
+          &#9432; Upcoming — will be recovered from next month's salary
+        </td>
+      </tr>
+      ${nextMonthAdvancesUpcoming.map((adv: any) => `
       <tr style="background:#fffbeb;opacity:.85;">
-        <td style="color:#92400e;">Advance (${nextMonthStr}) ${adv.notes ? `— ${adv.notes}` : ""}</td>
+        <td style="color:#92400e;">Advance (${nextMonthStr})${adv.notes ? ` — ${adv.notes}` : ""}</td>
         <td style="color:#92400e;">${adv.advance_date ? new Date(adv.advance_date + "T00:00:00").toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "—"}</td>
         <td style="color:#92400e;font-style:italic;">&#8722; ₹${formatCurr(Number(adv.amount))} *</td>
       </tr>`).join("")}
@@ -1019,13 +1139,26 @@ async function generatePayslipInternal(
   </table>
 
   <div class="tax-note">
-    <strong>Tax &amp; PF Policy Note:</strong> SS Brick and Clay Private Limited has processed this payslip with zero tax/PF deductions for the current period. In-hand salary matches gross salary minus LWP days.
+    <strong>Tax &amp; PF Policy Note:</strong> SS Brick and Clay Private Limited has processed this payslip with zero tax/PF deductions for the current period. In-hand salary matches gross salary minus LWP days and advance deductions.
   </div>
 
+  ${!isDraft && paymentDate && paymentReference ? `
+  <div style="background:#f0fdf4;border:1.5px solid #86efac;border-radius:6px;padding:12px 16px;margin-bottom:16px;font-size:12px;">
+    <div style="font-weight:700;color:#15803d;margin-bottom:6px;">&#10003; Payment Confirmed</div>
+    <div style="display:flex;gap:40px;color:#166534;">
+      <div><span style="font-weight:600;">Payment Date:</span> ${new Date(paymentDate + "T00:00:00").toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}</div>
+      <div><span style="font-weight:600;">Reference No.:</span> ${paymentReference}</div>
+      <div><span style="font-weight:600;">Mode:</span> ${paidThrough}</div>
+      <div><span style="font-weight:600;">Amount Paid:</span> ₹${formatCurr(amountPaidNum)}</div>
+    </div>
+  </div>
+  ` : ""}
+
   <div class="note">
-    * This is a system-generated salary slip and does not require a physical signature unless disputed.
-    Payment Method: ${paidThrough} | Amount Disbursed: ₹${formatCurr(amountPaidNum)}
-    ${nextMonthAdvances.length > 0 ? `<br>* Upcoming advance of ₹${formatCurr(totalNextMonthAdvance)} (${nextMonthStr}) is shown for transparency and will be recovered from the next month's salary.` : ""}
+    ${isDraft ? `&#9888; <strong>DRAFT</strong> — This payslip is for internal review only. Finalize by entering payment date and reference number.` : `* This is a system-generated salary slip and does not require a physical signature unless disputed.`}
+    ${!isDraft ? `Payment Method: ${paidThrough} | Amount Disbursed: ₹${formatCurr(amountPaidNum)}` : ""}
+    ${nextMonthAdvancesDeducted.length > 0 && isDraft ? `<br>&#8595; Next-month advances of ₹${formatCurr(totalNextMonthAdvance)} (${nextMonthStr}) are deducted in this draft as salary is credited after those advances were taken.` : ""}
+    ${nextMonthAdvancesUpcoming.length > 0 ? `<br>* Upcoming advance of ₹${formatCurr(nextMonthAdvancesUpcoming.reduce((s: number, a: any) => s + Number(a.amount), 0))} (${nextMonthStr}) will be recovered from the next month's salary.` : ""}
   </div>
 
   <div class="sig-row" style="align-items: flex-end;">
@@ -1133,11 +1266,15 @@ async function generatePayslipInternal(
     .eq("month", month)
     .maybeSingle();
 
+  const docFileName = isDraft
+    ? `[DRAFT] Salary Slip - ${monthLabel}.html`
+    : `Salary Slip - ${monthLabel}.html`;
+
   if (existingDoc) {
     const { error: updateErr } = await supabase
       .from("staff_documents")
       .update({
-        file_name: `Salary Slip - ${monthLabel}.html`,
+        file_name: docFileName,
         file_url: fileUrl,
         uploaded_by: owner.id,
         uploaded_at: new Date().toISOString(),
@@ -1156,7 +1293,7 @@ async function generatePayslipInternal(
         type: "salary_slip",
         month,
         file_url: fileUrl,
-        file_name: `Salary Slip - ${monthLabel}.html`,
+        file_name: docFileName,
         uploaded_by: owner.id,
       });
 
@@ -1166,7 +1303,12 @@ async function generatePayslipInternal(
     }
   }
 
-  return { ok: true, message: `Salary slip for ${monthLabel} generated successfully!` };
+  return {
+    ok: true,
+    message: isDraft
+      ? `Draft payslip for ${monthLabel} saved. Enter payment date & reference to finalize.`
+      : `Final salary slip for ${monthLabel} generated and payment confirmed!`,
+  };
 }
 
 /** Update a staff profile with all contact, personal, and payroll details */

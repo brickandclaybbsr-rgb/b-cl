@@ -4,23 +4,26 @@ import { useState, useTransition, useRef, useEffect } from "react";
 import { useFormState } from "react-dom";
 import { toast } from "sonner";
 import { Confetti } from "@/components/ui/confetti";
-import { 
-  FileText, 
-  CalendarDays, 
-  Calendar, 
-  Upload, 
-  Trash2, 
-  Check, 
-  X, 
+import {
+  FileText,
+  CalendarDays,
+  Calendar,
+  Upload,
+  Trash2,
+  Check,
+  X,
   Eye,
   EyeOff,
-  MessageSquare, 
+  MessageSquare,
   User,
   Plus,
   DollarSign,
-  Wallet
+  Wallet,
+  CheckCircle2,
+  Clock,
+  AlertCircle
 } from "lucide-react";
-import { updateLeaveStatus, uploadStaffDocument, deleteStaffDocument, generatePayslip, generateBatchPayslips, updateStaffProfile, uploadOwnerSignature, savePayrollAdvance, deletePayrollAdvance, togglePayslipVisibility } from "@/app/(app)/attendance/actions-hr";
+import { updateLeaveStatus, uploadStaffDocument, deleteStaffDocument, generatePayslip, generateBatchPayslips, updateStaffProfile, uploadOwnerSignature, savePayrollAdvance, deletePayrollAdvance, togglePayslipVisibility, finalizePayslip } from "@/app/(app)/attendance/actions-hr";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -254,6 +257,25 @@ export function AttendanceHRClient({ staffList, initialLeaves, initialDocuments,
   const [advanceState, advanceFormAction] = useFormState(savePayrollAdvance, {});
   const [deletingAdvanceId, setDeletingAdvanceId] = useState<string | null>(null);
   const [togglingDocId, setTogglingDocId] = useState<string | null>(null);
+  const [finalizingDocId, setFinalizingDocId] = useState<string | null>(null);
+  const [finalizePayDate, setFinalizePayDate] = useState("");
+  const [finalizePayRef, setFinalizePayRef] = useState("");
+  const [finalizeState, finalizeFormAction] = useFormState(finalizePayslip, {});
+  const finalizeFormRef = useRef<HTMLFormElement>(null);
+
+  useEffect(() => {
+    if (finalizeState.error) {
+      toast.error(finalizeState.error);
+    } else if (finalizeState.ok) {
+      toast.success(finalizeState.message || "Payslip finalized!");
+      setFinalizingDocId(null);
+      setFinalizePayDate("");
+      setFinalizePayRef("");
+      window.location.reload();
+    }
+  }, [finalizeState]);
+
+  const isDraftSlip = (doc: { file_name: string }) => doc.file_name.startsWith("[DRAFT]");
 
   useEffect(() => {
     if (advanceState.error) {
@@ -718,58 +740,133 @@ export function AttendanceHRClient({ staffList, initialLeaves, initialDocuments,
                       const staffName = staffNameMap[doc.profile_id] || "Unknown";
                       const isVisible = doc.is_visible_to_staff;
                       const isToggling = togglingDocId === doc.id;
+                      const isDraft = isDraftSlip(doc);
+                      const isShowingFinalize = finalizingDocId === doc.id;
                       return (
-                        <Card key={doc.id} className="p-3 flex items-center justify-between gap-2 bg-white/[0.01] border-border/30 text-xs">
-                          <div className="flex-1 min-w-0">
-                            <span className="font-semibold text-content-primary">{staffName}</span>
-                            <span className="mx-1.5 text-content-secondary">·</span>
-                            <span className="text-content-secondary">{formatMonth(doc.month)}</span>
-                          </div>
-                          <div className="flex items-center gap-1.5 shrink-0">
-                            {isVisible ? (
-                              <Badge variant="success" className="text-[9px] uppercase py-0 px-1.5">Visible</Badge>
-                            ) : (
-                              <Badge variant="default" className="text-[9px] uppercase py-0 px-1.5 bg-bg-elevated text-content-secondary border border-border/30">Hidden</Badge>
-                            )}
-                            <button
-                              type="button"
-                              disabled={pending || isToggling}
-                              onClick={() => {
-                                setTogglingDocId(doc.id);
-                                startTransition(async () => {
-                                  const res = await togglePayslipVisibility(doc.id, !isVisible);
-                                  setTogglingDocId(null);
-                                  if (res.error) toast.error(res.error);
-                                  else { toast.success(isVisible ? "Payslip hidden from staff." : "Payslip is now visible to staff."); window.location.reload(); }
-                                });
-                              }}
-                              className={cn(
-                                "p-1 rounded transition-colors",
-                                isVisible ? "text-green-400 hover:text-green-300" : "text-content-secondary hover:text-content-primary"
+                        <Card key={doc.id} className={cn(
+                          "p-3 bg-white/[0.01] border-border/30 text-xs",
+                          isDraft && "border-amber-500/40"
+                        )}>
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2 flex-1 min-w-0">
+                              {isDraft ? (
+                                <Clock className="size-3.5 text-amber-400 shrink-0" />
+                              ) : (
+                                <CheckCircle2 className="size-3.5 text-green-400 shrink-0" />
                               )}
-                              title={isVisible ? "Hide from staff" : "Make visible to staff"}
-                            >
-                              {isVisible ? <Eye className="size-4" /> : <EyeOff className="size-4" />}
-                            </button>
-                            <a
-                              href={doc.file_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="p-1 rounded text-content-secondary hover:text-content-primary transition-colors"
-                              title="View payslip"
-                            >
-                              <FileText className="size-3.5" />
-                            </a>
-                            <button
-                              type="button"
-                              disabled={pending}
-                              onClick={() => handleDeleteDoc(doc.id, doc.file_name)}
-                              className="p-1 rounded text-red-400 hover:text-red-300 transition-colors"
-                              title="Delete payslip"
-                            >
-                              <Trash2 className="size-3.5" />
-                            </button>
+                              <span className="font-semibold text-content-primary">{staffName}</span>
+                              <span className="text-content-secondary">·</span>
+                              <span className="text-content-secondary">{formatMonth(doc.month)}</span>
+                              {isDraft ? (
+                                <Badge className="text-[9px] uppercase py-0 px-1.5 bg-amber-500/15 text-amber-400 border-amber-500/30 border">Draft</Badge>
+                              ) : (
+                                <Badge className="text-[9px] uppercase py-0 px-1.5 bg-green-500/15 text-green-400 border-green-500/30 border">Final</Badge>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              {isVisible ? (
+                                <Badge variant="success" className="text-[9px] uppercase py-0 px-1.5">Visible</Badge>
+                              ) : (
+                                <Badge variant="default" className="text-[9px] uppercase py-0 px-1.5 bg-bg-elevated text-content-secondary border border-border/30">Hidden</Badge>
+                              )}
+                              {isDraft && (
+                                <button
+                                  type="button"
+                                  onClick={() => { setFinalizingDocId(isShowingFinalize ? null : doc.id); setFinalizePayDate(""); setFinalizePayRef(""); }}
+                                  className="px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-500/15 text-amber-300 hover:bg-amber-500/25 border border-amber-500/30 transition-colors"
+                                  title="Finalize payslip"
+                                >
+                                  {isShowingFinalize ? "Cancel" : "Finalize"}
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                disabled={pending || isToggling}
+                                onClick={() => {
+                                  setTogglingDocId(doc.id);
+                                  startTransition(async () => {
+                                    const res = await togglePayslipVisibility(doc.id, !isVisible);
+                                    setTogglingDocId(null);
+                                    if (res.error) toast.error(res.error);
+                                    else { toast.success(isVisible ? "Payslip hidden from staff." : "Payslip is now visible to staff."); window.location.reload(); }
+                                  });
+                                }}
+                                className={cn(
+                                  "p-1 rounded transition-colors",
+                                  isVisible ? "text-green-400 hover:text-green-300" : "text-content-secondary hover:text-content-primary"
+                                )}
+                                title={isVisible ? "Hide from staff" : "Make visible to staff"}
+                              >
+                                {isVisible ? <Eye className="size-4" /> : <EyeOff className="size-4" />}
+                              </button>
+                              <a
+                                href={doc.file_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="p-1 rounded text-content-secondary hover:text-content-primary transition-colors"
+                                title="View payslip"
+                              >
+                                <FileText className="size-3.5" />
+                              </a>
+                              <button
+                                type="button"
+                                disabled={pending}
+                                onClick={() => handleDeleteDoc(doc.id, doc.file_name)}
+                                className="p-1 rounded text-red-400 hover:text-red-300 transition-colors"
+                                title="Delete payslip"
+                              >
+                                <Trash2 className="size-3.5" />
+                              </button>
+                            </div>
                           </div>
+
+                          {/* Finalize inline form */}
+                          {isShowingFinalize && (
+                            <form
+                              ref={finalizeFormRef}
+                              action={finalizeFormAction}
+                              className="mt-2.5 pt-2.5 border-t border-amber-500/20 space-y-2"
+                            >
+                              <input type="hidden" name="docId" value={doc.id} />
+                              <p className="text-[10px] text-amber-400/80 flex items-center gap-1">
+                                <AlertCircle className="size-3" /> Enter payment details to generate the final payslip with confirmed advances.
+                              </p>
+                              <div className="flex gap-2">
+                                <div className="flex-1">
+                                  <Label className="text-[10px] text-content-secondary mb-1 block">Payment Date</Label>
+                                  <Input
+                                    type="date"
+                                    name="paymentDate"
+                                    required
+                                    value={finalizePayDate}
+                                    onChange={(e) => setFinalizePayDate(e.target.value)}
+                                    style={{ colorScheme: "dark" }}
+                                    className="text-xs py-1 h-7"
+                                  />
+                                </div>
+                                <div className="flex-1">
+                                  <Label className="text-[10px] text-content-secondary mb-1 block">Reference / UTR No.</Label>
+                                  <Input
+                                    type="text"
+                                    name="paymentReference"
+                                    required
+                                    placeholder="UTR or Cheque No."
+                                    value={finalizePayRef}
+                                    onChange={(e) => setFinalizePayRef(e.target.value)}
+                                    className="text-xs py-1 h-7"
+                                  />
+                                </div>
+                                <div className="flex items-end">
+                                  <SubmitButton
+                                    pendingText="Saving…"
+                                    className="h-7 px-3 text-[10px] bg-amber-500 hover:bg-amber-400 text-black font-semibold"
+                                  >
+                                    <CheckCircle2 className="size-3" /> Finalize
+                                  </SubmitButton>
+                                </div>
+                              </div>
+                            </form>
+                          )}
                         </Card>
                       );
                     })}
