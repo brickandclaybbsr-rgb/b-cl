@@ -305,37 +305,7 @@ export function ProfileClient({ initialLeaves, initialDocuments, attendanceChild
               )}
             </div>
 
-            {/* Salary Slips Section */}
-            <div className="space-y-3">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-content-secondary flex items-center gap-1.5">
-                <FileText className="size-4 text-warm" />
-                Monthly Salary Slips
-              </h3>
-              {salarySlips.length === 0 ? (
-                <Card className="p-5 text-center text-xs text-content-secondary">
-                  No salary slips uploaded yet.
-                </Card>
-              ) : (
-                <div className="grid gap-3 sm:grid-cols-2">
-                  {salarySlips.map((doc) => (
-                    <Card key={doc.id} className="p-4 flex items-center justify-between gap-3 bg-white/[0.01]">
-                      <div className="min-w-0">
-                        <p className="text-sm font-bold text-content-primary">{formatMonth(doc.month)}</p>
-                        <p className="text-[10px] text-content-secondary mt-0.5 truncate">
-                          {doc.file_name} · Uploaded {new Date(doc.uploaded_at).toLocaleDateString("en-IN")}
-                        </p>
-                      </div>
-                      <Button asChild size="sm" variant="secondary" className="shrink-0 gap-1">
-                        <a href={doc.file_url} target="_blank" rel="noopener noreferrer">
-                          <Download className="size-3.5" />
-                          View
-                        </a>
-                      </Button>
-                    </Card>
-                  ))}
-                </div>
-              )}
-            </div>
+
           </div>
         )}
 

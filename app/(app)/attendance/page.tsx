@@ -30,6 +30,7 @@ export default async function AttendancePage() {
   // Load all leaves and staff documents for owner view (wrapped in try-catch)
   let leaves: any[] = [];
   let documents: any[] = [];
+  let advances: any[] = [];
 
   try {
     const { data: leavesData, error: leavesErr } = await supabase
@@ -55,12 +56,25 @@ export default async function AttendancePage() {
     console.warn("Failed to fetch staff documents for owner (table may not exist yet):", err);
   }
 
+  try {
+    const { data: advData, error: advErr } = await supabase
+      .from("payroll_advances")
+      .select("*")
+      .order("advance_date", { ascending: false });
+    if (!advErr && advData) {
+      advances = advData;
+    }
+  } catch (err) {
+    console.warn("Failed to fetch payroll advances (table may not exist yet):", err);
+  }
+
   return (
     <div className="container mx-auto">
       <AttendanceHRClient
         staffList={staffList}
         initialLeaves={leaves}
         initialDocuments={documents}
+        initialAdvances={advances}
         ownerProfile={currentProfile}
         attendanceChild={
           <AttendanceClient
@@ -73,3 +87,4 @@ export default async function AttendancePage() {
     </div>
   );
 }
+

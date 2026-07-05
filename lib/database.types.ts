@@ -243,6 +243,18 @@ export type StaffDocument = {
   file_name: string;
   uploaded_by: string | null;
   uploaded_at: string;
+  is_visible_to_staff: boolean;
+};
+
+export type PayrollAdvance = {
+  id: string;
+  profile_id: string;
+  month: string;        // YYYY-MM
+  amount: number;
+  notes: string | null;
+  advance_date: string | null; // YYYY-MM-DD
+  recorded_by: string | null;
+  created_at: string;
 };
 
 export type CashExpense = {
@@ -284,6 +296,7 @@ export interface Database {
       attendance_punches: Table<AttendancePunch>;
       leaves: Table<StaffLeave>;
       staff_documents: Table<StaffDocument>;
+      payroll_advances: Table<PayrollAdvance>;
       cash_expenses: Table<CashExpense>;
     };
     Views: Record<string, never>;

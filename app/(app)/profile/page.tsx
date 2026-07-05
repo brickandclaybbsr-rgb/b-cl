@@ -92,6 +92,7 @@ export default async function ProfilePage() {
         .from("staff_documents")
         .select("*")
         .eq("profile_id", currentProfile.id)
+        .eq("is_visible_to_staff", true)
         .order("uploaded_at", { ascending: false });
       if (!docsErr && docsData) {
         documents = docsData;
@@ -99,6 +100,7 @@ export default async function ProfilePage() {
     } catch (err) {
       console.warn("Failed to fetch staff documents (table may not exist yet):", err);
     }
+
   } else {
     // Fetch all configuration settings for Owner
     const [staffData, stockData, vendorsData, openingData, closingData, ownerWaData, punchoutData, tasksData] = await Promise.all([

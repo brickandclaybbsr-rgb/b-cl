@@ -12,12 +12,15 @@ import {
   Trash2, 
   Check, 
   X, 
-  Eye, 
+  Eye,
+  EyeOff,
   MessageSquare, 
   User,
-  Plus
+  Plus,
+  DollarSign,
+  Wallet
 } from "lucide-react";
-import { updateLeaveStatus, uploadStaffDocument, deleteStaffDocument, generatePayslip, updateStaffProfile, uploadOwnerSignature } from "@/app/(app)/attendance/actions-hr";
+import { updateLeaveStatus, uploadStaffDocument, deleteStaffDocument, generatePayslip, generateBatchPayslips, updateStaffProfile, uploadOwnerSignature, savePayrollAdvance, deletePayrollAdvance, togglePayslipVisibility } from "@/app/(app)/attendance/actions-hr";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -74,12 +77,24 @@ interface StaffDocument {
   file_url: string;
   file_name: string;
   uploaded_at: string;
+  is_visible_to_staff: boolean;
+}
+
+interface PayrollAdvance {
+  id: string;
+  profile_id: string;
+  month: string;
+  amount: number;
+  notes: string | null;
+  advance_date: string | null;
+  created_at: string;
 }
 
 interface Props {
   staffList: StaffProfile[];
   initialLeaves: LeaveRequest[];
   initialDocuments: StaffDocument[];
+  initialAdvances: PayrollAdvance[];
   ownerProfile: StaffProfile | null;
   attendanceChild: React.ReactNode;
 }
@@ -129,8 +144,8 @@ function calculateUsedLeaves(leaves: LeaveRequest[], profileId: string) {
   };
 }
 
-export function AttendanceHRClient({ staffList, initialLeaves, initialDocuments, ownerProfile, attendanceChild }: Props) {
-  const [activeTab, setActiveTab] = useState<"attendance" | "leaves" | "documents" | "people">("people");
+export function AttendanceHRClient({ staffList, initialLeaves, initialDocuments, initialAdvances, ownerProfile, attendanceChild }: Props) {
+  const [activeTab, setActiveTab] = useState<"attendance" | "leaves" | "documents" | "people" | "payroll">("people");
   const [reviewingLeaveId, setReviewingLeaveId] = useState<string | null>(null);
   const [managerNotes, setManagerNotes] = useState<string>("");
   const [showConfetti, setShowConfetti] = useState(false);
@@ -150,6 +165,7 @@ export function AttendanceHRClient({ staffList, initialLeaves, initialDocuments,
   const [basicPay, setBasicPay] = useState("");
   const [amountPaid, setAmountPaid] = useState("");
   const [paidThrough, setPaidThrough] = useState("");
+  const [isBatchMode, setIsBatchMode] = useState(false);
 
   const payslipFormRef = useRef<HTMLFormElement>(null);
 
@@ -209,6 +225,39 @@ export function AttendanceHRClient({ staffList, initialLeaves, initialDocuments,
       window.location.reload();
     }
   }, [payslipState]);
+
+  // useFormState for generateBatchPayslips
+  const [batchState, batchFormAction] = useFormState(generateBatchPayslips, {});
+
+  useEffect(() => {
+    if (batchState.error) {
+      toast.error(batchState.error);
+    } else if (batchState.ok) {
+      toast.success(batchState.message || "Batch payslips generated successfully!");
+      setShowConfetti(true);
+      window.location.reload();
+    }
+  }, [batchState]);
+
+  // Payroll Advance state
+  const [advanceFilterMonth, setAdvanceFilterMonth] = useState<string>(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  });
+  const advanceFormRef = useRef<HTMLFormElement>(null);
+  const [advanceState, advanceFormAction] = useFormState(savePayrollAdvance, {});
+  const [deletingAdvanceId, setDeletingAdvanceId] = useState<string | null>(null);
+  const [togglingDocId, setTogglingDocId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (advanceState.error) {
+      toast.error(advanceState.error);
+    } else if (advanceState.ok) {
+      toast.success(advanceState.message || "Advance saved!");
+      advanceFormRef.current?.reset();
+      window.location.reload();
+    }
+  }, [advanceState]);
 
   // Signature upload state
   const sigFormRef = useRef<HTMLFormElement>(null);
@@ -348,6 +397,19 @@ export function AttendanceHRClient({ staffList, initialLeaves, initialDocuments,
         </button>
         <button
           type="button"
+          onClick={() => setActiveTab("payroll")}
+          className={cn(
+            "flex shrink-0 items-center gap-1.5 rounded-full px-4 py-2 text-sm font-semibold transition-colors",
+            activeTab === "payroll"
+              ? "bg-fire/15 text-warm"
+              : "text-content-secondary hover:bg-bg-elevated"
+          )}
+        >
+          <DollarSign className="size-4" />
+          Payroll
+        </button>
+        <button
+          type="button"
           onClick={() => setActiveTab("documents")}
           className={cn(
             "flex shrink-0 items-center gap-1.5 rounded-full px-4 py-2 text-sm font-semibold transition-colors",
@@ -372,8 +434,348 @@ export function AttendanceHRClient({ staffList, initialLeaves, initialDocuments,
           </div>
         )}
 
+        {/* PAYROLL TAB */}
+        {activeTab === "payroll" && (
+          <div className="animate-fade-in space-y-6">
+
+            {/* ── PAYSLIP GENERATION ──────────────────────── */}
+            <div className="space-y-3">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-content-secondary flex items-center gap-1.5">
+                <FileText className="size-3.5" />
+                Generate Payslips
+              </h3>
+
+              {/* Mode Toggle */}
+              <div className="flex rounded-md bg-white/5 p-0.5 border border-border/20">
+                <button
+                  type="button"
+                  className={cn("flex-1 py-1.5 rounded text-center text-xs transition-all", !isBatchMode ? "bg-fire text-white font-semibold" : "text-content-secondary hover:text-content-primary")}
+                  onClick={() => setIsBatchMode(false)} disabled={pending}
+                >Single Staff</button>
+                <button
+                  type="button"
+                  className={cn("flex-1 py-1.5 rounded text-center text-xs transition-all", isBatchMode ? "bg-fire text-white font-semibold" : "text-content-secondary hover:text-content-primary")}
+                  onClick={() => setIsBatchMode(true)} disabled={pending}
+                >Batch Generate All</button>
+              </div>
+
+              {!isBatchMode ? (
+                <form ref={payslipFormRef} action={payslipFormAction} className="space-y-3 text-xs">
+                  <div className="space-y-1">
+                    <Label htmlFor="pay-profile2">Staff Member</Label>
+                    <Select id="pay-profile2" name="profileId" required value={selectedStaffId} onChange={(e) => setSelectedStaffId(e.target.value)}>
+                      <option value="">-- Select Staff --</option>
+                      {activeStaffList.map((s) => (<option key={s.id} value={s.id}>{s.name}</option>))}
+                    </Select>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1">
+                      <Label htmlFor="pay-month2">Month</Label>
+                      <Input id="pay-month2" name="month" type="month" required style={{ colorScheme: "dark" }} />
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="pay-code2">Employee Code</Label>
+                      <Input id="pay-code2" name="employeeCode" placeholder="BC001" required value={employeeCode} onChange={(e) => setEmployeeCode(e.target.value)} />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1">
+                      <Label htmlFor="pay-dob2">Date of Birth</Label>
+                      <Input id="pay-dob2" name="dob" type="date" style={{ colorScheme: "dark" }} value={dob} onChange={(e) => setDob(e.target.value)} />
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="pay-pan2">PAN Number</Label>
+                      <Input id="pay-pan2" name="pan" placeholder="ABCDE1234F" required value={pan} onChange={(e) => setPan(e.target.value)} />
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="pay-aadhar2">Aadhar Number</Label>
+                    <Input id="pay-aadhar2" name="aadhar" placeholder="1234 5678 9012" required value={aadhar} onChange={(e) => setAadhar(e.target.value)} />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1">
+                      <Label htmlFor="pay-basic2">Basic Salary (₹)</Label>
+                      <Input id="pay-basic2" name="basicPay" type="number" step="1" placeholder="15000" required value={basicPay} onChange={(e) => { setBasicPay(e.target.value); setAmountPaid(e.target.value); }} />
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="pay-amount2">Amount Paid (₹)</Label>
+                      <Input id="pay-amount2" name="amountPaid" type="number" step="1" placeholder="15000" required value={amountPaid} onChange={(e) => setAmountPaid(e.target.value)} />
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="pay-through2">Paid Through</Label>
+                    <Input id="pay-through2" name="paidThrough" placeholder="Bank Transfer / UPI / Cash" required value={paidThrough} onChange={(e) => setPaidThrough(e.target.value)} />
+                  </div>
+                  <SubmitButton pendingText="Generating..." className="w-full mt-1">
+                    <Plus className="size-4" /> Generate Payslip
+                  </SubmitButton>
+                </form>
+              ) : (
+                <form action={batchFormAction} className="space-y-3 text-xs">
+                  <div className="space-y-1">
+                    <Label htmlFor="batch-month2">Select Month</Label>
+                    <Input id="batch-month2" name="month" type="month" required disabled={pending} style={{ colorScheme: "dark" }} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="batch-through2">Paid Through</Label>
+                    <Input id="batch-through2" name="paidThrough" placeholder="Bank Transfer / UPI / Cash" required disabled={pending} />
+                  </div>
+                  <div className="rounded-lg border border-border/30 bg-white/[0.015] p-3 space-y-2">
+                    <h4 className="font-semibold text-content-primary text-[11px] mb-1">Staff Included in Batch:</h4>
+                    <div className="space-y-1 max-h-36 overflow-y-auto pr-1">
+                      {activeStaffList.map((s) => {
+                        const isMissing = !s.employee_code || !s.basic_pay || !s.aadhar_number || !s.pan_number;
+                        return (
+                          <div key={s.id} className="flex items-center justify-between text-[11px] py-1 border-b border-border/10 last:border-0">
+                            <span className="font-medium text-content-secondary">{s.name}</span>
+                            {isMissing ? <span className="text-[10px] text-red-400 italic">Missing Info</span> : <span className="text-[10px] text-green-400">Ready · ₹{s.basic_pay?.toLocaleString("en-IN")}</span>}
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <p className="text-[10px] text-content-secondary italic mt-1 border-t border-border/10 pt-2">Owners excluded automatically.</p>
+                  </div>
+                  <SubmitButton pendingText="Generating Batch..." className="w-full mt-1">
+                    <Plus className="size-4" /> Generate Slips for All Staff
+                  </SubmitButton>
+                </form>
+              )}
+            </div>
+
+            {/* ── ADVANCE MANAGEMENT ──────────────────────── */}
+            <div className="space-y-3 pt-4 border-t border-border/40">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-content-secondary flex items-center gap-1.5">
+                <Wallet className="size-3.5" />
+                Staff Advances
+              </h3>
+
+              {/* Add Advance Form */}
+              <form ref={advanceFormRef} action={advanceFormAction} className="rounded-lg border border-border/30 bg-white/[0.015] p-3 space-y-3 text-xs">
+                <p className="text-[11px] font-semibold text-content-primary">Record Advance Taken</p>
+                <div className="space-y-1">
+                  <Label htmlFor="adv-staff">Staff Member</Label>
+                  <Select id="adv-staff" name="profileId" required>
+                    <option value="">-- Select Staff --</option>
+                    {activeStaffList.map((s) => (<option key={s.id} value={s.id}>{s.name}</option>))}
+                  </Select>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <Label htmlFor="adv-month">Payroll Month</Label>
+                    <Input id="adv-month" name="month" type="month" required style={{ colorScheme: "dark" }} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="adv-amount">Amount (₹)</Label>
+                    <Input id="adv-amount" name="amount" type="number" step="1" min="1" placeholder="5000" required />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <Label htmlFor="adv-date">Date Taken (Optional)</Label>
+                    <Input id="adv-date" name="advanceDate" type="date" style={{ colorScheme: "dark" }} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="adv-notes">Notes (Optional)</Label>
+                    <Input id="adv-notes" name="notes" placeholder="e.g. Emergency advance" />
+                  </div>
+                </div>
+                <SubmitButton pendingText="Saving..." className="w-full">
+                  <Plus className="size-3.5" /> Record Advance
+                </SubmitButton>
+              </form>
+
+              {/* Filter by month */}
+              <div className="flex items-center gap-2">
+                <Label htmlFor="adv-filter" className="text-[11px] shrink-0">Filter by Month:</Label>
+                <Input
+                  id="adv-filter"
+                  type="month"
+                  value={advanceFilterMonth}
+                  onChange={(e) => setAdvanceFilterMonth(e.target.value)}
+                  style={{ colorScheme: "dark" }}
+                  className="text-xs py-1 h-7 max-w-[160px]"
+                />
+              </div>
+
+              {/* Advances List */}
+              {(() => {
+                const filtered = initialAdvances.filter((a) => a.month === advanceFilterMonth);
+                if (filtered.length === 0) {
+                  return (
+                    <Card className="p-4 text-center text-xs text-content-secondary bg-white/[0.01]">
+                      No advances recorded for {advanceFilterMonth || "this month"}.
+                    </Card>
+                  );
+                }
+                // Group by staff
+                const byStaff: Record<string, typeof filtered> = {};
+                filtered.forEach((a) => {
+                  if (!byStaff[a.profile_id]) byStaff[a.profile_id] = [];
+                  byStaff[a.profile_id].push(a);
+                });
+                return (
+                  <div className="space-y-2">
+                    {Object.entries(byStaff).map(([pid, advs]) => {
+                      const staffName = staffNameMap[pid] || "Unknown";
+                      const total = advs.reduce((s, a) => s + Number(a.amount), 0);
+                      return (
+                        <Card key={pid} className="p-3 space-y-2 bg-white/[0.01] border-border/30 text-xs">
+                          <div className="flex items-center justify-between">
+                            <span className="font-semibold text-content-primary flex items-center gap-1.5">
+                              <User className="size-3.5 text-warm" />{staffName}
+                            </span>
+                            <span className="font-bold text-orange-400">Total: ₹{total.toLocaleString("en-IN")}</span>
+                          </div>
+                          <div className="space-y-1.5">
+                            {advs.map((adv) => (
+                              <div key={adv.id} className="flex items-center justify-between py-1 border-b border-border/10 last:border-0 gap-2">
+                                <div className="flex-1 min-w-0">
+                                  <span className="font-medium text-content-primary">₹{Number(adv.amount).toLocaleString("en-IN")}</span>
+                                  {adv.notes && <span className="ml-1.5 text-content-secondary">· {adv.notes}</span>}
+                                  {adv.advance_date && (
+                                    <span className="ml-1.5 text-[10px] text-content-secondary">
+                                      ({new Date(adv.advance_date + "T00:00:00").toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })})
+                                    </span>
+                                  )}
+                                </div>
+                                <button
+                                  type="button"
+                                  disabled={pending || deletingAdvanceId === adv.id}
+                                  onClick={() => {
+                                    if (!confirm(`Delete this ₹${adv.amount} advance for ${staffName}?`)) return;
+                                    setDeletingAdvanceId(adv.id);
+                                    startTransition(async () => {
+                                      const res = await deletePayrollAdvance(adv.id);
+                                      setDeletingAdvanceId(null);
+                                      if (res.error) toast.error(res.error);
+                                      else { toast.success("Advance deleted."); window.location.reload(); }
+                                    });
+                                  }}
+                                  className="shrink-0 text-red-400 hover:text-red-300 transition-colors p-1 rounded"
+                                  title="Delete advance"
+                                >
+                                  <Trash2 className="size-3.5" />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
+            </div>
+
+            {/* ── GENERATED PAYSLIPS (with visibility toggle) ── */}
+            <div className="space-y-3 pt-4 border-t border-border/40">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-content-secondary flex items-center gap-1.5">
+                <FileText className="size-3.5" />
+                Generated Payslips
+              </h3>
+              <p className="text-[11px] text-content-secondary">Toggle the eye icon to make a payslip visible or hidden for staff on their profile page.</p>
+              {(() => {
+                const payslips = initialDocuments.filter((d) => d.type === "salary_slip");
+                if (payslips.length === 0) {
+                  return (
+                    <Card className="p-4 text-center text-xs text-content-secondary bg-white/[0.01]">
+                      No payslips generated yet.
+                    </Card>
+                  );
+                }
+                return (
+                  <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
+                    {payslips.map((doc) => {
+                      const staffName = staffNameMap[doc.profile_id] || "Unknown";
+                      const isVisible = doc.is_visible_to_staff;
+                      const isToggling = togglingDocId === doc.id;
+                      return (
+                        <Card key={doc.id} className="p-3 flex items-center justify-between gap-2 bg-white/[0.01] border-border/30 text-xs">
+                          <div className="flex-1 min-w-0">
+                            <span className="font-semibold text-content-primary">{staffName}</span>
+                            <span className="mx-1.5 text-content-secondary">·</span>
+                            <span className="text-content-secondary">{formatMonth(doc.month)}</span>
+                          </div>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            {isVisible ? (
+                              <Badge variant="success" className="text-[9px] uppercase py-0 px-1.5">Visible</Badge>
+                            ) : (
+                              <Badge variant="default" className="text-[9px] uppercase py-0 px-1.5 bg-bg-elevated text-content-secondary border border-border/30">Hidden</Badge>
+                            )}
+                            <button
+                              type="button"
+                              disabled={pending || isToggling}
+                              onClick={() => {
+                                setTogglingDocId(doc.id);
+                                startTransition(async () => {
+                                  const res = await togglePayslipVisibility(doc.id, !isVisible);
+                                  setTogglingDocId(null);
+                                  if (res.error) toast.error(res.error);
+                                  else { toast.success(isVisible ? "Payslip hidden from staff." : "Payslip is now visible to staff."); window.location.reload(); }
+                                });
+                              }}
+                              className={cn(
+                                "p-1 rounded transition-colors",
+                                isVisible ? "text-green-400 hover:text-green-300" : "text-content-secondary hover:text-content-primary"
+                              )}
+                              title={isVisible ? "Hide from staff" : "Make visible to staff"}
+                            >
+                              {isVisible ? <Eye className="size-4" /> : <EyeOff className="size-4" />}
+                            </button>
+                            <a
+                              href={doc.file_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="p-1 rounded text-content-secondary hover:text-content-primary transition-colors"
+                              title="View payslip"
+                            >
+                              <FileText className="size-3.5" />
+                            </a>
+                            <button
+                              type="button"
+                              disabled={pending}
+                              onClick={() => handleDeleteDoc(doc.id, doc.file_name)}
+                              className="p-1 rounded text-red-400 hover:text-red-300 transition-colors"
+                              title="Delete payslip"
+                            >
+                              <Trash2 className="size-3.5" />
+                            </button>
+                          </div>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
+            </div>
+
+            {/* ── SIGNATURE UPLOAD ──────────────────────────── */}
+            <div className="space-y-3 pt-4 border-t border-border/40">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-content-secondary">Authorized Signature</h3>
+              <form ref={sigFormRef} action={sigFormAction} className="space-y-3 text-xs">
+                <div className="space-y-1.5">
+                  <Label htmlFor="sig-file2">Upload Authorized Signature</Label>
+                  <FileInput id="sig-file2" name="signatureFile" required accept="image/*" />
+                  <p className="text-[10px] text-content-secondary font-mono">Accepts JPG, PNG, WEBP (transparent background recommended)</p>
+                </div>
+                {ownerProfile?.signature_url && (
+                  <div className="flex items-center gap-2 p-2 rounded-lg border border-border/30 bg-white/[0.015]">
+                    <img src={ownerProfile.signature_url} alt="Current Signature" className="h-8 object-contain max-w-[120px]" />
+                    <span className="text-[10px] text-content-secondary">Current signature on file</span>
+                  </div>
+                )}
+                <SubmitButton pendingText="Uploading..." className="w-full">
+                  <Upload className="size-4" /> Update Signature
+                </SubmitButton>
+              </form>
+            </div>
+
+          </div>
+        )}
+
         {/* 2. LEAVE REQUESTS */}
         {activeTab === "leaves" && (
+
           <div className="animate-fade-in grid gap-5 lg:grid-cols-3">
             {/* Pending leave requests */}
             <div className="lg:col-span-2 space-y-4">
@@ -674,130 +1076,206 @@ export function AttendanceHRClient({ staffList, initialLeaves, initialDocuments,
               )}
 
               {docSubTab === "generate" && (
-                <form ref={payslipFormRef} action={payslipFormAction} className="space-y-3 animate-fade-in text-xs">
-                  <div className="space-y-1">
-                    <Label htmlFor="pay-profile">Staff Member</Label>
-                    <Select 
-                      id="pay-profile" 
-                      name="profileId" 
-                      required 
-                      value={selectedStaffId}
-                      onChange={(e) => setSelectedStaffId(e.target.value)}
+                <div className="space-y-3 animate-fade-in text-xs">
+                  {/* Mode Selector Toggle */}
+                  <div className="flex rounded-md bg-white/5 p-0.5 border border-border/20 mb-2">
+                    <button
+                      type="button"
+                      className={cn(
+                        "flex-1 py-1 rounded text-center transition-all",
+                        !isBatchMode ? "bg-fire text-white font-semibold" : "text-content-secondary hover:text-content-primary"
+                      )}
+                      onClick={() => setIsBatchMode(false)}
+                      disabled={pending}
                     >
-                      <option value="">-- Select Staff --</option>
-                      {activeStaffList.map((s) => (
-                        <option key={s.id} value={s.id}>
-                          {s.name}
-                        </option>
-                      ))}
-                    </Select>
+                      Single Staff
+                    </button>
+                    <button
+                      type="button"
+                      className={cn(
+                        "flex-1 py-1 rounded text-center transition-all",
+                        isBatchMode ? "bg-fire text-white font-semibold" : "text-content-secondary hover:text-content-primary"
+                      )}
+                      onClick={() => setIsBatchMode(true)}
+                      disabled={pending}
+                    >
+                      Batch Generate
+                    </button>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="space-y-1">
-                      <Label htmlFor="pay-month">Select Month</Label>
-                      <Input id="pay-month" name="month" type="month" required />
-                    </div>
-                    <div className="space-y-1">
-                      <Label htmlFor="pay-code">Employee Code</Label>
-                      <Input 
-                        id="pay-code" 
-                        name="employeeCode" 
-                        placeholder="e.g. BC001" 
-                        required 
-                        value={employeeCode}
-                        onChange={(e) => setEmployeeCode(e.target.value)}
-                      />
-                    </div>
-                  </div>
+                  {!isBatchMode ? (
+                    <form ref={payslipFormRef} action={payslipFormAction} className="space-y-3">
+                      <div className="space-y-1">
+                        <Label htmlFor="pay-profile">Staff Member</Label>
+                        <Select 
+                          id="pay-profile" 
+                          name="profileId" 
+                          required 
+                          value={selectedStaffId}
+                          onChange={(e) => setSelectedStaffId(e.target.value)}
+                        >
+                          <option value="">-- Select Staff --</option>
+                          {activeStaffList.map((s) => (
+                            <option key={s.id} value={s.id}>
+                              {s.name}
+                            </option>
+                          ))}
+                        </Select>
+                      </div>
 
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="space-y-1">
-                      <Label htmlFor="pay-dob">Date of Birth</Label>
-                      <Input 
-                        id="pay-dob" 
-                        name="dob" 
-                        type="date" 
-                        required 
-                        style={{ colorScheme: "dark" }}
-                        value={dob}
-                        onChange={(e) => setDob(e.target.value)}
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <Label htmlFor="pay-pan">PAN Number</Label>
-                      <Input 
-                        id="pay-pan" 
-                        name="pan" 
-                        placeholder="ABCDE1234F" 
-                        required 
-                        value={pan}
-                        onChange={(e) => setPan(e.target.value)}
-                      />
-                    </div>
-                  </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="space-y-1">
+                          <Label htmlFor="pay-month">Select Month</Label>
+                          <Input id="pay-month" name="month" type="month" required />
+                        </div>
+                        <div className="space-y-1">
+                          <Label htmlFor="pay-code">Employee Code</Label>
+                          <Input 
+                            id="pay-code" 
+                            name="employeeCode" 
+                            placeholder="e.g. BC001" 
+                            required 
+                            value={employeeCode}
+                            onChange={(e) => setEmployeeCode(e.target.value)}
+                          />
+                        </div>
+                      </div>
 
-                  <div className="space-y-1">
-                    <Label htmlFor="pay-aadhar">Aadhar Number</Label>
-                    <Input 
-                      id="pay-aadhar" 
-                      name="aadhar" 
-                      placeholder="1234 5678 9012" 
-                      required 
-                      value={aadhar}
-                      onChange={(e) => setAadhar(e.target.value)}
-                    />
-                  </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="space-y-1">
+                          <Label htmlFor="pay-dob">Date of Birth</Label>
+                          <Input 
+                            id="pay-dob" 
+                            name="dob" 
+                            type="date" 
+                            required 
+                            style={{ colorScheme: "dark" }}
+                            value={dob}
+                            onChange={(e) => setDob(e.target.value)}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label htmlFor="pay-pan">PAN Number</Label>
+                          <Input 
+                            id="pay-pan" 
+                            name="pan" 
+                            placeholder="ABCDE1234F" 
+                            required 
+                            value={pan}
+                            onChange={(e) => setPan(e.target.value)}
+                          />
+                        </div>
+                      </div>
 
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="space-y-1">
-                      <Label htmlFor="pay-basic">Basic Salary (₹)</Label>
-                      <Input 
-                        id="pay-basic" 
-                        name="basicPay" 
-                        type="number" 
-                        step="0.01" 
-                        placeholder="15000" 
-                        required 
-                        value={basicPay}
-                        onChange={(e) => {
-                          setBasicPay(e.target.value);
-                          setAmountPaid(e.target.value);
-                        }}
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <Label htmlFor="pay-amount">Amount Paid (₹)</Label>
-                      <Input 
-                        id="pay-amount" 
-                        name="amountPaid" 
-                        type="number" 
-                        step="0.01" 
-                        placeholder="15000" 
-                        required 
-                        value={amountPaid}
-                        onChange={(e) => setAmountPaid(e.target.value)}
-                      />
-                    </div>
-                  </div>
+                      <div className="space-y-1">
+                        <Label htmlFor="pay-aadhar">Aadhar Number</Label>
+                        <Input 
+                          id="pay-aadhar" 
+                          name="aadhar" 
+                          placeholder="1234 5678 9012" 
+                          required 
+                          value={aadhar}
+                          onChange={(e) => setAadhar(e.target.value)}
+                        />
+                      </div>
 
-                  <div className="space-y-1">
-                    <Label htmlFor="pay-through">Paid Through</Label>
-                    <Input 
-                      id="pay-through" 
-                      name="paidThrough" 
-                      placeholder="e.g. Bank Transfer / UPI / Cash" 
-                      required 
-                      value={paidThrough}
-                      onChange={(e) => setPaidThrough(e.target.value)}
-                    />
-                  </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="space-y-1">
+                          <Label htmlFor="pay-basic">Basic Salary (₹)</Label>
+                          <Input 
+                            id="pay-basic" 
+                            name="basicPay" 
+                            type="number" 
+                            step="0.01" 
+                            placeholder="15000" 
+                            required 
+                            value={basicPay}
+                            onChange={(e) => {
+                              setBasicPay(e.target.value);
+                              setAmountPaid(e.target.value);
+                            }}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label htmlFor="pay-amount">Amount Paid (₹)</Label>
+                          <Input 
+                            id="pay-amount" 
+                            name="amountPaid" 
+                            type="number" 
+                            step="0.01" 
+                            placeholder="15000" 
+                            required 
+                            value={amountPaid}
+                            onChange={(e) => setAmountPaid(e.target.value)}
+                          />
+                        </div>
+                      </div>
 
-                  <SubmitButton pendingText="Generating..." className="w-full mt-2">
-                    <Plus className="size-4" />
-                    Generate Payslip
-                  </SubmitButton>
-                </form>
+                      <div className="space-y-1">
+                        <Label htmlFor="pay-through">Paid Through</Label>
+                        <Input 
+                          id="pay-through" 
+                          name="paidThrough" 
+                          placeholder="e.g. Bank Transfer / UPI / Cash" 
+                          required 
+                          value={paidThrough}
+                          onChange={(e) => setPaidThrough(e.target.value)}
+                        />
+                      </div>
+
+                      <SubmitButton pendingText="Generating..." className="w-full mt-2">
+                        <Plus className="size-4" />
+                        Generate Payslip
+                      </SubmitButton>
+                    </form>
+                  ) : (
+                    <form action={batchFormAction} className="space-y-3">
+                      <div className="space-y-1">
+                        <Label htmlFor="batch-month">Select Month</Label>
+                        <Input id="batch-month" name="month" type="month" required disabled={pending} />
+                      </div>
+                      <div className="space-y-1">
+                        <Label htmlFor="batch-through">Paid Through</Label>
+                        <Input 
+                          id="batch-through" 
+                          name="paidThrough" 
+                          placeholder="e.g. Bank Transfer / UPI / Cash" 
+                          required 
+                          disabled={pending}
+                        />
+                      </div>
+                      
+                      {/* Active Staff List Preview */}
+                      <div className="rounded-lg border border-border/30 bg-white/[0.015] p-3 space-y-2">
+                        <h4 className="font-semibold text-content-primary mb-1">Staff Included in Batch:</h4>
+                        <div className="space-y-1 max-h-40 overflow-y-auto pr-1">
+                          {activeStaffList
+                            .map((s) => {
+                              const isMissing = !s.employee_code || !s.basic_pay || !s.aadhar_number || !s.pan_number;
+                              return (
+                                <div key={s.id} className="flex items-center justify-between text-[11px] py-1 border-b border-border/10 last:border-0">
+                                  <span className="font-medium text-content-secondary">{s.name}</span>
+                                  {isMissing ? (
+                                    <span className="text-[10px] text-red-400 italic">Missing Profile Info</span>
+                                  ) : (
+                                    <span className="text-[10px] text-green-400">Ready (₹{s.basic_pay})</span>
+                                  )}
+                                </div>
+                              );
+                            })}
+                        </div>
+                        <p className="text-[10px] text-content-secondary italic mt-1 border-t border-border/10 pt-2">
+                          * Owners are automatically excluded. Make sure all staff show "Ready" before generating.
+                        </p>
+                      </div>
+
+                      <SubmitButton pendingText="Generating Batch..." className="w-full mt-2">
+                        <Plus className="size-4" />
+                        Generate Slips for All Staff
+                      </SubmitButton>
+                    </form>
+                  )}
+                </div>
               )}
 
               {docSubTab === "signature" && (
