@@ -28,6 +28,7 @@ const CATEGORY_LABELS: Record<string, string> = {
   advance:    "Salary Advance",
   expense:    "Expense",
   other:      "Other",
+  deposit:    "Deposit",
 };
 
 const CATEGORY_LABELS_SHORT: Record<string, string> = {
@@ -35,6 +36,7 @@ const CATEGORY_LABELS_SHORT: Record<string, string> = {
   advance:    "Advance",
   expense:    "Expense",
   other:      "Other",
+  deposit:    "Deposit",
 };
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -42,6 +44,7 @@ const CATEGORY_COLORS: Record<string, string> = {
   advance:    "text-warning",
   expense:    "text-warm",
   other:      "text-content-secondary",
+  deposit:    "text-green-400",
 };
 
 type EntryRow = {
@@ -232,6 +235,7 @@ export function ExpenseClient({
                     <option value="advance">Advance</option>
                     <option value="expense">Expense</option>
                     <option value="other">Other</option>
+                    <option value="deposit">Deposit ↑</option>
                   </select>
                 </div>
 
@@ -339,6 +343,7 @@ export function ExpenseClient({
                     <option value="advance">Salary Advance</option>
                     <option value="expense">Expense</option>
                     <option value="other">Other</option>
+                    <option value="deposit">Deposit ↑</option>
                   </select>
                 </div>
               </div>
@@ -480,8 +485,8 @@ function PrevDayRow({ entry, isOwner }: { entry: CashExpense; isOwner: boolean }
             <span className="ml-1 opacity-60">· {time}</span>
           </p>
         </div>
-        <span className="shrink-0 font-mono text-sm font-bold tabular-nums text-danger">
-          -{formatINR(Number(amount))}
+        <span className={`shrink-0 font-mono text-sm font-bold tabular-nums ${category === "deposit" ? "text-green-400" : "text-danger"}`}>
+          {category === "deposit" ? "+" : "-"}{formatINR(Number(amount))}
         </span>
         {isOwner && (
           <>
@@ -533,6 +538,7 @@ function PrevDayRow({ entry, isOwner }: { entry: CashExpense; isOwner: boolean }
                 <option value="advance">Advance</option>
                 <option value="expense">Expense</option>
                 <option value="other">Other</option>
+                <option value="deposit">Deposit ↑</option>
               </select>
             </div>
             <div className="col-span-2">
@@ -599,8 +605,8 @@ function ExpenseRow({ entry, isOwner, canDelete }: { entry: CashExpense; isOwner
             <span className="ml-1 opacity-60">· {time}</span>
           </p>
         </div>
-        <span className="shrink-0 font-mono text-base font-bold tabular-nums text-danger">
-          -{formatINR(Number(amount))}
+        <span className={`shrink-0 font-mono text-base font-bold tabular-nums ${category === "deposit" ? "text-green-400" : "text-danger"}`}>
+          {category === "deposit" ? "+" : "-"}{formatINR(Number(amount))}
         </span>
         {isOwner && (
           <button
@@ -650,11 +656,12 @@ function ExpenseRow({ entry, isOwner, canDelete }: { entry: CashExpense; isOwner
               <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-content-secondary">
                 Type
               </label>
-              <select name="category" value={category} onChange={(e) => setCategory(e.target.value as "withdrawal" | "advance" | "expense" | "other")} className="h-9 w-full rounded-lg border border-border bg-bg-elevated px-2.5 text-sm text-content-primary focus:outline-none focus:ring-2 focus:ring-fire/40">
+              <select name="category" value={category} onChange={(e) => setCategory(e.target.value as "withdrawal" | "advance" | "expense" | "other" | "deposit")} className="h-9 w-full rounded-lg border border-border bg-bg-elevated px-2.5 text-sm text-content-primary focus:outline-none focus:ring-2 focus:ring-fire/40">
                 <option value="withdrawal">Withdrawal</option>
                 <option value="advance">Advance</option>
                 <option value="expense">Expense</option>
                 <option value="other">Other</option>
+                <option value="deposit">Deposit ↑</option>
               </select>
             </div>
             <div className="col-span-2">

@@ -17,9 +17,9 @@ export async function addCashExpense(
   const person_name = String(formData.get("person_name") ?? "").trim();
   const amountRaw = String(formData.get("amount") ?? "").trim();
   const categoryRaw = String(formData.get("category") ?? "withdrawal").trim();
-  const category = (["withdrawal","advance","expense","other"].includes(categoryRaw)
+  const category = (["withdrawal","advance","expense","other","deposit"].includes(categoryRaw)
     ? categoryRaw
-    : "withdrawal") as "withdrawal" | "advance" | "expense" | "other";
+    : "withdrawal") as "withdrawal" | "advance" | "expense" | "other" | "deposit";
   const notes = String(formData.get("notes") ?? "").trim();
 
   if (!person_name) return { error: "Please enter the person's name." };
@@ -60,8 +60,8 @@ export async function updateCashExpense(
   const person_name = String(formData.get("person_name") ?? "").trim();
   const amountRaw   = String(formData.get("amount") ?? "").trim();
   const categoryRaw = String(formData.get("category") ?? "withdrawal").trim();
-  const category = (["withdrawal", "advance", "expense", "other"].includes(categoryRaw)
-    ? categoryRaw : "withdrawal") as "withdrawal" | "advance" | "expense" | "other";
+  const category = (["withdrawal", "advance", "expense", "other", "deposit"].includes(categoryRaw)
+    ? categoryRaw : "withdrawal") as "withdrawal" | "advance" | "expense" | "other" | "deposit";
   const notes = String(formData.get("notes") ?? "").trim();
 
   if (!person_name) return { error: "Please enter the person's name." };
@@ -92,7 +92,7 @@ export async function addMultipleCashExpenses(
 
   const inserts: Array<{
     date: string; person_name: string; amount: number;
-    category: "withdrawal" | "advance" | "expense" | "other";
+    category: "withdrawal" | "advance" | "expense" | "other" | "deposit";
     notes: string | null; submitted_by: string;
   }> = [];
 
@@ -101,7 +101,7 @@ export async function addMultipleCashExpenses(
     const amount = parseFloat(row.amount);
     const categoryRaw = row.category;
     const category = (["withdrawal", "advance", "expense", "other"].includes(categoryRaw)
-      ? categoryRaw : "withdrawal") as "withdrawal" | "advance" | "expense" | "other";
+      ? categoryRaw : "withdrawal") as "withdrawal" | "advance" | "expense" | "other" | "deposit";
     const notes = row.notes.trim();
     if (!person_name || isNaN(amount) || amount <= 0) continue;
     inserts.push({ date: safeDate, person_name, amount, category, notes: notes || null, submitted_by: profile.id });

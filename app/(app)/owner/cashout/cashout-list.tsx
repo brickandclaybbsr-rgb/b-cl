@@ -20,6 +20,7 @@ const CATEGORY_LABELS: Record<string, string> = {
   advance:    "Advance",
   expense:    "Expense",
   other:      "Other",
+  deposit:    "Deposit",
 };
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -27,7 +28,10 @@ const CATEGORY_COLORS: Record<string, string> = {
   advance:    "text-warning",
   expense:    "text-warm",
   other:      "text-content-secondary",
+  deposit:    "text-green-400",
 };
+
+const isDeposit = (cat: string) => cat === "deposit";
 
 export function CashOutList({
   entries,
@@ -62,7 +66,7 @@ function EntryRow({
   // Edit field state — pre-filled with existing values
   const [personName, setPersonName] = useState(entry.person_name);
   const [amount,     setAmount]     = useState(String(entry.amount));
-  const [category,   setCategory]   = useState(entry.category);
+  const [category,   setCategory]   = useState<"withdrawal" | "advance" | "expense" | "other" | "deposit">(entry.category);
   const [notes,      setNotes]      = useState(entry.notes ?? "");
 
   useEffect(() => {
@@ -98,8 +102,8 @@ function EntryRow({
             <span className="ml-1 opacity-60">· {time}</span>
           </p>
         </div>
-        <span className="shrink-0 font-mono text-sm font-bold tabular-nums text-danger">
-          -{formatINR(Number(amount))}
+        <span className={`shrink-0 font-mono text-sm font-bold tabular-nums ${isDeposit(category) ? "text-green-400" : "text-danger"}`}>
+          {isDeposit(category) ? "+" : "-"}{formatINR(Number(amount))}
         </span>
 
         {/* Edit button */}
@@ -169,13 +173,14 @@ function EntryRow({
               <select
                 name="category"
                 value={category}
-                onChange={(e) => setCategory(e.target.value as "withdrawal" | "advance" | "expense" | "other")}
+                onChange={(e) => setCategory(e.target.value as "withdrawal" | "advance" | "expense" | "other" | "deposit")}
                 className="h-9 w-full rounded-lg border border-border bg-bg-elevated px-2.5 text-sm text-content-primary focus:outline-none focus:ring-2 focus:ring-fire/40"
               >
                 <option value="withdrawal">Withdrawal</option>
                 <option value="advance">Advance</option>
                 <option value="expense">Expense</option>
                 <option value="other">Other</option>
+                <option value="deposit">Deposit ↑</option>
               </select>
             </div>
             <div className="col-span-2">

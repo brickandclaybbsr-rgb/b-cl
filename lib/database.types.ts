@@ -262,7 +262,7 @@ export type CashExpense = {
   date: string;
   person_name: string;
   amount: number;
-  category: "withdrawal" | "advance" | "expense" | "other";
+  category: "withdrawal" | "advance" | "expense" | "other" | "deposit";
   notes: string | null;
   submitted_by: string | null;
   submitted_at: string;
