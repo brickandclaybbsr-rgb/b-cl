@@ -126,5 +126,6 @@ export async function deleteCashExpense(
   if (error) return { error: error.message };
   revalidatePath("/sales");
   revalidatePath("/owner");
+  revalidatePath("/owner/cashout");
   return { ok: true };
 }

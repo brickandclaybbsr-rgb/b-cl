@@ -71,6 +71,10 @@ function EntryRow({
 
   useEffect(() => {
     if (deleteState.error) toast.error(deleteState.error);
+    if (deleteState.ok) {
+      toast.success("Entry deleted");
+      router.refresh();
+    }
   }, [deleteState]);
 
   useEffect(() => {
