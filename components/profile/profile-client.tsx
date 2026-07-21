@@ -344,7 +344,7 @@ export function ProfileClient({ initialLeaves, initialDocuments, attendanceChild
                             </p>
                           </div>
                           <Button asChild size="sm" variant="secondary" className="shrink-0 gap-1">
-                            <a href={doc.file_url} target="_blank" rel="noopener noreferrer">
+                            <a href={`/api/payslip/${doc.id}`} target="_blank" rel="noopener noreferrer">
                               <Download className="size-3.5" />
                               View
                             </a>
