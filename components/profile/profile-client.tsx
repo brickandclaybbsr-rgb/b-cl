@@ -15,6 +15,7 @@ import {
   CheckCircle2, 
   XCircle,
   FileSignature,
+  Wallet,
   Info
 } from "lucide-react";
 import { applyLeave, deleteLeave } from "@/app/(app)/attendance/actions-hr";
@@ -48,12 +49,20 @@ interface StaffDocument {
   file_url: string;
   file_name: string;
   uploaded_at: string;
+  payment_date?: string | null;
+  payment_reference?: string | null;
+  payment_mode?: string | null;
+  amount_paid?: number | null;
 }
 
 interface Props {
   initialLeaves: LeaveRequest[];
   initialDocuments: StaffDocument[];
   attendanceChild: React.ReactNode;
+  /** Head chef only: all staff leave requests (read-only). */
+  allLeaves?: LeaveRequest[];
+  /** Head chef only: profile id → name map for the read-only list. */
+  staffNames?: Record<string, string>;
 }
 
 function hasWeekendDays(startStr: string, endStr: string): boolean {
@@ -107,7 +116,8 @@ function calculateOwnUsedLeaves(leaves: LeaveRequest[]) {
   };
 }
 
-export function ProfileClient({ initialLeaves, initialDocuments, attendanceChild }: Props) {
+export function ProfileClient({ initialLeaves, initialDocuments, attendanceChild, allLeaves, staffNames }: Props) {
+  const isHeadChef = Array.isArray(allLeaves);
   const [activeTab, setActiveTab] = useState<"attendance" | "documents" | "leaves">("attendance");
   const [leaves, setLeaves] = useState<LeaveRequest[]>(initialLeaves);
   const [documents, setDocuments] = useState<StaffDocument[]>(initialDocuments);
@@ -305,6 +315,57 @@ export function ProfileClient({ initialLeaves, initialDocuments, attendanceChild
               )}
             </div>
 
+            {/* Salary Slips Section */}
+            <div className="space-y-3">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-content-secondary flex items-center gap-1.5">
+                <Wallet className="size-4 text-warm" />
+                Salary Slips
+              </h3>
+              {salarySlips.length === 0 ? (
+                <Card className="p-5 text-center text-xs text-content-secondary">
+                  No salary slips available yet.
+                </Card>
+              ) : (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {salarySlips.map((doc) => {
+                    const paid = typeof doc.amount_paid === "number" ? doc.amount_paid : null;
+                    const payDate = doc.payment_date
+                      ? new Date(doc.payment_date + "T00:00:00").toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
+                      : null;
+                    return (
+                      <Card key={doc.id} className="p-4 flex flex-col gap-2 bg-white/[0.01]">
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="text-sm font-semibold truncate text-content-primary">
+                              {doc.month ? formatMonth(doc.month) : doc.file_name}
+                            </p>
+                            <p className="text-[10px] text-content-secondary mt-0.5">
+                              Issued {new Date(doc.uploaded_at).toLocaleDateString("en-IN")}
+                            </p>
+                          </div>
+                          <Button asChild size="sm" variant="secondary" className="shrink-0 gap-1">
+                            <a href={doc.file_url} target="_blank" rel="noopener noreferrer">
+                              <Download className="size-3.5" />
+                              View
+                            </a>
+                          </Button>
+                        </div>
+                        {payDate && (
+                          <div className="rounded-lg border border-green-500/20 bg-green-500/[0.06] px-3 py-2 text-[11px] text-green-300/90">
+                            <span className="font-semibold text-green-300">✓ Paid</span>
+                            {paid !== null && <> ₹{paid.toLocaleString("en-IN")}</>} on {payDate}
+                            {doc.payment_mode && <> · {doc.payment_mode}</>}
+                            {doc.payment_reference && (
+                              <> · Ref <span className="font-mono">{doc.payment_reference}</span></>
+                            )}
+                          </div>
+                        )}
+                      </Card>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
 
           </div>
         )}
@@ -597,6 +658,63 @@ export function ProfileClient({ initialLeaves, initialDocuments, attendanceChild
                 </div>
               )}
             </div>
+
+            {/* Head chef: read-only view of everyone's leave requests */}
+            {isHeadChef && (
+              <div className="lg:col-span-3 space-y-3 pt-2 border-t border-border/40">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-content-secondary flex items-center gap-1.5">
+                  <CalendarDays className="size-4 text-warm" />
+                  All Team Leave Requests
+                  <span className="ml-1 rounded-full bg-bg-elevated px-2 py-0.5 text-[9px] font-semibold normal-case tracking-normal text-content-secondary">
+                    View only
+                  </span>
+                </h3>
+
+                {(!allLeaves || allLeaves.length === 0) ? (
+                  <Card className="p-6 text-center text-xs text-content-secondary">
+                    No leave requests from the team yet.
+                  </Card>
+                ) : (
+                  <div className="space-y-3 max-h-[600px] overflow-y-auto pr-1">
+                    {allLeaves.map((leave) => {
+                      const from = new Date(leave.start_date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+                      const to = new Date(leave.end_date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+                      const who = staffNames?.[leave.profile_id] ?? "Staff member";
+                      return (
+                        <Card key={leave.id} className="p-4 space-y-2 bg-bg-card">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="space-y-0.5">
+                              <p className="text-sm font-bold text-content-primary">{who}</p>
+                              <span className="text-xs font-semibold text-content-secondary">
+                                {from} {from !== to && `to ${to}`}
+                              </span>
+                              <div className="mt-1">
+                                <Badge variant="default" className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0 bg-bg-elevated text-content-primary border border-border/30">
+                                  {leave.leave_type === "cl" ? "Weekly Leave / CL" : leave.leave_type === "sl" ? "Sick Leave (SL)" : "Leave Without Pay (LWP)"}
+                                </Badge>
+                              </div>
+                            </div>
+                            {leave.status === "pending" && (
+                              <Badge variant="warning" className="text-[10px] uppercase font-bold px-2 py-0.5">Pending</Badge>
+                            )}
+                            {leave.status === "approved" && (
+                              <Badge variant="success" className="text-[10px] uppercase font-bold px-2 py-0.5">Approved</Badge>
+                            )}
+                            {leave.status === "rejected" && (
+                              <Badge variant="danger" className="text-[10px] uppercase font-bold px-2 py-0.5">Rejected</Badge>
+                            )}
+                          </div>
+                          <div className="text-xs text-content-secondary">
+                            <span className="font-semibold text-content-primary">Reason: </span>
+                            {leave.reason}
+                          </div>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>

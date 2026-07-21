@@ -1,6 +1,6 @@
 import { AlertTriangle, MessageCircle, Settings, Shield, User, Bell, CalendarClock } from "lucide-react";
-import { requireProfile } from "@/lib/auth";
-import { getStaff } from "@/lib/data/profiles";
+import { requireProfile, isHeadChef } from "@/lib/auth";
+import { getStaff, getProfileNameMap } from "@/lib/data/profiles";
 import { getAllStockItems } from "@/lib/data/stock";
 import { getAllVendors } from "@/lib/data/vendors";
 import { getAllChecklistItems, getAppSetting } from "@/lib/data/settings";
@@ -54,6 +54,10 @@ export default async function ProfilePage() {
   let punches: any[] = [];
   let leaves: any[] = [];
   let documents: any[] = [];
+  // Head chef gets a read-only view of everyone's leave requests.
+  const headChef = isHeadChef(currentProfile);
+  let allLeaves: any[] = [];
+  let staffNames: Record<string, string> = {};
 
   // Settings variables
   let staff: any[] = [];
@@ -99,6 +103,19 @@ export default async function ProfilePage() {
       }
     } catch (err) {
       console.warn("Failed to fetch staff documents (table may not exist yet):", err);
+    }
+
+    if (headChef) {
+      try {
+        const [{ data: allLeavesData }, nameMap] = await Promise.all([
+          supabase.from("leaves").select("*").order("submitted_at", { ascending: false }),
+          getProfileNameMap(),
+        ]);
+        allLeaves = allLeavesData ?? [];
+        staffNames = nameMap;
+      } catch (err) {
+        console.warn("Failed to fetch all leaves for head chef:", err);
+      }
     }
 
   } else {
@@ -170,6 +187,8 @@ export default async function ProfilePage() {
           <ProfileClient
             initialLeaves={leaves}
             initialDocuments={documents}
+            allLeaves={headChef ? allLeaves : undefined}
+            staffNames={headChef ? staffNames : undefined}
             attendanceChild={
               <AttendanceClient
                 staffList={[currentProfile]}

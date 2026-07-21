@@ -20,6 +20,7 @@ export default async function ExpensesPage() {
       <ExpenseClient
         entries={entries}
         isOwner={profile.role === "owner"}
+        canDeleteAll={profile.role === "owner" || profile.team === "head_chef"}
         viewingDate={todayIST()}
       />
     </div>

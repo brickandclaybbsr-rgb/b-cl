@@ -67,12 +67,15 @@ export function ExpenseClient({
   isOwner,
   viewingDate,
   canDelete,
+  canDeleteAll,
   previousGroups,
 }: {
   entries: CashExpense[];
   isOwner: boolean;
   viewingDate: string;
   canDelete?: boolean;
+  /** Unrestricted delete (owner or head chef) — no time-window limit. */
+  canDeleteAll?: boolean;
   previousGroups?: { date: string; entries: CashExpense[] }[];
 }) {
   const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
@@ -286,7 +289,7 @@ export function ExpenseClient({
               </div>
               <Card className="divide-y divide-border overflow-hidden">
                 {entries.map((entry) => (
-                  <ExpenseRow key={entry.id} entry={entry} isOwner={isOwner} canDelete={canDelete} />
+                  <ExpenseRow key={entry.id} entry={entry} isOwner={isOwner} canDelete={canDelete} canDeleteAll={canDeleteAll} />
                 ))}
               </Card>
             </div>
@@ -299,7 +302,7 @@ export function ExpenseClient({
 
           {/* Previous days accordion */}
           {previousGroups && previousGroups.length > 0 && (
-            <PreviousDaysAccordion groups={previousGroups} isOwner={isOwner} />
+            <PreviousDaysAccordion groups={previousGroups} isOwner={isOwner} canDeleteAll={canDeleteAll} />
           )}
         </>
       ) : (
@@ -371,7 +374,7 @@ export function ExpenseClient({
               </div>
               <Card className="divide-y divide-border overflow-hidden">
                 {entries.map((entry) => (
-                  <ExpenseRow key={entry.id} entry={entry} isOwner={isOwner} canDelete={canDelete} />
+                  <ExpenseRow key={entry.id} entry={entry} isOwner={isOwner} canDelete={canDelete} canDeleteAll={canDeleteAll} />
                 ))}
               </Card>
             </div>
@@ -391,9 +394,11 @@ export function ExpenseClient({
 function PreviousDaysAccordion({
   groups,
   isOwner,
+  canDeleteAll,
 }: {
   groups: { date: string; entries: CashExpense[] }[];
   isOwner: boolean;
+  canDeleteAll?: boolean;
 }) {
   const [open, setOpen] = useState<string | null>(null);
 
@@ -432,7 +437,7 @@ function PreviousDaysAccordion({
               {isOpen && (
                 <div className="divide-y divide-border border-t border-border">
                   {entries.map((entry) => (
-                    <PrevDayRow key={entry.id} entry={entry} isOwner={isOwner} />
+                    <PrevDayRow key={entry.id} entry={entry} isOwner={isOwner} canDeleteAll={canDeleteAll} />
                   ))}
                 </div>
               )}
@@ -444,7 +449,7 @@ function PreviousDaysAccordion({
   );
 }
 
-function PrevDayRow({ entry, isOwner }: { entry: CashExpense; isOwner: boolean }) {
+function PrevDayRow({ entry, isOwner, canDeleteAll }: { entry: CashExpense; isOwner: boolean; canDeleteAll?: boolean }) {
   const [deleteState, deleteAction] = useFormState<ExpenseFormState, FormData>(deleteCashExpense, {});
   const [editState, editFormAction] = useFormState<ExpenseFormState, FormData>(updateCashExpense, {});
   const [editing, setEditing] = useState(false);
@@ -488,19 +493,21 @@ function PrevDayRow({ entry, isOwner }: { entry: CashExpense; isOwner: boolean }
         <span className={`shrink-0 font-mono text-sm font-bold tabular-nums ${category === "deposit" ? "text-green-400" : "text-danger"}`}>
           {category === "deposit" ? "+" : "-"}{formatINR(Number(amount))}
         </span>
-        {isOwner && (
+        {(isOwner || canDeleteAll) && (
           <>
-            <button
-              type="button"
-              onClick={() => setEditing((v) => !v)}
-              className={`rounded-lg p-1.5 transition-colors ${
-                editing
-                  ? "bg-fire/15 text-fire"
-                  : "text-content-secondary hover:bg-bg-elevated hover:text-content-primary"
-              }`}
-            >
-              {editing ? <X className="size-4" /> : <Pencil className="size-3.5" />}
-            </button>
+            {isOwner && (
+              <button
+                type="button"
+                onClick={() => setEditing((v) => !v)}
+                className={`rounded-lg p-1.5 transition-colors ${
+                  editing
+                    ? "bg-fire/15 text-fire"
+                    : "text-content-secondary hover:bg-bg-elevated hover:text-content-primary"
+                }`}
+              >
+                {editing ? <X className="size-4" /> : <Pencil className="size-3.5" />}
+              </button>
+            )}
             <form action={deleteAction}>
               <input type="hidden" name="id" value={entry.id} />
               <button
@@ -561,7 +568,7 @@ function PrevDayRow({ entry, isOwner }: { entry: CashExpense; isOwner: boolean }
 }
 
 /* ── Today's expense row (with edit/delete) ─────────────────────────── */
-function ExpenseRow({ entry, isOwner, canDelete }: { entry: CashExpense; isOwner: boolean; canDelete?: boolean }) {
+function ExpenseRow({ entry, isOwner, canDelete, canDeleteAll }: { entry: CashExpense; isOwner: boolean; canDelete?: boolean; canDeleteAll?: boolean }) {
   const [deleteState, deleteAction] = useFormState<ExpenseFormState, FormData>(deleteCashExpense, {});
   const [editState, editFormAction] = useFormState<ExpenseFormState, FormData>(updateCashExpense, {});
   const [editing, setEditing] = useState(false);
@@ -589,7 +596,7 @@ function ExpenseRow({ entry, isOwner, canDelete }: { entry: CashExpense; isOwner
   });
 
   const withinTwoHours = Date.now() - new Date(entry.submitted_at).getTime() < 2 * 60 * 60 * 1000;
-  const showDelete = isOwner || (canDelete && withinTwoHours);
+  const showDelete = isOwner || canDeleteAll || (canDelete && withinTwoHours);
 
   return (
     <>

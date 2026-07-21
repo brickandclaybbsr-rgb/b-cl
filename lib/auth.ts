@@ -12,6 +12,14 @@ export function isInventoryManager(profile: Profile): boolean {
   return profile.role === "inventory_manager";
 }
 
+/**
+ * Who may delete financial records (cash-outs / cash expenses) freely.
+ * Owner (e.g. Pradosh) and the head chef both have unrestricted delete.
+ */
+export function canDeleteFinancialRecords(profile: Profile): boolean {
+  return profile.role === "owner" || isHeadChef(profile);
+}
+
 /** Current authenticated profile, or null. Safe to call anywhere server-side. */
 export async function getCurrentProfile(): Promise<Profile | null> {
   const supabase = createClient();

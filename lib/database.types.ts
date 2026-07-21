@@ -244,6 +244,11 @@ export type StaffDocument = {
   uploaded_by: string | null;
   uploaded_at: string;
   is_visible_to_staff: boolean;
+  // Populated when a salary slip is finalized — surfaced on the employee's card.
+  payment_date: string | null;
+  payment_reference: string | null;
+  payment_mode: string | null;
+  amount_paid: number | null;
 };
 
 export type PayrollAdvance = {
@@ -266,6 +271,29 @@ export type CashExpense = {
   notes: string | null;
   submitted_by: string | null;
   submitted_at: string;
+};
+
+export type Outlet = {
+  id: string;
+  name: string;
+  qr_token: string;
+  latitude: number;
+  longitude: number;
+  radius_m: number;
+  is_active: boolean;
+  created_at: string;
+};
+
+export type AttendanceCheckin = {
+  id: string;
+  profile_id: string;
+  outlet_id: string | null;
+  date: string;         // IST business date, yyyy-MM-dd
+  checked_in_at: string;
+  latitude: number | null;
+  longitude: number | null;
+  distance_m: number | null;
+  created_at: string;
 };
 
 /** A table definition in the shape supabase-js expects (incl. Relationships). */
@@ -298,6 +326,8 @@ export interface Database {
       staff_documents: Table<StaffDocument>;
       payroll_advances: Table<PayrollAdvance>;
       cash_expenses: Table<CashExpense>;
+      outlets: Table<Outlet>;
+      attendance_checkins: Table<AttendanceCheckin>;
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;

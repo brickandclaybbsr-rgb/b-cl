@@ -7,7 +7,7 @@ import { requireProfile, requireOwner } from "@/lib/auth";
 import { todayIST } from "@/lib/date";
 import { uploadPublicFile, deletePublicFile } from "@/lib/storage";
 import { whatsappNotify } from "@/lib/whatsapp-notify";
-import { notifyOwner, notifyStaff } from "@/lib/push";
+import { notifyOwner, notifyStaff, sendPushToProfile } from "@/lib/push";
 
 export type HRActionState = { ok?: boolean; error?: string; message?: string };
 
@@ -533,6 +533,8 @@ export async function finalizePayslip(
     const docId = String(formData.get("docId") ?? "").trim();
     const paymentDate = String(formData.get("paymentDate") ?? "").trim();
     const paymentReference = String(formData.get("paymentReference") ?? "").trim();
+    // Editable actual amount paid — falls back to the employee's basic pay below.
+    const amountPaidInput = String(formData.get("amountPaid") ?? "").trim();
 
     if (!docId || !paymentDate || !paymentReference) {
       return { error: "Payment date and reference number are required to finalize." };
@@ -569,7 +571,7 @@ export async function finalizePayslip(
     subFormData.append("aadhar", employee.aadhar_number || "");
     subFormData.append("pan", employee.pan_number || "");
     subFormData.append("basicPay", String(employee.basic_pay || 0));
-    subFormData.append("amountPaid", String(employee.basic_pay || 0));
+    subFormData.append("amountPaid", amountPaidInput || String(employee.basic_pay || 0));
     subFormData.append("paidThrough", employee.paid_through || "Cash");
 
     const res = await generatePayslipInternal(supabase, owner, employee, subFormData, {
@@ -579,6 +581,22 @@ export async function finalizePayslip(
     });
 
     if (res.error) return { error: res.error };
+
+    // Notify the employee that their finalized payslip is now available.
+    try {
+      const [yStr, mStr] = (doc.month || "").split("-");
+      const monthLabel = yStr && mStr
+        ? new Date(parseInt(yStr), parseInt(mStr) - 1, 1).toLocaleDateString("en-IN", { month: "long", year: "numeric" })
+        : "your salary";
+      await sendPushToProfile(
+        employee.id,
+        "Payslip ready 📄",
+        `Your salary slip for ${monthLabel} has been finalized and is now available in My Documents.`,
+        "/profile",
+      );
+    } catch (pushErr) {
+      console.warn("finalizePayslip push failed:", pushErr);
+    }
 
     revalidatePath("/profile");
     revalidatePath("/attendance");
@@ -1270,6 +1288,24 @@ ${isDraft ? `
     ? `[DRAFT] Salary Slip - ${monthLabel}.html`
     : `Salary Slip - ${monthLabel}.html`;
 
+  // Drafts stay hidden from staff; finalized slips are auto-published to the
+  // employee and carry the payment summary so it shows on their profile card.
+  const paymentFields = isDraft
+    ? {
+        is_visible_to_staff: false,
+        payment_date: null,
+        payment_reference: null,
+        payment_mode: null,
+        amount_paid: null,
+      }
+    : {
+        is_visible_to_staff: true,
+        payment_date: paymentDate || null,
+        payment_reference: paymentReference || null,
+        payment_mode: paidThrough || null,
+        amount_paid: amountPaidNum,
+      };
+
   if (existingDoc) {
     const { error: updateErr } = await supabase
       .from("staff_documents")
@@ -1278,6 +1314,7 @@ ${isDraft ? `
         file_url: fileUrl,
         uploaded_by: owner.id,
         uploaded_at: new Date().toISOString(),
+        ...paymentFields,
       })
       .eq("id", existingDoc.id);
 
@@ -1295,6 +1332,7 @@ ${isDraft ? `
         file_url: fileUrl,
         file_name: docFileName,
         uploaded_by: owner.id,
+        ...paymentFields,
       });
 
     if (insertErr) {

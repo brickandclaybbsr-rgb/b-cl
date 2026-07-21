@@ -12,6 +12,7 @@ import {
   Bell,
   Wallet,
   Receipt,
+  MapPin,
   type LucideIcon,
 } from "lucide-react";
 
@@ -43,6 +44,7 @@ export const OWNER_NAV: NavItem[] = [
   { label: "Stock", href: "/stock", icon: Package },
   { label: "Vendors", href: "/vendors", icon: ShoppingCart },
   { label: "Peoples", href: "/attendance", icon: Users, match: ["/attendance", "/reimbursements"] },
+  { label: "Outlets", href: "/owner/outlets", icon: MapPin },
   { label: "Settings", href: "/profile", icon: Settings, match: ["/profile", "/notifications"] },
 ];
 

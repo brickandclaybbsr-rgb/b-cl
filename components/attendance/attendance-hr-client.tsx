@@ -260,6 +260,7 @@ export function AttendanceHRClient({ staffList, initialLeaves, initialDocuments,
   const [finalizingDocId, setFinalizingDocId] = useState<string | null>(null);
   const [finalizePayDate, setFinalizePayDate] = useState("");
   const [finalizePayRef, setFinalizePayRef] = useState("");
+  const [finalizeAmount, setFinalizeAmount] = useState("");
   const [finalizeState, finalizeFormAction] = useFormState(finalizePayslip, {});
   const finalizeFormRef = useRef<HTMLFormElement>(null);
 
@@ -271,6 +272,7 @@ export function AttendanceHRClient({ staffList, initialLeaves, initialDocuments,
       setFinalizingDocId(null);
       setFinalizePayDate("");
       setFinalizePayRef("");
+      setFinalizeAmount("");
       window.location.reload();
     }
   }, [finalizeState]);
@@ -772,7 +774,7 @@ export function AttendanceHRClient({ staffList, initialLeaves, initialDocuments,
                               {isDraft && (
                                 <button
                                   type="button"
-                                  onClick={() => { setFinalizingDocId(isShowingFinalize ? null : doc.id); setFinalizePayDate(""); setFinalizePayRef(""); }}
+                                  onClick={() => { setFinalizingDocId(isShowingFinalize ? null : doc.id); setFinalizePayDate(""); setFinalizePayRef(""); setFinalizeAmount(""); }}
                                   className="px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-500/15 text-amber-300 hover:bg-amber-500/25 border border-amber-500/30 transition-colors"
                                   title="Finalize payslip"
                                 >
@@ -829,7 +831,7 @@ export function AttendanceHRClient({ staffList, initialLeaves, initialDocuments,
                             >
                               <input type="hidden" name="docId" value={doc.id} />
                               <p className="text-[10px] text-amber-400/80 flex items-center gap-1">
-                                <AlertCircle className="size-3" /> Enter payment details to generate the final payslip with confirmed advances.
+                                <AlertCircle className="size-3" /> Enter payment details to generate the final payslip with confirmed advances. Finalizing publishes it to the employee.
                               </p>
                               <div className="flex gap-2">
                                 <div className="flex-1">
@@ -853,6 +855,21 @@ export function AttendanceHRClient({ staffList, initialLeaves, initialDocuments,
                                     placeholder="UTR or Cheque No."
                                     value={finalizePayRef}
                                     onChange={(e) => setFinalizePayRef(e.target.value)}
+                                    className="text-xs py-1 h-7"
+                                  />
+                                </div>
+                              </div>
+                              <div className="flex gap-2">
+                                <div className="flex-1">
+                                  <Label className="text-[10px] text-content-secondary mb-1 block">Amount Paid (₹)</Label>
+                                  <Input
+                                    type="number"
+                                    name="amountPaid"
+                                    step="1"
+                                    min="0"
+                                    placeholder="Leave blank to use basic pay"
+                                    value={finalizeAmount}
+                                    onChange={(e) => setFinalizeAmount(e.target.value)}
                                     className="text-xs py-1 h-7"
                                   />
                                 </div>

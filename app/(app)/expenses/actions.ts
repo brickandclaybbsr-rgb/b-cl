@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { requireProfile } from "@/lib/auth";
+import { requireProfile, canDeleteFinancialRecords } from "@/lib/auth";
 import { todayIST } from "@/lib/date";
 
 export type ExpenseFormState = { ok?: boolean; error?: string };
@@ -119,6 +119,10 @@ export async function deleteCashExpense(
   _prev: ExpenseFormState,
   formData: FormData,
 ): Promise<ExpenseFormState> {
+  const profile = await requireProfile();
+  if (!canDeleteFinancialRecords(profile)) {
+    return { error: "You don't have permission to delete cash-out entries." };
+  }
   const id = String(formData.get("id") ?? "").trim();
   if (!id) return { error: "Missing id." };
   const supabase = createClient();

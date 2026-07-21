@@ -61,6 +61,7 @@ export default async function SalesPage({
             isOwner={isOwner}
             viewingDate={today}
             canDelete={canSeeYesterday}
+            canDeleteAll={isOwner || isHeadChef}
             previousGroups={previousGroups}
           />
         </div>
@@ -75,7 +76,7 @@ export default async function SalesPage({
           subtitle={isOwner ? "Today's cash out" : "Log cash withdrawals & expenses"}
         />
         <SalesTabs />
-        <ExpenseClient entries={entries} isOwner={isOwner} viewingDate={expenseDate} canDelete={canSeeYesterday} />
+        <ExpenseClient entries={entries} isOwner={isOwner} viewingDate={expenseDate} canDelete={canSeeYesterday} canDeleteAll={isOwner || isHeadChef} />
       </div>
     );
   }
