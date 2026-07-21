@@ -11,11 +11,8 @@ export const APP_START_DATE = "2026-06-14";
  * QR + geofence attendance rollout. Before this date the check-in gate is
  * dormant (staff use the app normally); on/after it, staff must scan an outlet
  * QR within its geofence before they can use the app for the day.
- *
- * ⚠️ TEMPORARILY set to 2026-07-22 for live testing on Pradosh's account.
- * Set this back to "2026-08-01" once testing is complete.
  */
-export const ATTENDANCE_ROLLOUT_DATE = "2026-07-22";
+export const ATTENDANCE_ROLLOUT_DATE = "2026-08-01";
 
 export type ChecklistType = "opening" | "closing";
 
