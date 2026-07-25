@@ -24,6 +24,8 @@ export interface NavItem {
   match?: string[];
 }
 
+// Staff bottom bar destinations. Profile lives in the header top-right; the QR
+// scan button is rendered as a raised button in the centre of the bottom bar.
 export const STAFF_NAV: NavItem[] = [
   { label: "Home", href: "/dashboard", icon: Home },
   {
@@ -34,7 +36,6 @@ export const STAFF_NAV: NavItem[] = [
   },
   { label: "Sales", href: "/sales", icon: IndianRupee },
   { label: "Store", href: "/stock", icon: Package, match: ["/stock", "/vendors"] },
-  { label: "Profile", href: "/profile", icon: Users, match: ["/profile", "/notifications"] },
 ];
 
 export const OWNER_NAV: NavItem[] = [

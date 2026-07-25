@@ -7,7 +7,7 @@ import { usePathname, useSearchParams } from "next/navigation";
 import type { Role } from "@/lib/database.types";
 import { BrandLogo } from "@/components/brand-logo";
 import { SignOutButton } from "./sign-out-button";
-import { Settings } from "lucide-react";
+import { Settings, QrCode } from "lucide-react";
 import { OWNER_NAV, OWNER_MOBILE_NAV, STAFF_NAV, INVENTORY_MANAGER_NAV, isActive, type NavItem } from "./nav-config";
 import { initials, cn } from "@/lib/utils";
 import { hapticLight } from "@/lib/native";
@@ -311,12 +311,28 @@ function StaffShell({
 }) {
   const pathname = usePathname();
   const nav = STAFF_NAV;
+  // Split the 4 destinations around the centred QR button: 2 left, 2 right.
+  const leftNav = nav.slice(0, 2);
+  const rightNav = nav.slice(2, 4);
+  const profileActive = pathname === "/profile" || pathname.startsWith("/notifications");
   return (
     <div className="flex min-h-dvh flex-col">
       <header className="sticky top-0 z-20 border-b border-border bg-bg-primary/80 backdrop-blur-xl pt-safe">
         <div className="container-app flex items-center justify-between py-3.5">
           <BrandLogo height={20} />
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-1.5">
+            <Link
+              href="/profile"
+              className={cn(
+                "flex size-8 items-center justify-center rounded-full text-xs font-bold transition-all duration-200",
+                profileActive
+                  ? "bg-white text-black ring-2 ring-white/30"
+                  : "bg-white/10 text-white hover:bg-white/20",
+              )}
+              title={`${name} — Profile`}
+            >
+              {initials(name)}
+            </Link>
             <SignOutButton label="" className="px-1.5" />
           </div>
         </div>
@@ -326,40 +342,56 @@ function StaffShell({
         {children}
       </main>
 
-      {/* Bottom navigation */}
+      {/* Bottom navigation — 2 tabs, centred QR scan button, 2 tabs */}
       <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-bg-card/90 pb-safe backdrop-blur-xl">
-        <div className="mx-auto grid max-w-2xl" style={{ gridTemplateColumns: `repeat(${nav.length}, minmax(0, 1fr))` }}>
-          {nav.map((item) => {
-            const active = isActive(item, pathname);
-            const Icon = item.icon;
-            return (
-              <Link
-                key={item.label}
-                href={item.href}
-                onClick={() => void hapticLight()}
-                className={cn(
-                  "relative flex flex-col items-center gap-1 py-3 text-[0.7rem] font-medium transition-colors duration-200",
-                  active ? "text-white" : "text-content-secondary",
-                )}
-              >
-                <span
-                  className={cn(
-                    "absolute top-0 h-0.5 w-8 rounded-full bg-white transition-all duration-300",
-                    active ? "opacity-100" : "opacity-0",
-                  )}
-                />
-                <Icon
-                  className={cn(
-                    "size-5 transition-transform duration-200",
-                    active && "-translate-y-px scale-105",
-                  )}
-                />
-                {item.label}
-              </Link>
-            );
-          })}
+        <div className="mx-auto grid max-w-2xl grid-cols-5 items-end">
+          {leftNav.map((item) => (
+            <BottomTab key={item.label} item={item} active={isActive(item, pathname)} />
+          ))}
+
+          {/* Centre QR scan button (raised) */}
+          <div className="flex justify-center">
+            <Link
+              href="/attendance/checkin"
+              onClick={() => void hapticLight()}
+              title="Scan QR"
+              className={cn(
+                "-mt-6 flex size-14 flex-col items-center justify-center rounded-full bg-fire text-white shadow-lg shadow-fire/30 ring-4 ring-bg-card transition-transform duration-200 active:scale-95",
+                pathname.startsWith("/attendance/checkin") && "scale-105",
+              )}
+            >
+              <QrCode className="size-6" />
+            </Link>
+          </div>
+
+          {rightNav.map((item) => (
+            <BottomTab key={item.label} item={item} active={isActive(item, pathname)} />
+          ))}
         </div>
       </nav>
     </div>
+  );
+}
+
+function BottomTab({ item, active }: { item: NavItem; active: boolean }) {
+  const Icon = item.icon;
+  return (
+    <Link
+      href={item.href}
+      onClick={() => void hapticLight()}
+      className={cn(
+        "relative flex flex-col items-center gap-1 py-3 text-[0.7rem] font-medium transition-colors duration-200",
+        active ? "text-white" : "text-content-secondary",
+      )}
+    >
+      <span
+        className={cn(
+          "absolute top-0 h-0.5 w-8 rounded-full bg-white transition-all duration-300",
+          active ? "opacity-100" : "opacity-0",
+        )}
+      />
+      <Icon className={cn("size-5 transition-transform duration-200", active && "-translate-y-px scale-105")} />
+      {item.label}
+    </Link>
   );
 }

@@ -7,12 +7,13 @@ import { QrCode, MapPin, Loader2, CheckCircle2, AlertCircle, Camera } from "luci
 import { checkIn } from "@/app/(app)/attendance/checkin-actions";
 import { SignOutButton } from "@/components/layout/sign-out-button";
 import { BrandLogo } from "@/components/brand-logo";
+import { cn } from "@/lib/utils";
 
 type Phase = "start" | "scanning" | "processing" | "success";
 
 const QR_REGION_ID = "qr-reader-region";
 
-export function CheckInScreen({ name }: { name: string }) {
+export function CheckInScreen({ name, redirectTo, embedded }: { name: string; redirectTo?: string; embedded?: boolean }) {
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const busyRef = useRef(false);
   const [phase, setPhase] = useState<Phase>("start");
@@ -90,7 +91,10 @@ export function CheckInScreen({ name }: { name: string }) {
             setOutletName(res.outletName || "");
             setPhase("success");
             toast.success("Attendance marked!");
-            setTimeout(() => window.location.reload(), 1300);
+            setTimeout(() => {
+              if (redirectTo) window.location.assign(redirectTo);
+              else window.location.reload();
+            }, 1300);
           } else {
             setError(res.error || "Check-in failed. Please try again.");
             setPhase("start");
@@ -112,10 +116,13 @@ export function CheckInScreen({ name }: { name: string }) {
   };
 
   return (
-    <div className="min-h-[100dvh] bg-bg-base flex flex-col items-center justify-center px-5 py-8">
+    <div className={cn(
+      "flex flex-col items-center justify-center px-5",
+      embedded ? "min-h-[70dvh] py-4" : "min-h-[100dvh] bg-bg-base py-8",
+    )}>
       <div className="w-full max-w-sm space-y-6">
         <div className="flex flex-col items-center gap-3 text-center">
-          <BrandLogo height={40} />
+          {!embedded && <BrandLogo height={40} />}
           <div>
             <h1 className="text-lg font-bold text-content-primary">Mark your attendance</h1>
             <p className="mt-1 text-sm text-content-secondary">
@@ -191,13 +198,15 @@ export function CheckInScreen({ name }: { name: string }) {
         )}
 
         <p className="text-center text-[11px] leading-relaxed text-content-secondary/70">
-          You must be physically present at the outlet to check in. Attendance is
-          required before you can use the app for the day.
+          You must be physically present at the outlet to check in.
+          {!embedded && " Attendance is required before you can use the app for the day."}
         </p>
 
-        <div className="flex justify-center pt-1">
-          <SignOutButton />
-        </div>
+        {!embedded && (
+          <div className="flex justify-center pt-1">
+            <SignOutButton />
+          </div>
+        )}
       </div>
     </div>
   );
