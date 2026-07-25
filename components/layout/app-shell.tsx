@@ -356,7 +356,7 @@ function StaffShell({
               onClick={() => void hapticLight()}
               title="Scan QR"
               className={cn(
-                "-mt-6 flex size-14 flex-col items-center justify-center rounded-full bg-fire text-white shadow-lg shadow-fire/30 ring-4 ring-bg-card transition-transform duration-200 active:scale-95",
+                "-mt-6 flex size-14 flex-col items-center justify-center rounded-full bg-white text-black shadow-lg shadow-black/40 ring-4 ring-bg-card transition-transform duration-200 active:scale-95",
                 pathname.startsWith("/attendance/checkin") && "scale-105",
               )}
             >

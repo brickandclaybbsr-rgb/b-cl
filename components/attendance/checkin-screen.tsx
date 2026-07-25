@@ -141,7 +141,7 @@ export function CheckInScreen({ name, redirectTo, embedded }: { name: string; re
               <button
                 type="button"
                 onClick={startScan}
-                className="flex w-full items-center justify-center gap-2 rounded-xl bg-fire py-3 text-sm font-bold text-white transition-opacity hover:opacity-90"
+                className="flex w-full items-center justify-center gap-2 rounded-xl bg-white py-3 text-sm font-bold text-black transition-opacity hover:opacity-90"
               >
                 <Camera className="size-4" /> Scan QR to check in
               </button>
