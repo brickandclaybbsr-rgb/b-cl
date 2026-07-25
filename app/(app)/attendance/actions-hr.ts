@@ -8,6 +8,7 @@ import { todayIST } from "@/lib/date";
 import { uploadPublicFile, deletePublicFile } from "@/lib/storage";
 import { whatsappNotify } from "@/lib/whatsapp-notify";
 import { notifyOwner, notifyStaff, sendPushToProfile } from "@/lib/push";
+import { SIGNATURE_DATA_URI, STAMP_DATA_URI } from "@/lib/payslip-assets";
 
 export type HRActionState = { ok?: boolean; error?: string; message?: string };
 
@@ -876,33 +877,13 @@ async function generatePayslipInternal(
     console.warn("Logo load failed:", logoErr);
   }
 
-  // Fetch Soumyashree Das signature and stamp directly from local filesystem
-  let signatureBase64 = "";
-  let stampBase64 = "";
+  // Soumyashree Das signature + company stamp — embedded as data URIs so they
+  // render in every environment (Vercel serverless has no local filesystem for
+  // these). See lib/payslip-assets.ts.
+  let signatureBase64 = SIGNATURE_DATA_URI;
+  let stampBase64 = STAMP_DATA_URI;
   let signatoryName = "Soumyashree Das";
   let signatoryTitle = "Managing Director";
-
-  try {
-    const fs = require('fs');
-    const localSigPath = "D:\\Brick & Clay\\Documents\\Signature Soumyashree Das.png";
-    if (fs.existsSync(localSigPath)) {
-      const sigBuffer = fs.readFileSync(localSigPath);
-      signatureBase64 = `data:image/png;base64,${sigBuffer.toString("base64")}`;
-    }
-  } catch (err) {
-    console.warn("Local signature load failed:", err);
-  }
-
-  try {
-    const fs = require('fs');
-    const localStampPath = "D:\\Brick & Clay\\Documents\\brick and Clay S Stamp.png";
-    if (fs.existsSync(localStampPath)) {
-      const stampBuffer = fs.readFileSync(localStampPath);
-      stampBase64 = `data:image/png;base64,${stampBuffer.toString("base64")}`;
-    }
-  } catch (err) {
-    console.warn("Local stamp load failed:", err);
-  }
 
   // Fallback signature resolution if local file is missing
   if (!signatureBase64) {
