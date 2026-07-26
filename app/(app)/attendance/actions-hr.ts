@@ -1086,7 +1086,10 @@ ${isDraft ? `
   ${logoBase64 ? `<img src="${logoBase64}" class="logo" alt="Brick and Clay">` : `<strong style="font-size: 20px; color: #ffffff; letter-spacing: 0.5px;">BRICK & CLAY</strong>`}
   <div class="co-info">
     <div class="co-name">SS BRICK AND CLAY PRIVATE LIMITED</div>
-    <div class="co-sub">C-3, Ground Floor, Inox Block, BMC Bhawani Mall, Saheed Nagar, Bhubaneswar, Odisha &ndash; 751007</div>
+    <div class="co-sub"><strong>Regd. Office:</strong> Plot No. A-17/13, Unit-7, Surya Nagar, Bhubaneswar, Khordha, Odisha &ndash; 751003</div>
+    <div class="co-sub"><strong>Outlet 1:</strong> C-3, Ground Floor, Inox Block, BMC Bhawani Mall, Saheed Nagar, Bhubaneswar, Odisha &ndash; 751007</div>
+    <div class="co-sub"><strong>Outlet 2:</strong> Plot No. 516/1755, A/2, Maruti Villa, 1st Floor, KIIT Square, Patia, PS-Infocity, Bhubaneswar, Odisha &ndash; 751024</div>
+    <div class="co-sub"><strong>CIN:</strong> U52590OR2022PTC040271</div>
   </div>
 </div>
 
@@ -1266,7 +1269,10 @@ ${isDraft ? `
   ${logoBase64 ? `<img src="${logoBase64}" class="logo" alt="Brick and Clay">` : `<strong style="font-size: 20px; color: #ffffff; letter-spacing: 0.5px;">BRICK & CLAY</strong>`}
   <div class="co-info">
     <div class="co-name">SS BRICK AND CLAY PRIVATE LIMITED</div>
-    <div class="co-sub">C-3, Ground Floor, Inox Block, BMC Bhawani Mall, Saheed Nagar, Bhubaneswar, Odisha &ndash; 751007</div>
+    <div class="co-sub"><strong>Regd. Office:</strong> Plot No. A-17/13, Unit-7, Surya Nagar, Bhubaneswar, Khordha, Odisha &ndash; 751003</div>
+    <div class="co-sub"><strong>Outlet 1:</strong> C-3, Ground Floor, Inox Block, BMC Bhawani Mall, Saheed Nagar, Bhubaneswar, Odisha &ndash; 751007</div>
+    <div class="co-sub"><strong>Outlet 2:</strong> Plot No. 516/1755, A/2, Maruti Villa, 1st Floor, KIIT Square, Patia, PS-Infocity, Bhubaneswar, Odisha &ndash; 751024</div>
+    <div class="co-sub"><strong>CIN:</strong> U52590OR2022PTC040271</div>
   </div>
 </div>
 
