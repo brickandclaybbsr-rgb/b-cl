@@ -10,7 +10,7 @@ import { whatsappNotify } from "@/lib/whatsapp-notify";
 import { notifyOwner, notifyStaff, sendPushToProfile } from "@/lib/push";
 import { SIGNATURE_DATA_URI, STAMP_DATA_URI } from "@/lib/payslip-assets";
 
-export type HRActionState = { ok?: boolean; error?: string; message?: string };
+export type HRActionState = { ok?: boolean; error?: string; message?: string; html?: string };
 
 // ── LEAVE MANAGEMENT ACTIONS ──────────────────────────────────────────────────
 
@@ -608,13 +608,84 @@ export async function finalizePayslip(
   }
 }
 
+/**
+ * Render a payslip live from CURRENT data (profile, advances, stored payment
+ * details) — no stale stored snapshot. Used by /api/payslip so any change to an
+ * employee's data or advances is reflected the next time the slip is opened.
+ * Enforces access: owner sees all; everyone else only their own visible slip.
+ */
+export async function renderLivePayslip(
+  docId: string,
+): Promise<{ html?: string; error?: string; status?: number }> {
+  try {
+    const profile = await requireProfile();
+    const supabase = createClient();
+
+    const { data: doc, error: docErr } = await supabase
+      .from("staff_documents")
+      .select("*")
+      .eq("id", docId)
+      .single();
+    if (docErr || !doc) return { error: "Payslip not found.", status: 404 };
+
+    // Access: staff may only view their own visible slip; owner sees all.
+    if (profile.role !== "owner") {
+      if (doc.profile_id !== profile.id || !doc.is_visible_to_staff) {
+        return { error: "Forbidden.", status: 403 };
+      }
+    }
+
+    const { data: employee, error: empErr } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("id", doc.profile_id)
+      .single();
+    if (empErr || !employee) return { error: "Employee profile not found.", status: 404 };
+
+    // Owner profile is only used for the signature fallback lookup.
+    const { data: owner } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("role", "owner")
+      .eq("is_active", true)
+      .limit(1)
+      .maybeSingle();
+
+    const isFinal = !!(doc.payment_date && doc.payment_reference);
+
+    const fd = new FormData();
+    fd.append("profileId", employee.id);
+    fd.append("month", doc.month || "");
+    fd.append("employeeCode", employee.employee_code || "");
+    fd.append("dob", employee.dob || "");
+    fd.append("aadhar", employee.aadhar_number || "");
+    fd.append("pan", employee.pan_number || "");
+    fd.append("basicPay", String(employee.basic_pay || 0));
+    fd.append("amountPaid", doc.amount_paid != null ? String(doc.amount_paid) : String(employee.basic_pay || 0));
+    fd.append("paidThrough", doc.payment_mode || employee.paid_through || "Cash");
+
+    const res = await generatePayslipInternal(supabase, owner || employee, employee, fd, {
+      isDraft: !isFinal,
+      paymentDate: doc.payment_date || undefined,
+      paymentReference: doc.payment_reference || undefined,
+      renderOnly: true,
+    });
+
+    if (res.error || !res.html) return { error: res.error || "Failed to render payslip.", status: 500 };
+    return { html: res.html };
+  } catch (err: any) {
+    console.error("renderLivePayslip exception:", err);
+    return { error: err.message || "Failed to render payslip.", status: 500 };
+  }
+}
+
 /** Private helper function to handle payslip generation logic for a single staff member */
 async function generatePayslipInternal(
   supabase: any,
   owner: any,
   employee: any,
   formData: FormData,
-  opts: { isDraft?: boolean; paymentDate?: string; paymentReference?: string } = {}
+  opts: { isDraft?: boolean; paymentDate?: string; paymentReference?: string; renderOnly?: boolean } = {}
 ): Promise<HRActionState> {
   const profileId = String(formData.get("profileId") ?? "").trim();
   const month = String(formData.get("month") ?? "").trim();
@@ -877,15 +948,15 @@ async function generatePayslipInternal(
     console.warn("Logo load failed:", logoErr);
   }
 
-  // Soumyashree Das signature + company stamp — embedded as data URIs so they
-  // render in every environment (Vercel serverless has no local filesystem for
-  // these). See lib/payslip-assets.ts.
-  let signatureBase64 = SIGNATURE_DATA_URI;
+  // Signature: prefer an uploaded signature (profiles.signature_url), then fall
+  // back to the embedded Soumyashree Das signature. Stamp is always embedded.
+  // See lib/payslip-assets.ts.
+  let signatureBase64 = "";
   let stampBase64 = STAMP_DATA_URI;
   let signatoryName = "Soumyashree Das";
   let signatoryTitle = "Managing Director";
 
-  // Fallback signature resolution if local file is missing
+  // Try an uploaded signature first (HR manager, else owner).
   if (!signatureBase64) {
     const { data: hrManagerProfile } = await supabase
       .from("profiles")
@@ -914,6 +985,9 @@ async function generatePayslipInternal(
     signatoryName = signatoryProfile?.name || "Soumyashree Das";
     signatoryTitle = signatoryProfile?.name === "Soumyashree Das" ? "Managing Director" : "Authorized Signatory";
   }
+
+  // No uploaded signature → use the embedded Soumyashree Das signature.
+  if (!signatureBase64) signatureBase64 = SIGNATURE_DATA_URI;
 
   // Helper to safely format dates from YYYY-MM-DD to DD/MM/YYYY
   const formatDateStr = (d: string | null | undefined) => {
@@ -1230,6 +1304,12 @@ ${isDraft ? `
 
 </body>
 </html>`;
+
+  // Live render path: return the freshly-built HTML without touching storage or
+  // the document record. Used by /api/payslip to render slips from current data.
+  if (opts.renderOnly) {
+    return { ok: true, html: htmlContent };
+  }
 
   // Save payslip to Supabase Storage (overwrites any existing one for the month)
   const filename = `payslip-${profileId}-${month}.html`;

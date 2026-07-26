@@ -1,41 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
-import { requireProfile } from "@/lib/auth";
+import { renderLivePayslip } from "@/app/(app)/attendance/actions-hr";
 
+/**
+ * Serves a payslip rendered LIVE from current data (profile, advances, payment
+ * details) — never a stale stored snapshot. Access control lives in
+ * renderLivePayslip (owner sees all; staff only their own visible slip).
+ */
 export async function GET(
   _req: NextRequest,
-  { params }: { params: { docId: string } }
+  { params }: { params: { docId: string } },
 ) {
   try {
-    const profile = await requireProfile();
-    if (!profile) {
-      return new NextResponse("Unauthorized", { status: 401 });
+    const { html, error, status } = await renderLivePayslip(params.docId);
+
+    if (error || !html) {
+      return new NextResponse(error || "Payslip not available", { status: status ?? 500 });
     }
-
-    const supabase = createClient();
-    const { data: doc, error } = await supabase
-      .from("staff_documents")
-      .select("file_url, profile_id, file_name, is_visible_to_staff")
-      .eq("id", params.docId)
-      .single();
-
-    if (error || !doc) {
-      return new NextResponse("Payslip not found", { status: 404 });
-    }
-
-    // Staff can only view their own visible payslips; owner can view all
-    if (profile.role !== "owner") {
-      if (doc.profile_id !== profile.id || !doc.is_visible_to_staff) {
-        return new NextResponse("Forbidden", { status: 403 });
-      }
-    }
-
-    const res = await fetch(doc.file_url);
-    if (!res.ok) {
-      return new NextResponse("Could not fetch payslip file", { status: 502 });
-    }
-
-    const html = await res.text();
 
     return new NextResponse(html, {
       status: 200,
