@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition, useRef, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { useFormState } from "react-dom";
 import { toast } from "sonner";
 import { Confetti } from "@/components/ui/confetti";
@@ -148,6 +149,7 @@ function calculateUsedLeaves(leaves: LeaveRequest[], profileId: string) {
 }
 
 export function AttendanceHRClient({ staffList, initialLeaves, initialDocuments, initialAdvances, ownerProfile, attendanceChild }: Props) {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<"attendance" | "leaves" | "documents" | "people" | "payroll">("people");
   const [reviewingLeaveId, setReviewingLeaveId] = useState<string | null>(null);
   const [managerNotes, setManagerNotes] = useState<string>("");
@@ -184,7 +186,7 @@ export function AttendanceHRClient({ staffList, initialLeaves, initialDocuments,
       toast.success(profileState.message || "Profile updated successfully!");
       setShowConfetti(true);
       setEditingStaffId(null);
-      window.location.reload();
+      router.refresh();
     }
   }, [profileState]);
 
@@ -225,7 +227,7 @@ export function AttendanceHRClient({ staffList, initialLeaves, initialDocuments,
       setShowConfetti(true);
       payslipFormRef.current?.reset();
       setSelectedStaffId("");
-      window.location.reload();
+      router.refresh();
     }
   }, [payslipState]);
 
@@ -238,7 +240,7 @@ export function AttendanceHRClient({ staffList, initialLeaves, initialDocuments,
     } else if (batchState.ok) {
       toast.success(batchState.message || "Batch payslips generated successfully!");
       setShowConfetti(true);
-      window.location.reload();
+      router.refresh();
     }
   }, [batchState]);
 
@@ -273,7 +275,7 @@ export function AttendanceHRClient({ staffList, initialLeaves, initialDocuments,
       setFinalizePayDate("");
       setFinalizePayRef("");
       setFinalizeAmount("");
-      window.location.reload();
+      router.refresh();
     }
   }, [finalizeState]);
 
@@ -285,7 +287,7 @@ export function AttendanceHRClient({ staffList, initialLeaves, initialDocuments,
     } else if (advanceState.ok) {
       toast.success(advanceState.message || "Advance saved!");
       advanceFormRef.current?.reset();
-      window.location.reload();
+      router.refresh();
     }
   }, [advanceState]);
 
@@ -299,7 +301,7 @@ export function AttendanceHRClient({ staffList, initialLeaves, initialDocuments,
       toast.success(sigState.message || "Signature uploaded!");
       setShowConfetti(true);
       sigFormRef.current?.reset();
-      window.location.reload();
+      router.refresh();
     }
   }, [sigState]);
   
@@ -318,7 +320,7 @@ export function AttendanceHRClient({ staffList, initialLeaves, initialDocuments,
         toast.success(res.message || `Leave ${status} successfully.`);
         setReviewingLeaveId(null);
         setManagerNotes("");
-        window.location.reload();
+        router.refresh();
       }
     });
   };
@@ -332,7 +334,7 @@ export function AttendanceHRClient({ staffList, initialLeaves, initialDocuments,
         toast.success(res.message || "Document uploaded!");
         fileFormRef.current?.reset();
         setDocType("appointment_letter");
-        window.location.reload();
+        router.refresh();
       }
     });
   };
@@ -345,7 +347,7 @@ export function AttendanceHRClient({ staffList, initialLeaves, initialDocuments,
         toast.error(res.error);
       } else {
         toast.success(res.message || "Document deleted.");
-        window.location.reload();
+        router.refresh();
       }
     });
   };
@@ -678,7 +680,7 @@ export function AttendanceHRClient({ staffList, initialLeaves, initialDocuments,
                                       const res = await deletePayrollAdvance(adv.id);
                                       setDeletingAdvanceId(null);
                                       if (res.error) toast.error(res.error);
-                                      else { toast.success("Advance deleted."); window.location.reload(); }
+                                      else { toast.success("Advance deleted."); router.refresh(); }
                                     });
                                   }}
                                   className="shrink-0 text-red-400 hover:text-red-300 transition-colors p-1 rounded"
@@ -790,7 +792,7 @@ export function AttendanceHRClient({ staffList, initialLeaves, initialDocuments,
                                     const res = await togglePayslipVisibility(doc.id, !isVisible);
                                     setTogglingDocId(null);
                                     if (res.error) toast.error(res.error);
-                                    else { toast.success(isVisible ? "Payslip hidden from staff." : "Payslip is now visible to staff."); window.location.reload(); }
+                                    else { toast.success(isVisible ? "Payslip hidden from staff." : "Payslip is now visible to staff."); router.refresh(); }
                                   });
                                 }}
                                 className={cn(
