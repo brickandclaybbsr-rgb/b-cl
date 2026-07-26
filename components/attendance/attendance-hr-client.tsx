@@ -1390,8 +1390,17 @@ export function AttendanceHRClient({ staffList, initialLeaves, initialDocuments,
                 (() => {
                   const staff = activeStaffList.find((s) => s.id === editingStaffId);
                   if (!staff) return null;
-                  
+
+                  const staffPayslips = initialDocuments
+                    .filter((d) => d.type === "salary_slip" && d.profile_id === staff.id)
+                    .sort((a, b) => (b.month || "").localeCompare(a.month || ""));
+                  const staffAdvances = initialAdvances
+                    .filter((a) => a.profile_id === staff.id)
+                    .sort((a, b) => (b.advance_date || b.month).localeCompare(a.advance_date || a.month));
+                  const staffAdvanceTotal = staffAdvances.reduce((sum, a) => sum + Number(a.amount), 0);
+
                   return (
+                    <div className="space-y-4">
                     <Card className="p-5 space-y-4 bg-white/[0.02] border-border/40 animate-fade-in">
                       <div className="flex items-center justify-between border-b border-border/20 pb-3 lg:border-0 lg:pb-0">
                         <div>
@@ -1581,6 +1590,137 @@ export function AttendanceHRClient({ staffList, initialLeaves, initialDocuments,
                         </div>
                       </form>
                     </Card>
+
+                    {/* ── Per-employee payroll hub ──────────────────────── */}
+                    <Card className="p-5 space-y-5 bg-white/[0.02] border-border/40 animate-fade-in">
+                      {/* Payslips */}
+                      <div className="space-y-2.5">
+                        <div className="flex items-center justify-between">
+                          <h4 className="font-bold text-[10px] uppercase tracking-wider text-warm">Salary Slips</h4>
+                          <button
+                            type="button"
+                            onClick={() => setActiveTab("payroll")}
+                            className="text-[10px] font-semibold text-warm hover:underline"
+                          >
+                            Generate / batch →
+                          </button>
+                        </div>
+                        {staffPayslips.length === 0 ? (
+                          <p className="text-xs text-content-secondary">No payslips yet. Use “Generate” in the Payroll tab.</p>
+                        ) : (
+                          <div className="space-y-1.5">
+                            {staffPayslips.map((doc) => {
+                              const isDraft = isDraftSlip(doc);
+                              const isVisible = doc.is_visible_to_staff;
+                              return (
+                                <div key={doc.id} className={cn(
+                                  "flex items-center gap-2 rounded-lg border px-3 py-2 text-xs",
+                                  isDraft ? "border-amber-500/30 bg-amber-500/[0.04]" : "border-border/30 bg-white/[0.01]",
+                                )}>
+                                  {isDraft ? <Clock className="size-3.5 text-amber-400 shrink-0" /> : <CheckCircle2 className="size-3.5 text-green-400 shrink-0" />}
+                                  <span className="font-semibold text-content-primary">{formatMonth(doc.month)}</span>
+                                  <Badge className={cn(
+                                    "text-[9px] uppercase py-0 px-1.5 border",
+                                    isDraft ? "bg-amber-500/15 text-amber-400 border-amber-500/30" : "bg-green-500/15 text-green-400 border-green-500/30",
+                                  )}>{isDraft ? "Draft" : "Final"}</Badge>
+                                  {isVisible
+                                    ? <Badge variant="success" className="text-[9px] uppercase py-0 px-1.5">Visible</Badge>
+                                    : <Badge variant="default" className="text-[9px] uppercase py-0 px-1.5 bg-bg-elevated text-content-secondary border border-border/30">Hidden</Badge>}
+                                  <div className="ml-auto flex items-center gap-1 shrink-0">
+                                    <button
+                                      type="button"
+                                      disabled={pending}
+                                      onClick={() => startTransition(async () => {
+                                        const res = await togglePayslipVisibility(doc.id, !isVisible);
+                                        if (res.error) toast.error(res.error);
+                                        else { toast.success(isVisible ? "Hidden from staff." : "Visible to staff."); router.refresh(); }
+                                      })}
+                                      className={cn("p-1 rounded transition-colors", isVisible ? "text-green-400 hover:text-green-300" : "text-content-secondary hover:text-content-primary")}
+                                      title={isVisible ? "Hide from staff" : "Make visible"}
+                                    >
+                                      {isVisible ? <Eye className="size-3.5" /> : <EyeOff className="size-3.5" />}
+                                    </button>
+                                    <a href={`/api/payslip/${doc.id}`} target="_blank" rel="noopener noreferrer" className="p-1 rounded text-content-secondary hover:text-content-primary transition-colors" title="View payslip">
+                                      <FileText className="size-3.5" />
+                                    </a>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setFinalizingDocId(doc.id);
+                                        setFinalizePayDate(doc.payment_date ?? "");
+                                        setFinalizePayRef(doc.payment_reference ?? "");
+                                        setFinalizeAmount(doc.amount_paid != null ? String(doc.amount_paid) : "");
+                                        setActiveTab("payroll");
+                                      }}
+                                      className="px-2 py-0.5 rounded text-[10px] font-semibold bg-bg-elevated text-content-secondary hover:text-content-primary border border-border/40 transition-colors"
+                                      title={isDraft ? "Finalize in Payroll tab" : "Edit payment details in Payroll tab"}
+                                    >
+                                      {isDraft ? "Finalize" : "Edit"}
+                                    </button>
+                                    <button type="button" disabled={pending} onClick={() => handleDeleteDoc(doc.id, doc.file_name)} className="p-1 rounded text-red-400 hover:text-red-300 transition-colors" title="Delete payslip">
+                                      <Trash2 className="size-3.5" />
+                                    </button>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Advances */}
+                      <div className="space-y-2.5 pt-1 border-t border-border/20">
+                        <div className="flex items-center justify-between">
+                          <h4 className="font-bold text-[10px] uppercase tracking-wider text-warm">Advances</h4>
+                          <span className="text-[10px] text-content-secondary">Total: <span className="font-bold text-content-primary">₹{staffAdvanceTotal.toLocaleString("en-IN")}</span></span>
+                        </div>
+                        {staffAdvances.length > 0 && (
+                          <div className="space-y-1.5">
+                            {staffAdvances.map((adv) => (
+                              <div key={adv.id} className="flex items-center gap-2 rounded-lg border border-border/30 bg-white/[0.01] px-3 py-2 text-xs">
+                                <span className="font-bold text-content-primary">₹{Number(adv.amount).toLocaleString("en-IN")}</span>
+                                <span className="text-content-secondary">
+                                  {adv.advance_date ? new Date(adv.advance_date + "T00:00:00").toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : formatMonth(adv.month)}
+                                </span>
+                                {adv.notes && <span className="text-content-secondary truncate">· {adv.notes}</span>}
+                                <button
+                                  type="button"
+                                  disabled={pending}
+                                  onClick={() => startTransition(async () => {
+                                    if (!confirm("Delete this advance?")) return;
+                                    const res = await deletePayrollAdvance(adv.id);
+                                    if (res.error) toast.error(res.error);
+                                    else { toast.success("Advance deleted."); router.refresh(); }
+                                  })}
+                                  className="ml-auto p-1 rounded text-red-400 hover:text-red-300 transition-colors"
+                                  title="Delete advance"
+                                >
+                                  <Trash2 className="size-3.5" />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {/* Add advance */}
+                        <form action={advanceFormAction} className="flex flex-wrap items-end gap-2 rounded-lg border border-border/30 bg-white/[0.015] p-2.5">
+                          <input type="hidden" name="profileId" value={staff.id} />
+                          <div className="space-y-1">
+                            <Label className="text-[9px] text-content-secondary">Amount (₹)</Label>
+                            <Input name="amount" type="number" min="1" step="1" required placeholder="5000" className="h-8 w-24 text-xs" />
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-[9px] text-content-secondary">Month</Label>
+                            <Input name="month" type="month" required defaultValue={new Date().toISOString().slice(0, 7)} style={{ colorScheme: "dark" }} className="h-8 text-xs" />
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-[9px] text-content-secondary">Date</Label>
+                            <Input name="advanceDate" type="date" style={{ colorScheme: "dark" }} className="h-8 text-xs" />
+                          </div>
+                          <SubmitButton pendingText="Adding…" className="h-8 px-3 text-[10px]">Add advance</SubmitButton>
+                        </form>
+                      </div>
+                    </Card>
+                    </div>
                   );
                 })()
               ) : (
