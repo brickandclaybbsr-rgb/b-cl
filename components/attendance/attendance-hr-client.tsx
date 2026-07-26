@@ -82,6 +82,10 @@ interface StaffDocument {
   file_name: string;
   uploaded_at: string;
   is_visible_to_staff: boolean;
+  payment_date?: string | null;
+  payment_reference?: string | null;
+  payment_mode?: string | null;
+  amount_paid?: number | null;
 }
 
 interface PayrollAdvance {
@@ -773,16 +777,29 @@ export function AttendanceHRClient({ staffList, initialLeaves, initialDocuments,
                               ) : (
                                 <Badge variant="default" className="text-[9px] uppercase py-0 px-1.5 bg-bg-elevated text-content-secondary border border-border/30">Hidden</Badge>
                               )}
-                              {isDraft && (
-                                <button
-                                  type="button"
-                                  onClick={() => { setFinalizingDocId(isShowingFinalize ? null : doc.id); setFinalizePayDate(""); setFinalizePayRef(""); setFinalizeAmount(""); }}
-                                  className="px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-500/15 text-amber-300 hover:bg-amber-500/25 border border-amber-500/30 transition-colors"
-                                  title="Finalize payslip"
-                                >
-                                  {isShowingFinalize ? "Cancel" : "Finalize"}
-                                </button>
-                              )}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (isShowingFinalize) {
+                                    setFinalizingDocId(null);
+                                  } else {
+                                    setFinalizingDocId(doc.id);
+                                    // Pre-fill from current values when editing a finalized slip.
+                                    setFinalizePayDate(doc.payment_date ?? "");
+                                    setFinalizePayRef(doc.payment_reference ?? "");
+                                    setFinalizeAmount(doc.amount_paid != null ? String(doc.amount_paid) : "");
+                                  }
+                                }}
+                                className={cn(
+                                  "px-2 py-0.5 rounded text-[10px] font-semibold border transition-colors",
+                                  isDraft
+                                    ? "bg-amber-500/15 text-amber-300 hover:bg-amber-500/25 border-amber-500/30"
+                                    : "bg-bg-elevated text-content-secondary hover:text-content-primary border-border/40",
+                                )}
+                                title={isDraft ? "Finalize payslip" : "Edit payment details"}
+                              >
+                                {isShowingFinalize ? "Cancel" : isDraft ? "Finalize" : "Edit"}
+                              </button>
                               <button
                                 type="button"
                                 disabled={pending || isToggling}
@@ -833,7 +850,10 @@ export function AttendanceHRClient({ staffList, initialLeaves, initialDocuments,
                             >
                               <input type="hidden" name="docId" value={doc.id} />
                               <p className="text-[10px] text-amber-400/80 flex items-center gap-1">
-                                <AlertCircle className="size-3" /> Enter payment details to generate the final payslip with confirmed advances. Finalizing publishes it to the employee.
+                                <AlertCircle className="size-3" />
+                                {isDraft
+                                  ? "Enter payment details to finalize and publish this payslip to the employee."
+                                  : "Edit the confirmed payment details. The employee's slip updates immediately."}
                               </p>
                               <div className="flex gap-2">
                                 <div className="flex-1">
@@ -880,7 +900,7 @@ export function AttendanceHRClient({ staffList, initialLeaves, initialDocuments,
                                     pendingText="Saving…"
                                     className="h-7 px-3 text-[10px] bg-amber-500 hover:bg-amber-400 text-black font-semibold"
                                   >
-                                    <CheckCircle2 className="size-3" /> Finalize
+                                    <CheckCircle2 className="size-3" /> {isDraft ? "Finalize" : "Update"}
                                   </SubmitButton>
                                 </div>
                               </div>
