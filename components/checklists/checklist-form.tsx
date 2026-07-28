@@ -38,6 +38,7 @@ export function ChecklistForm({
   hiddenFields,
   prevClosingBalance,
   reminderSales,
+  promptCheckout,
 }: {
   variant: "opening" | "closing";
   config: ChecklistItemDef[];
@@ -46,6 +47,8 @@ export function ChecklistForm({
   hiddenFields?: Record<string, string>;
   prevClosingBalance?: number;
   reminderSales?: boolean;
+  /** Closing only: employee is checked in but not out — send them to scan out. */
+  promptCheckout?: boolean;
 }) {
   // Kitchen team (incl. head chef, who maps to "kitchen") doesn't handle cash
   const showCashFields = team !== "kitchen";
@@ -74,6 +77,15 @@ export function ChecklistForm({
             .maybeSingle();
           if (!data) setShowReminder(true);
         }, 3000);
+        return () => clearTimeout(timer);
+      }
+
+      // Closing checklist done and still checked in → send them to the scanner
+      // to complete check-out.
+      if (variant === "closing" && promptCheckout) {
+        const timer = setTimeout(() => {
+          window.location.assign("/attendance/checkin");
+        }, 2500);
         return () => clearTimeout(timer);
       }
     }

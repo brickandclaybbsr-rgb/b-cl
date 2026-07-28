@@ -1,6 +1,7 @@
 import { requireProfile, isHeadChef } from "@/lib/auth";
+import { createClient } from "@/lib/supabase/server";
 import { todayIST, daysAgoIST, formatDateLabel, formatTimeIST } from "@/lib/date";
-import { APP_START_DATE } from "@/lib/constants";
+import { APP_START_DATE, ATTENDANCE_ROLLOUT_DATE } from "@/lib/constants";
 import {
   getChecklistConfig,
   getClosingChecklist,
@@ -26,6 +27,24 @@ export default async function ClosingChecklistPage({
 
   const isOwner = profile.role === "owner";
   const headChef = isHeadChef(profile);
+
+  // Staff who are checked in but haven't checked out are sent to the scanner
+  // once the closing checklist is submitted.
+  let promptCheckout = false;
+  if (!isOwner && date >= ATTENDANCE_ROLLOUT_DATE) {
+    try {
+      const supabase = createClient();
+      const { data: checkin } = await supabase
+        .from("attendance_checkins")
+        .select("checked_out_at")
+        .eq("profile_id", profile.id)
+        .eq("date", date)
+        .maybeSingle();
+      promptCheckout = !!checkin && !checkin.checked_out_at;
+    } catch {
+      promptCheckout = false;
+    }
+  }
   const kitchenEditMode = headChef && searchParams.edit === "1";
   // head_chef shares the kitchen checklist record
   const myTeam: "kitchen" | "front_desk" | null =
@@ -252,6 +271,7 @@ export default async function ClosingChecklistPage({
           action={submitClosingChecklist}
           team={myTeam}
           reminderSales={myTeam === "front_desk"}
+          promptCheckout={promptCheckout}
         />
       )}
 
