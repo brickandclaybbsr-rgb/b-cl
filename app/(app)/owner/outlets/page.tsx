@@ -3,8 +3,9 @@ import { ArrowLeft } from "lucide-react";
 import QRCode from "qrcode";
 import { requireOwner } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import type { Outlet } from "@/lib/database.types";
+import type { Outlet, QrCode as QrCodeRow } from "@/lib/database.types";
 import { OutletsClient } from "./outlets-client";
+import { QrCodesClient } from "./qr-codes-client";
 
 export const metadata = { title: "Outlets & QR Attendance" };
 
@@ -37,6 +38,29 @@ export default async function OutletsPage() {
     }
   }
 
+  // Non-attendance QR codes (review/training/survey/task/...) managed from
+  // the admin panel. Attendance QRs are managed via the outlet cards above.
+  let otherQrCodes: QrCodeRow[] = [];
+  try {
+    const { data } = await supabase
+      .from("qr_codes")
+      .select("*")
+      .neq("qr_type", "attendance")
+      .order("created_at", { ascending: false });
+    otherQrCodes = data ?? [];
+  } catch {
+    otherQrCodes = [];
+  }
+
+  const otherQrMap: Record<string, string> = {};
+  for (const q of otherQrCodes) {
+    try {
+      otherQrMap[q.id] = await QRCode.toDataURL(q.token, { width: 480, margin: 2, errorCorrectionLevel: "M" });
+    } catch {
+      otherQrMap[q.id] = "";
+    }
+  }
+
   return (
     <div className="container mx-auto max-w-3xl space-y-5 pb-16">
       <div className="flex items-center gap-3 pt-1">
@@ -55,6 +79,19 @@ export default async function OutletsPage() {
       </div>
 
       <OutletsClient initialOutlets={outlets} qrMap={qrMap} />
+
+      <div className="pt-4 border-t border-border/40">
+        <h2 className="text-sm font-bold text-content-primary mb-1">Other QR Codes</h2>
+        <p className="text-xs text-content-secondary mb-3">
+          Create QR codes for future workflows (staff review, training, survey, task…). The scanner
+          automatically recognises the type once scanned — no app update needed to add a new one.
+        </p>
+        <QrCodesClient
+          initialQrCodes={otherQrCodes}
+          qrMap={otherQrMap}
+          outlets={outlets.map((o) => ({ id: o.id, name: o.name }))}
+        />
+      </div>
     </div>
   );
 }
