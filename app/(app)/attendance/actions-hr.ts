@@ -9,6 +9,13 @@ import { uploadPublicFile, deletePublicFile } from "@/lib/storage";
 import { whatsappNotify } from "@/lib/whatsapp-notify";
 import { notifyOwner, notifyStaff, sendPushToProfile } from "@/lib/push";
 import { SIGNATURE_DATA_URI, STAMP_DATA_URI } from "@/lib/payslip-assets";
+import {
+  buildMonthAttendance,
+  leaveBalances,
+  sickLeaveUsedInYear,
+  CL_PER_MONTH,
+  SL_PER_YEAR,
+} from "@/lib/leave-policy";
 
 export type HRActionState = { ok?: boolean; error?: string; message?: string; html?: string };
 
@@ -759,7 +766,8 @@ async function generatePayslipInternal(
     .lte("start_date", endOfMonthStr)
     .gte("end_date", startOfMonthStr);
 
-  // 2. Fetch punches for this month
+  // 2. Attendance for this month — union of QR check-ins (current system) and
+  // legacy biometric punches (historical months imported from the machine).
   const { data: punches } = await supabase
     .from("attendance_punches")
     .select("date")
@@ -767,7 +775,34 @@ async function generatePayslipInternal(
     .gte("date", startOfMonthStr)
     .lte("date", endOfMonthStr);
 
-  const punchDates = new Set((punches ?? []).map((p: any) => p.date));
+  const attendedDates = new Set<string>((punches ?? []).map((p: any) => p.date));
+
+  try {
+    const { data: checkins } = await supabase
+      .from("attendance_checkins")
+      .select("date")
+      .eq("profile_id", profileId)
+      .gte("date", startOfMonthStr)
+      .lte("date", endOfMonthStr);
+    for (const c of checkins ?? []) attendedDates.add((c as any).date);
+  } catch {
+    // Table may not exist yet — fall back to punches only.
+  }
+
+  // Approved sick leave across the whole calendar year, for the 6/year balance.
+  let slUsedThisYear = 0;
+  try {
+    const { data: yearLeaves } = await supabase
+      .from("leaves")
+      .select("leave_type, start_date, end_date, status")
+      .eq("profile_id", profileId)
+      .eq("status", "approved")
+      .lte("start_date", `${year}-12-31`)
+      .gte("end_date", `${year}-01-01`);
+    slUsedThisYear = sickLeaveUsedInYear((yearLeaves ?? []) as any, year);
+  } catch {
+    slUsedThisYear = 0;
+  }
 
   // 2b. Fetch advance deductions for this staff member and month
   // In final mode: only deduct advances with advance_date <= paymentDate
@@ -832,58 +867,35 @@ async function generatePayslipInternal(
     (employee.name.toLowerCase().includes("biswajeet") || employee.name.toLowerCase().includes("kandi")) && 
     month === "2026-06";
 
-  let presentCount = 0;
-  let clCount = 0;
-  let slCount = 0;
-  let lwpCount = 0;
+  // Attendance, leave counts and unpaid days all come from the shared policy
+  // module so payroll, leave balances and reports can never disagree.
+  const summary = buildMonthAttendance({
+    year,
+    monthNum,
+    today: todayIST(),
+    leaves: (leaves ?? []) as any,
+    attendedDates,
+    assumePresent: isBiswajeetJune2026,
+  });
 
-  interface DayDetail {
-    dayNum: number;
-    class: string;
-    statusLabel: string;
-  }
+  const presentCount = summary.presentCount;
+  const clCount = summary.clCount;
+  const slCount = summary.slCount;
+  // Unpaid = approved LWP + unexplained absence. Future days are never unpaid.
+  const lwpCount = summary.unpaidCount;
 
-  const calendarDays: DayDetail[] = [];
+  const balances = leaveBalances({ clUsedThisMonth: clCount, slUsedThisYear });
 
-  for (let day = 1; day <= maxDay; day++) {
-    const dateStr = `${year}-${String(monthNum).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-    
-    // Check if covered by any leave
-    const leave = (leaves ?? []).find(
-      (l: any) => l.start_date <= dateStr && l.end_date >= dateStr
-    );
-
-    if (leave) {
-      const type = leave.leave_type; // 'cl', 'sl', 'lwp'
-      if (type === "cl") clCount++;
-      else if (type === "sl") slCount++;
-      else if (type === "lwp") lwpCount++;
-
-      calendarDays.push({
-        dayNum: day,
-        class: type === "cl" ? "cl-day" : type === "sl" ? "sl-day" : "lwp-day",
-        statusLabel: type.toUpperCase()
-      });
-    } else {
-      // Check punches
-      if (punchDates.has(dateStr) || isBiswajeetJune2026) {
-        presentCount++;
-        calendarDays.push({
-          dayNum: day,
-          class: "present",
-          statusLabel: ""
-        });
-      } else {
-        // Absent without leave counts as LWP
-        lwpCount++;
-        calendarDays.push({
-          dayNum: day,
-          class: "lwp-day",
-          statusLabel: "LWP"
-        });
-      }
+  const calendarDays = summary.days.map((d) => {
+    switch (d.status) {
+      case "cl":      return { dayNum: d.dayNum, class: "cl-day",  statusLabel: "CL" };
+      case "sl":      return { dayNum: d.dayNum, class: "sl-day",  statusLabel: "SL" };
+      case "lwp":     return { dayNum: d.dayNum, class: "lwp-day", statusLabel: "LWP" };
+      case "absent":  return { dayNum: d.dayNum, class: "lwp-day", statusLabel: "LWP" };
+      case "future":  return { dayNum: d.dayNum, class: "empty",   statusLabel: "" };
+      default:        return { dayNum: d.dayNum, class: "present", statusLabel: "" };
     }
-  }
+  });
 
   // 4. Calculate LWP deduction, advance deduction, and net salary
   const dailyRate = parseFloat(basicPay) / maxDay;
@@ -893,7 +905,7 @@ async function generatePayslipInternal(
   const totalAllAdvances = totalAdvance + totalNextMonthAdvance;
   const netSalary = Math.max(0, grossBeforeAdvance - totalAllAdvances);
   const amountPaidNum = amountPaid ? Math.max(0, parseFloat(amountPaid) - totalAllAdvances) : netSalary;
-  const cfCount = isBiswajeetJune2026 ? 2 : Math.max(0, 4 - clCount);
+  const cfCount = isBiswajeetJune2026 ? 2 : balances.clRemaining;
 
   // Build calendar grid HTML table rows
   const startDayOfWeek = startOfMonth.getDay(); // 0 = Sun, 1 = Mon, ..., 6 = Sat
@@ -1284,10 +1296,16 @@ ${isDraft ? `
 
   <div class="att-cards">
     <div class="att-card present"><div class="num">${presentCount}</div><div class="lbl">Days Present</div></div>
-    <div class="att-card cl"><div class="num">${clCount}</div><div class="lbl">Casual Leave</div></div>
+    <div class="att-card cl"><div class="num">${clCount}<span style="font-size:13px;color:#6b7280;">/${CL_PER_MONTH}</span></div><div class="lbl">Weekly Off / CL</div></div>
     <div class="att-card sl"><div class="num">${slCount}</div><div class="lbl">Sick Leave</div></div>
     <div class="att-card lwp"><div class="num">${lwpCount}</div><div class="lbl">LWP / Absent</div></div>
-    <div class="att-card cf"><div class="num">${cfCount}</div><div class="lbl">Carry Fwd</div></div>
+    <div class="att-card cf"><div class="num">${cfCount}</div><div class="lbl">CL Remaining</div></div>
+  </div>
+
+  <div style="margin-top:10px;font-size:10px;color:#6b7280;">
+    Sick leave used this year: <strong style="color:#111111;">${balances.slUsed}</strong> of ${SL_PER_YEAR}
+    &nbsp;&#183;&nbsp; Remaining: <strong style="color:#111111;">${balances.slRemaining}</strong>
+    &nbsp;&#183;&nbsp; Weekly Off / CL allowance: ${CL_PER_MONTH} per month
   </div>
 
   <div class="slbl">${monthLabel} &#8212; Daily Attendance Calendar</div>

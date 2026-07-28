@@ -28,6 +28,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select } from "@/components/ui/select";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { cn } from "@/lib/utils";
+import { CL_PER_YEAR, SL_PER_YEAR } from "@/lib/leave-policy";
 
 interface LeaveRequest {
   id: string;
@@ -111,8 +112,8 @@ function calculateOwnUsedLeaves(leaves: LeaveRequest[]) {
   return {
     clUsed,
     slUsed,
-    clRemaining: Math.max(0, 48 - clUsed),
-    slRemaining: Math.max(0, 6 - slUsed),
+    clRemaining: Math.max(0, CL_PER_YEAR - clUsed),
+    slRemaining: Math.max(0, SL_PER_YEAR - slUsed),
   };
 }
 

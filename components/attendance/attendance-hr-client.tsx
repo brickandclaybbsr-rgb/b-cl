@@ -25,6 +25,7 @@ import {
   AlertCircle
 } from "lucide-react";
 import { updateLeaveStatus, uploadStaffDocument, deleteStaffDocument, generatePayslip, generateBatchPayslips, updateStaffProfile, uploadOwnerSignature, savePayrollAdvance, deletePayrollAdvance, togglePayslipVisibility, finalizePayslip } from "@/app/(app)/attendance/actions-hr";
+import { CL_PER_YEAR, SL_PER_YEAR } from "@/lib/leave-policy";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -147,8 +148,8 @@ function calculateUsedLeaves(leaves: LeaveRequest[], profileId: string) {
     lwpUsed,
     clThisMonth,
     slThisMonth,
-    clRemaining: Math.max(0, 48 - clUsed),
-    slRemaining: Math.max(0, 6 - slUsed),
+    clRemaining: Math.max(0, CL_PER_YEAR - clUsed),
+    slRemaining: Math.max(0, SL_PER_YEAR - slUsed),
   };
 }
 
