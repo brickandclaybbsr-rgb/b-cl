@@ -63,6 +63,10 @@ export type Profile = {
   signature_url?: string | null;
   fcm_token?: string | null;
   team?: "kitchen" | "front_desk" | "head_chef" | null;
+  /** Outlet this employee is assigned to. Null = may mark attendance anywhere. */
+  outlet_id?: string | null;
+  /** Paid daily in cash, no app attendance/checklists (house helpers). */
+  is_house_helper?: boolean;
 };
 
 export type OpeningChecklist = {
@@ -294,6 +298,36 @@ export type AttendanceCheckin = {
   longitude: number | null;
   distance_m: number | null;
   created_at: string;
+  checked_out_at: string | null;
+  checkout_latitude: number | null;
+  checkout_longitude: number | null;
+  checkout_distance_m: number | null;
+};
+
+/**
+ * A typed QR code. One universal scanner resolves a scanned token to a row
+ * here and dispatches on `qr_type`, so new QR workflows are added as data
+ * (from the admin panel) rather than as scanner code changes.
+ */
+export type QrType =
+  | "attendance"
+  | "review"
+  | "training"
+  | "survey"
+  | "task";
+
+export type QrCode = {
+  id: string;
+  token: string;
+  qr_type: string;      // QrType, but kept open so new types need no code change
+  label: string;
+  action: string | null;
+  outlet_id: string | null;
+  metadata: Record<string, unknown>;
+  expires_at: string | null;
+  is_active: boolean;
+  created_by: string | null;
+  created_at: string;
 };
 
 /** A table definition in the shape supabase-js expects (incl. Relationships). */
@@ -328,6 +362,7 @@ export interface Database {
       cash_expenses: Table<CashExpense>;
       outlets: Table<Outlet>;
       attendance_checkins: Table<AttendanceCheckin>;
+      qr_codes: Table<QrCode>;
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;

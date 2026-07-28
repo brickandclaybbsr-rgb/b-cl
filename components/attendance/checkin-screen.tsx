@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Html5Qrcode } from "html5-qrcode";
 import { toast } from "sonner";
 import { QrCode, MapPin, Loader2, CheckCircle2, AlertCircle, Camera } from "lucide-react";
-import { checkIn } from "@/app/(app)/attendance/checkin-actions";
+import { handleScan } from "@/app/(app)/attendance/scan-actions";
 import { SignOutButton } from "@/components/layout/sign-out-button";
 import { BrandLogo } from "@/components/brand-logo";
 import { cn } from "@/lib/utils";
@@ -19,7 +19,8 @@ export function CheckInScreen({ name, redirectTo, embedded }: { name: string; re
   const [phase, setPhase] = useState<Phase>("start");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
-  const [outletName, setOutletName] = useState("");
+  const [resultTitle, setResultTitle] = useState("");
+  const [resultDetails, setResultDetails] = useState<string[]>([]);
 
   const stopScan = async () => {
     const s = scannerRef.current;
@@ -82,21 +83,22 @@ export function CheckInScreen({ name, redirectTo, embedded }: { name: string; re
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
         try {
-          const fd = new FormData();
-          fd.set("qr_token", token);
-          fd.set("latitude", String(pos.coords.latitude));
-          fd.set("longitude", String(pos.coords.longitude));
-          const res = await checkIn({}, fd);
+          const res = await handleScan(token, {
+            latitude: pos.coords.latitude,
+            longitude: pos.coords.longitude,
+          });
           if (res.ok) {
-            setOutletName(res.outletName || "");
+            setResultTitle(res.title || "Done");
+            setResultDetails(res.details || []);
             setPhase("success");
-            toast.success("Attendance marked!");
+            toast.success(res.title || "Done");
+            const target = res.redirectTo ?? redirectTo;
             setTimeout(() => {
-              if (redirectTo) window.location.assign(redirectTo);
+              if (target) window.location.assign(target);
               else window.location.reload();
-            }, 1300);
+            }, 1400);
           } else {
-            setError(res.error || "Check-in failed. Please try again.");
+            setError(res.error || "Scan failed. Please try again.");
             setPhase("start");
             busyRef.current = false;
           }
@@ -107,7 +109,7 @@ export function CheckInScreen({ name, redirectTo, embedded }: { name: string; re
         }
       },
       () => {
-        setError("Location access is required to check in. Enable location and try again.");
+        setError("Location access is required to mark attendance. Enable location and try again.");
         setPhase("start");
         busyRef.current = false;
       },
@@ -143,7 +145,7 @@ export function CheckInScreen({ name, redirectTo, embedded }: { name: string; re
                 onClick={startScan}
                 className="flex w-full items-center justify-center gap-2 rounded-xl bg-white py-3 text-sm font-bold text-black transition-opacity hover:opacity-90"
               >
-                <Camera className="size-4" /> Scan QR to check in
+                <Camera className="size-4" /> Scan QR
               </button>
             </div>
           )}
@@ -180,11 +182,11 @@ export function CheckInScreen({ name, redirectTo, embedded }: { name: string; re
             <div className="flex flex-col items-center gap-3 py-10 text-center">
               <CheckCircle2 className="size-12 text-green-400" />
               <div>
-                <p className="text-base font-bold text-content-primary">Checked in!</p>
-                {outletName && (
-                  <p className="mt-0.5 text-sm text-content-secondary">at {outletName}</p>
-                )}
-                <p className="mt-2 text-xs text-content-secondary">Opening your dashboard…</p>
+                <p className="text-base font-bold text-content-primary">{resultTitle}</p>
+                {resultDetails.map((line) => (
+                  <p key={line} className="mt-0.5 text-sm text-content-secondary">{line}</p>
+                ))}
+                <p className="mt-2 text-xs text-content-secondary">Taking you to the next step…</p>
               </div>
             </div>
           )}

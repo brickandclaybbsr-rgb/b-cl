@@ -129,6 +129,90 @@ export async function saveOutlet(
   }
 }
 
+// ── QR code registry management (owner only) ──────────────────────────────────
+
+/**
+ * Create a QR code of any type. New workflows are added as data here — the
+ * universal scanner dispatches on qr_type without code changes.
+ */
+export async function createQrCode(
+  _prev: OutletActionState,
+  formData: FormData,
+): Promise<OutletActionState> {
+  try {
+    await requireOwner();
+    const supabase = createClient();
+
+    const label = String(formData.get("label") ?? "").trim();
+    const qrType = String(formData.get("qr_type") ?? "").trim();
+    const action = String(formData.get("action") ?? "").trim();
+    const outletId = String(formData.get("outlet_id") ?? "").trim();
+    const expiresAt = String(formData.get("expires_at") ?? "").trim();
+
+    if (!label) return { error: "A label is required so you can identify this QR." };
+    if (!qrType) return { error: "Please choose a QR type." };
+    if (qrType === "attendance" && !outletId) {
+      return { error: "Attendance QR codes must be linked to an outlet." };
+    }
+
+    const { error } = await supabase.from("qr_codes").insert({
+      token: randomUUID(),
+      qr_type: qrType,
+      label,
+      action: action || null,
+      outlet_id: outletId || null,
+      expires_at: expiresAt ? new Date(expiresAt).toISOString() : null,
+      is_active: true,
+    });
+
+    if (error) return { error: error.message };
+    revalidatePath("/owner/outlets");
+    return { ok: true, message: `${label} created.` };
+  } catch (err: any) {
+    console.error("createQrCode exception:", err);
+    return { error: err.message || "An unexpected error occurred." };
+  }
+}
+
+/** Activate / deactivate a QR code (owner only). */
+export async function setQrCodeActive(
+  qrId: string,
+  isActive: boolean,
+): Promise<OutletActionState> {
+  try {
+    await requireOwner();
+    const supabase = createClient();
+    const { error } = await supabase
+      .from("qr_codes")
+      .update({ is_active: isActive })
+      .eq("id", qrId);
+    if (error) return { error: error.message };
+    revalidatePath("/owner/outlets");
+    return { ok: true };
+  } catch (err: any) {
+    return { error: err.message || "An unexpected error occurred." };
+  }
+}
+
+/** Delete a QR code (owner only). */
+export async function deleteQrCode(
+  _prev: OutletActionState,
+  formData: FormData,
+): Promise<OutletActionState> {
+  try {
+    await requireOwner();
+    const supabase = createClient();
+    const id = String(formData.get("id") ?? "").trim();
+    if (!id) return { error: "Missing QR id." };
+    const { error } = await supabase.from("qr_codes").delete().eq("id", id);
+    if (error) return { error: error.message };
+    revalidatePath("/owner/outlets");
+    return { ok: true };
+  } catch (err: any) {
+    return { error: err.message || "An unexpected error occurred." };
+  }
+}
+
 /** Delete an outlet (owner only). */
 export async function deleteOutlet(
   _prev: OutletActionState,
