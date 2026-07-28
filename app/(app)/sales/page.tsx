@@ -35,6 +35,7 @@ export default async function SalesPage({
     const rawDate = String(searchParams.date ?? "").trim();
     const expenseDate = (rawDate >= APP_START_DATE && rawDate <= today) ? rawDate : today;
     const isViewingToday = expenseDate === today;
+    const staffNames = (await getStaff()).filter((s) => s.role !== "owner").map((s) => s.name);
 
     if (isViewingToday) {
       const allRecent = await getRecentCashExpenses(7);
@@ -63,6 +64,7 @@ export default async function SalesPage({
             canDelete={canSeeYesterday}
             canDeleteAll={isOwner || isHeadChef}
             previousGroups={previousGroups}
+            staffNames={staffNames}
           />
         </div>
       );
@@ -76,7 +78,7 @@ export default async function SalesPage({
           subtitle={isOwner ? "Today's cash out" : "Log cash withdrawals & expenses"}
         />
         <SalesTabs />
-        <ExpenseClient entries={entries} isOwner={isOwner} viewingDate={expenseDate} canDelete={canSeeYesterday} canDeleteAll={isOwner || isHeadChef} />
+        <ExpenseClient entries={entries} isOwner={isOwner} viewingDate={expenseDate} canDelete={canSeeYesterday} canDeleteAll={isOwner || isHeadChef} staffNames={staffNames} />
       </div>
     );
   }

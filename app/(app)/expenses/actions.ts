@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireProfile, canDeleteFinancialRecords } from "@/lib/auth";
 import { todayIST } from "@/lib/date";
+import { syncAdvanceOnInsert, syncAdvanceOnUpdate } from "@/lib/advance-linking";
 
 export type ExpenseFormState = { ok?: boolean; error?: string };
 
@@ -33,19 +34,32 @@ export async function addCashExpense(
   // Only allow today or past dates (no future filing)
   const date = (dateRaw && dateRaw <= today) ? dateRaw : today;
 
-  const { error } = await supabase.from("cash_expenses").insert({
-    date,
-    person_name,
-    amount,
-    category: category,
-    notes: notes || null,
-    submitted_by: profile.id,
-  });
+  const { data: inserted, error } = await supabase
+    .from("cash_expenses")
+    .insert({
+      date,
+      person_name,
+      amount,
+      category: category,
+      notes: notes || null,
+      submitted_by: profile.id,
+    })
+    .select("id, category, person_name, amount, date, notes")
+    .single();
 
   if (error) return { error: error.message };
 
+  if (inserted) {
+    try {
+      await syncAdvanceOnInsert(supabase, inserted, profile.id);
+    } catch (err) {
+      console.warn("syncAdvanceOnInsert failed:", err);
+    }
+  }
+
   revalidatePath("/sales");
   revalidatePath("/owner");
+  revalidatePath("/attendance");
   return { ok: true };
 }
 
@@ -53,7 +67,7 @@ export async function updateCashExpense(
   _prev: ExpenseFormState,
   formData: FormData,
 ): Promise<ExpenseFormState> {
-  await requireProfile();
+  const profile = await requireProfile();
   const id = String(formData.get("id") ?? "").trim();
   if (!id) return { error: "Missing id." };
 
@@ -75,9 +89,17 @@ export async function updateCashExpense(
     .eq("id", id);
 
   if (error) return { error: error.message };
+
+  try {
+    await syncAdvanceOnUpdate(supabase, id, { category, person_name, amount, notes: notes || null }, profile.id);
+  } catch (err) {
+    console.warn("syncAdvanceOnUpdate failed:", err);
+  }
+
   revalidatePath("/sales");
   revalidatePath("/owner");
   revalidatePath("/owner/cashout");
+  revalidatePath("/attendance");
   return { ok: true };
 }
 
@@ -108,10 +130,23 @@ export async function addMultipleCashExpenses(
   }
 
   if (!inserts.length) return { error: "No valid entries to save." };
-  const { error } = await supabase.from("cash_expenses").insert(inserts);
+  const { data: insertedRows, error } = await supabase
+    .from("cash_expenses")
+    .insert(inserts)
+    .select("id, category, person_name, amount, date, notes");
   if (error) return { error: error.message };
+
+  for (const row of insertedRows ?? []) {
+    try {
+      await syncAdvanceOnInsert(supabase, row, profile.id);
+    } catch (err) {
+      console.warn("syncAdvanceOnInsert (batch) failed:", err);
+    }
+  }
+
   revalidatePath("/sales");
   revalidatePath("/owner");
+  revalidatePath("/attendance");
   return { ok: true };
 }
 

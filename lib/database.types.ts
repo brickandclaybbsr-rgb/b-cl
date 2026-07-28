@@ -264,6 +264,8 @@ export type PayrollAdvance = {
   advance_date: string | null; // YYYY-MM-DD
   recorded_by: string | null;
   created_at: string;
+  /** Set when this advance was auto-created from a cash-out "Advance" entry. */
+  cash_expense_id?: string | null;
 };
 
 export type CashExpense = {
@@ -275,6 +277,8 @@ export type CashExpense = {
   notes: string | null;
   submitted_by: string | null;
   submitted_at: string;
+  /** Set automatically when an "advance" entry's name matches a staff profile. */
+  profile_id?: string | null;
 };
 
 export type Outlet = {

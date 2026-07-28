@@ -69,6 +69,7 @@ export function ExpenseClient({
   canDelete,
   canDeleteAll,
   previousGroups,
+  staffNames = [],
 }: {
   entries: CashExpense[];
   isOwner: boolean;
@@ -77,6 +78,8 @@ export function ExpenseClient({
   /** Unrestricted delete (owner or head chef) — no time-window limit. */
   canDeleteAll?: boolean;
   previousGroups?: { date: string; entries: CashExpense[] }[];
+  /** Staff names for the Advance autocomplete — must match a profile name exactly to auto-link to payroll. */
+  staffNames?: string[];
 }) {
   const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
   const isToday = viewingDate === today;
@@ -147,6 +150,11 @@ export function ExpenseClient({
     <>
       <Confetti active={showConfetti} />
 
+      {/* Shared name suggestions for the Advance category — auto-linking requires an exact match. */}
+      <datalist id="staff-names-list">
+        {staffNames.map((n) => <option key={n} value={n} />)}
+      </datalist>
+
       {/* ── Date picker ──────────────────────────────────────────────────── */}
       <div className="relative flex items-center gap-3 rounded-xl border border-border bg-bg-elevated px-4 py-3.5 cursor-pointer">
         <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-fire/15">
@@ -200,12 +208,18 @@ export function ExpenseClient({
 
                 {/* Person / Purpose */}
                 <Input
-                  placeholder="Person / Purpose"
+                  placeholder={row.category === "advance" ? "Employee name (must match exactly)" : "Person / Purpose"}
                   value={row.personName}
+                  list={row.category === "advance" ? "staff-names-list" : undefined}
                   onChange={(e) =>
                     setRows((r) => r.map((x, idx) => idx === i ? { ...x, personName: e.target.value } : x))
                   }
                 />
+                {row.category === "advance" && (
+                  <p className="text-[10px] text-content-secondary -mt-1">
+                    Type the employee's exact name to auto-link this to their payroll and salary slip.
+                  </p>
+                )}
 
                 {/* Amount + Type */}
                 <div className="grid grid-cols-2 gap-2">
@@ -318,6 +332,7 @@ export function ExpenseClient({
                   name="person_name"
                   placeholder="e.g. Satya Sir, John Sir, Grocery run"
                   autoComplete="off"
+                  list="staff-names-list"
                 />
               </div>
               <div className="grid grid-cols-2 gap-3">
