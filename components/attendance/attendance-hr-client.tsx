@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition, useRef, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useFormState } from "react-dom";
 import { toast } from "sonner";
 import { Confetti } from "@/components/ui/confetti";
@@ -195,7 +195,19 @@ function calculateUsedLeaves(leaves: LeaveRequest[], profileId: string) {
 
 export function AttendanceHRClient({ staffList, initialLeaves, initialDocuments, initialAdvances, ownerProfile, attendanceChild, outlets = [], initialHouseHelperPayments = [], initialPayrollOverrides = [] }: Props) {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<"attendance" | "leaves" | "documents" | "people" | "payroll">("people");
+  const searchParams = useSearchParams();
+  type TabKey = "attendance" | "leaves" | "documents" | "people" | "payroll";
+  const VALID_TABS: TabKey[] = ["people", "attendance", "leaves", "payroll", "documents"];
+  const tabFromUrl = searchParams.get("tab");
+  const activeTab: TabKey = (VALID_TABS as string[]).includes(tabFromUrl ?? "")
+    ? (tabFromUrl as TabKey)
+    : "people";
+  // Each section gets its own URL (?tab=…) — bookmarkable, works with the
+  // browser back/forward buttons, and reads like separate admin panel pages
+  // without the risk of physically splitting this component apart.
+  const setActiveTab = (tab: TabKey) => {
+    router.push(`/attendance?tab=${tab}`, { scroll: false });
+  };
   const [reviewingLeaveId, setReviewingLeaveId] = useState<string | null>(null);
   const [managerNotes, setManagerNotes] = useState<string>("");
   const [showConfetti, setShowConfetti] = useState(false);
