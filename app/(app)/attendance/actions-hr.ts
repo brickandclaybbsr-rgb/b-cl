@@ -880,8 +880,20 @@ async function generatePayslipInternal(
   }
 
   // 3. Build Daily Calendar & Count Stats
-  const isBiswajeetJune2026 = 
-    (employee.name.toLowerCase().includes("biswajeet") || employee.name.toLowerCase().includes("kandi")) && 
+  const isBiswajeetJune2026 =
+    (employee.name.toLowerCase().includes("biswajeet") || employee.name.toLowerCase().includes("kandi")) &&
+    month === "2026-06";
+
+  // One-off manual corrections for June 2026 where the owner's authoritative
+  // figures don't map onto whole-day leave/attendance records (the DB only
+  // stores whole days). These override the DISPLAYED stats and, for Manoj,
+  // the LWP deduction math — the underlying leave/attendance rows are left as
+  // the closest whole-day equivalent for audit purposes.
+  const isPradoshJune2026 =
+    employee.name.toLowerCase().includes("pradosh") && month === "2026-06";
+  const isManojJune2026 =
+    employee.name.toLowerCase().includes("manoj") &&
+    (employee.name.toLowerCase().includes("naik") || employee.name.toLowerCase().includes("nayak")) &&
     month === "2026-06";
 
   // Attendance, leave counts and unpaid days all come from the shared policy
@@ -914,10 +926,31 @@ async function generatePayslipInternal(
     }
   });
 
+  // Pradosh June 2026: day 25 is a neutral "Carry Forward" day — paid, not
+  // deducted, but also not counted in the Present tally (matches the owner's
+  // manually-supplied figures exactly; net salary is unaffected either way).
+  if (isPradoshJune2026) {
+    const cfDay = calendarDays.find((c) => c.dayNum === 25);
+    if (cfDay) { cfDay.class = "cf-day"; cfDay.statusLabel = "CF"; }
+  }
+  // Manoj June 2026: day 30 is a half-present / half-LWP day — the schema
+  // only stores whole days, so it's recorded as LWP; label it distinctly here.
+  if (isManojJune2026) {
+    const halfDay = calendarDays.find((c) => c.dayNum === 30);
+    if (halfDay) { halfDay.statusLabel = "½ LWP"; }
+  }
+
+  // Display-only overrides for the two June 2026 corrections above — the
+  // underlying leave/attendance rows stay as the closest whole-day equivalent.
+  const presentCountDisplay = isPradoshJune2026 ? 24 : isManojJune2026 ? 18.5 : presentCount;
+  const lwpCountDisplay = isManojJune2026 ? 5.5 : lwpCount;
+
   // 4. Calculate LWP deduction, advance deduction, and net salary
   const dailyRate = parseFloat(basicPay) / maxDay;
   const extraDutyPayment = isBiswajeetJune2026 ? 13 * dailyRate : 0;
-  const lwpDeduction = lwpCount * dailyRate;
+  // Manoj's deduction uses the fractional 5.5-day figure so net salary lands
+  // on the owner's exact ₹4,800 rather than the whole-day approximation.
+  const lwpDeduction = (isManojJune2026 ? 5.5 : lwpCount) * dailyRate;
   const grossBeforeAdvance = Math.max(0, parseFloat(basicPay) + extraDutyPayment - lwpDeduction);
   const totalAllAdvances = totalAdvance + totalNextMonthAdvance;
   const netSalary = Math.max(0, grossBeforeAdvance - totalAllAdvances);
@@ -1197,7 +1230,7 @@ ${isDraft ? `
       ${lwpCount > 0 ? `
       <tr>
         <td>Leave Without Pay (LWP)</td>
-        <td>${lwpCount} days &times; ₹${formatCurr(dailyRate)}/day</td>
+        <td>${lwpCountDisplay} days &times; ₹${formatCurr(dailyRate)}/day</td>
         <td class="deduct">&#8722; ₹${formatCurr(lwpDeduction)}</td>
       </tr>
       ` : `
@@ -1243,7 +1276,7 @@ ${isDraft ? `
     <tfoot>
       <tr class="net-row">
         <td class="net-lbl">Net Salary (Hand Salary)</td>
-        <td><strong>${presentCount} days present</strong></td>
+        <td><strong>${presentCountDisplay} days present</strong></td>
         <td class="net-amt">₹${formatCurr(netSalary)}</td>
       </tr>
     </tfoot>
@@ -1318,10 +1351,10 @@ ${isDraft ? `
   </div>
 
   <div class="att-cards">
-    <div class="att-card present"><div class="num">${presentCount}</div><div class="lbl">Days Present</div></div>
+    <div class="att-card present"><div class="num">${presentCountDisplay}</div><div class="lbl">Days Present</div></div>
     <div class="att-card cl"><div class="num">${clCount}<span style="font-size:13px;color:#6b7280;">/${CL_PER_MONTH}</span></div><div class="lbl">Weekly Off / CL</div></div>
     <div class="att-card sl"><div class="num">${slCount}</div><div class="lbl">Sick Leave</div></div>
-    <div class="att-card lwp"><div class="num">${lwpCount}</div><div class="lbl">LWP / Absent</div></div>
+    <div class="att-card lwp"><div class="num">${lwpCountDisplay}</div><div class="lbl">LWP / Absent</div></div>
     <div class="att-card cf"><div class="num">${cfCount}</div><div class="lbl">CL Remaining</div></div>
   </div>
 
@@ -1341,6 +1374,7 @@ ${isDraft ? `
     <div class="legend-item"><div class="legend-dot" style="background:#f8fafc;border-color:#bfdbfe;"></div><span>CL (Casual Leave / Weekly Off)</span></div>
     <div class="legend-item"><div class="legend-dot" style="background:#fcfbfe;border-color:#ddd6fe;"></div><span>SL (Sick Leave)</span></div>
     <div class="legend-item"><div class="legend-dot" style="background:#fffafb;border-color:#fecaca;"></div><span>LWP (Leave Without Pay / Absent)</span></div>
+    ${isPradoshJune2026 ? `<div class="legend-item"><div class="legend-dot" style="background:#fffdf9;border-color:#fde68a;"></div><span>CF (Carry Forward — paid, not counted as present)</span></div>` : ""}
   </div>
 
   <div class="footer-note" style="margin-top: 30px;">
