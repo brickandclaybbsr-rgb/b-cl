@@ -728,6 +728,23 @@ async function generatePayslipInternal(
     }
   }
 
+  // Resolve assigned outlet name (profiles.outlet_id)
+  let assignedOutletName = "Not Assigned";
+  if (employee.outlet_id) {
+    const { data: outletRow } = await supabase
+      .from("outlets")
+      .select("name")
+      .eq("id", employee.outlet_id)
+      .maybeSingle();
+    if (outletRow) assignedOutletName = outletRow.name;
+  }
+
+  const teamLabel =
+    employee.team === "head_chef" ? "Head Chef / Kitchen"
+    : employee.team === "kitchen" ? "Kitchen"
+    : employee.team === "front_desk" ? "Front Desk"
+    : "Not Assigned";
+
   // Update staff profile with these details so they persist for next month
   const { error: profileUpdateErr } = await supabase
     .from("profiles")
@@ -1147,6 +1164,12 @@ ${isDraft ? `
       <td class="lbl">Working Hours</td>
       <td class="val">${employee.working_hours || "Not Provided"}</td>
     </tr>
+    <tr>
+      <td class="lbl">Assigned Outlet</td>
+      <td class="val">${assignedOutletName}</td>
+      <td class="lbl">Department</td>
+      <td class="val">${teamLabel}</td>
+    </tr>
   </table>
 
   <div class="slbl">Earnings &amp; Deductions</div>
@@ -1321,7 +1344,7 @@ ${isDraft ? `
   </div>
 
   <div class="footer-note" style="margin-top: 30px;">
-    This is an audit report compiled from official biometric punches and approved leave database.
+    This is an audit report compiled from QR attendance check-ins and the approved leave database.
     SS Brick and Clay Private Limited &#183; ${monthLabel}
   </div>
 </div>
@@ -1465,6 +1488,8 @@ export async function updateStaffProfile(
     const reportingAuthority = String(formData.get("reportingAuthority") ?? "").trim();
     const teamRaw = String(formData.get("team") ?? "").trim();
     const team = teamRaw === "kitchen" || teamRaw === "front_desk" || teamRaw === "head_chef" ? teamRaw : null;
+    const outletId = String(formData.get("outletId") ?? "").trim();
+    const isHouseHelper = String(formData.get("isHouseHelper") ?? "false") === "true";
 
     const aadharFile = formData.get("aadharFile") as File | null;
     const panFile = formData.get("panFile") as File | null;
@@ -1497,6 +1522,8 @@ export async function updateStaffProfile(
         employment_type: employmentType || null,
         reporting_authority: reportingAuthority || null,
         team,
+        outlet_id: outletId || null,
+        is_house_helper: isHouseHelper,
       })
       .eq("id", profileId);
 

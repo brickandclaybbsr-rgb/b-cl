@@ -60,6 +60,13 @@ interface StaffProfile {
   signature_url?: string | null;
   biometric_pin?: string | null;
   biometric_name?: string | null;
+  outlet_id?: string | null;
+  is_house_helper?: boolean;
+}
+
+interface OutletOption {
+  id: string;
+  name: string;
 }
 
 interface LeaveRequest {
@@ -106,6 +113,7 @@ interface Props {
   initialAdvances: PayrollAdvance[];
   ownerProfile: StaffProfile | null;
   attendanceChild: React.ReactNode;
+  outlets?: OutletOption[];
 }
 
 function getDurationInDays(startDateStr: string, endDateStr: string): number {
@@ -153,7 +161,7 @@ function calculateUsedLeaves(leaves: LeaveRequest[], profileId: string) {
   };
 }
 
-export function AttendanceHRClient({ staffList, initialLeaves, initialDocuments, initialAdvances, ownerProfile, attendanceChild }: Props) {
+export function AttendanceHRClient({ staffList, initialLeaves, initialDocuments, initialAdvances, ownerProfile, attendanceChild, outlets = [] }: Props) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<"attendance" | "leaves" | "documents" | "people" | "payroll">("people");
   const [reviewingLeaveId, setReviewingLeaveId] = useState<string | null>(null);
@@ -1540,6 +1548,24 @@ export function AttendanceHRClient({ staffList, initialLeaves, initialDocuments,
                             <div className="space-y-1.5">
                               <Label htmlFor="edit-hours">Working Hours</Label>
                               <Input id="edit-hours" name="workingHours" defaultValue={staff.working_hours || ""} placeholder="e.g. 9:00 AM - 6:00 PM" />
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="space-y-1.5">
+                              <Label htmlFor="edit-outlet">Assigned Outlet</Label>
+                              <Select id="edit-outlet" name="outletId" defaultValue={staff.outlet_id || ""}>
+                                <option value="">Any outlet (unassigned)</option>
+                                {outlets.map((o) => (
+                                  <option key={o.id} value={o.id}>{o.name}</option>
+                                ))}
+                              </Select>
+                            </div>
+                            <div className="space-y-1.5">
+                              <Label htmlFor="edit-house-helper">Attendance Type</Label>
+                              <Select id="edit-house-helper" name="isHouseHelper" defaultValue={staff.is_house_helper ? "true" : "false"}>
+                                <option value="false">QR Attendance (normal staff)</option>
+                                <option value="true">House Helper (manual, cash-paid)</option>
+                              </Select>
                             </div>
                           </div>
                           <div className="grid grid-cols-2 gap-3">

@@ -68,6 +68,19 @@ export default async function AttendancePage() {
     console.warn("Failed to fetch payroll advances (table may not exist yet):", err);
   }
 
+  let outlets: { id: string; name: string }[] = [];
+  try {
+    const { data: outletsData, error: outletsErr } = await supabase
+      .from("outlets")
+      .select("id, name")
+      .order("name", { ascending: true });
+    if (!outletsErr && outletsData) {
+      outlets = outletsData;
+    }
+  } catch (err) {
+    console.warn("Failed to fetch outlets (table may not exist yet):", err);
+  }
+
   return (
     <div className="container mx-auto">
       <AttendanceHRClient
@@ -75,6 +88,7 @@ export default async function AttendancePage() {
         initialLeaves={leaves}
         initialDocuments={documents}
         initialAdvances={advances}
+        outlets={outlets}
         ownerProfile={currentProfile}
         attendanceChild={
           <AttendanceClient
