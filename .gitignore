@@ -53,3 +53,9 @@ yarn-error.log*
 B&CL OPS - Google Play package/
 *.keystore
 *.jks
+
+# CRITICAL: never ignore the signing-key backup folder, even though it holds
+# .jks/.keystore/.pem files — this is the ONE durable, version-controlled
+# backup of the Google Play upload key. Losing it once already cost days.
+!/signing-keys-DO-NOT-DELETE/
+!/signing-keys-DO-NOT-DELETE/**
