@@ -616,6 +616,89 @@ export async function finalizePayslip(
 }
 
 /**
+ * Save (create or update) a manual payroll override for one employee/month.
+ * Any field left blank in the form is stored as null, meaning "use the
+ * computed value" — the owner only needs to fill in what's actually different
+ * from what attendance/leave records would otherwise produce.
+ */
+export async function savePayrollOverride(
+  _prev: HRActionState,
+  formData: FormData,
+): Promise<HRActionState> {
+  try {
+    const owner = await requireOwner();
+    const supabase = createClient();
+
+    const profileId = String(formData.get("profileId") ?? "").trim();
+    const month = String(formData.get("month") ?? "").trim();
+    if (!profileId || !month) return { error: "Missing employee or month." };
+
+    const num = (key: string) => {
+      const raw = String(formData.get(key) ?? "").trim();
+      if (raw === "") return null;
+      const n = parseFloat(raw);
+      return isNaN(n) ? null : n;
+    };
+    const str = (key: string) => {
+      const raw = String(formData.get(key) ?? "").trim();
+      return raw === "" ? null : raw;
+    };
+
+    const { error } = await supabase.from("payroll_overrides").upsert(
+      {
+        profile_id: profileId,
+        month,
+        present_days: num("presentDays"),
+        cl_days: num("clDays"),
+        sl_days: num("slDays"),
+        lwp_days: num("lwpDays"),
+        basic_pay_override: num("basicPayOverride"),
+        extra_duty_amount: num("extraDutyAmount"),
+        extra_duty_label: str("extraDutyLabel"),
+        bonus_amount: num("bonusAmount"),
+        bonus_label: str("bonusLabel"),
+        incentive_amount: num("incentiveAmount"),
+        incentive_label: str("incentiveLabel"),
+        other_deduction_amount: num("otherDeductionAmount"),
+        other_deduction_label: str("otherDeductionLabel"),
+        notes: str("notes"),
+        updated_by: owner.id,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "profile_id,month" },
+    );
+
+    if (error) return { error: error.message };
+    revalidatePath("/attendance");
+    revalidatePath("/profile");
+    return { ok: true, message: "Overrides saved. The payslip will reflect them immediately." };
+  } catch (err: any) {
+    console.error("savePayrollOverride exception:", err);
+    return { error: err.message || "An unexpected error occurred." };
+  }
+}
+
+/** Clear all manual overrides for one employee/month, reverting to computed values. */
+export async function clearPayrollOverride(profileId: string, month: string): Promise<HRActionState> {
+  try {
+    await requireOwner();
+    const supabase = createClient();
+    const { error } = await supabase
+      .from("payroll_overrides")
+      .delete()
+      .eq("profile_id", profileId)
+      .eq("month", month);
+    if (error) return { error: error.message };
+    revalidatePath("/attendance");
+    revalidatePath("/profile");
+    return { ok: true, message: "Overrides cleared." };
+  } catch (err: any) {
+    console.error("clearPayrollOverride exception:", err);
+    return { error: err.message || "An unexpected error occurred." };
+  }
+}
+
+/**
  * Render a payslip live from CURRENT data (profile, advances, stored payment
  * details) — no stale stored snapshot. Used by /api/payslip so any change to an
  * employee's data or advances is reflected the next time the slip is opened.
@@ -821,6 +904,24 @@ async function generatePayslipInternal(
     slUsedThisYear = 0;
   }
 
+  // 2a-2. Manual override for this employee/month, if the owner has set one
+  // (Payroll tab → Manual Overrides). Any field left blank falls back to the
+  // computed value — this replaces having to hardcode a per-employee/month
+  // exception in code every time reality doesn't match the biometric/leave
+  // records.
+  let override: any = null;
+  try {
+    const { data: overrideRow } = await supabase
+      .from("payroll_overrides")
+      .select("*")
+      .eq("profile_id", profileId)
+      .eq("month", month)
+      .maybeSingle();
+    override = overrideRow;
+  } catch {
+    override = null;
+  }
+
   // 2b. Fetch advance deductions for this staff member and month
   // In final mode: only deduct advances with advance_date <= paymentDate
   // In draft mode: deduct all current-month advances
@@ -942,16 +1043,42 @@ async function generatePayslipInternal(
 
   // Display-only overrides for the two June 2026 corrections above — the
   // underlying leave/attendance rows stay as the closest whole-day equivalent.
-  const presentCountDisplay = isPradoshJune2026 ? 24 : isManojJune2026 ? 18.5 : presentCount;
-  const lwpCountDisplay = isManojJune2026 ? 5.5 : lwpCount;
+  // A manual override (if set) takes final precedence over both the computed
+  // value and these one-off historical corrections.
+  const presentCountDisplay = override?.present_days != null ? Number(override.present_days)
+    : isPradoshJune2026 ? 24 : isManojJune2026 ? 18.5 : presentCount;
+  const clCountDisplay = override?.cl_days != null ? Number(override.cl_days) : clCount;
+  const slCountDisplay = override?.sl_days != null ? Number(override.sl_days) : slCount;
+  const lwpCountDisplay = override?.lwp_days != null ? Number(override.lwp_days)
+    : isManojJune2026 ? 5.5 : lwpCount;
+  // The days actually used in the pay calculation below (may differ from the
+  // whole-day database records when an override or a historical correction
+  // applies a fractional value).
+  const lwpDaysForCalc = override?.lwp_days != null ? Number(override.lwp_days)
+    : isManojJune2026 ? 5.5 : lwpCount;
+
+  const effectiveBasicPay = override?.basic_pay_override != null
+    ? Number(override.basic_pay_override)
+    : parseFloat(basicPay);
 
   // 4. Calculate LWP deduction, advance deduction, and net salary
-  const dailyRate = parseFloat(basicPay) / maxDay;
-  const extraDutyPayment = isBiswajeetJune2026 ? 13 * dailyRate : 0;
-  // Manoj's deduction uses the fractional 5.5-day figure so net salary lands
-  // on the owner's exact ₹4,800 rather than the whole-day approximation.
-  const lwpDeduction = (isManojJune2026 ? 5.5 : lwpCount) * dailyRate;
-  const grossBeforeAdvance = Math.max(0, parseFloat(basicPay) + extraDutyPayment - lwpDeduction);
+  const dailyRate = effectiveBasicPay / maxDay;
+  const extraDutyPayment = override?.extra_duty_amount != null
+    ? Number(override.extra_duty_amount)
+    : isBiswajeetJune2026 ? 13 * dailyRate : 0;
+  const extraDutyLabel = override?.extra_duty_label || "Extra Duty Allowance";
+  const bonusAmount = override?.bonus_amount != null ? Number(override.bonus_amount) : 0;
+  const bonusLabel = override?.bonus_label || "Bonus";
+  const incentiveAmount = override?.incentive_amount != null ? Number(override.incentive_amount) : 0;
+  const incentiveLabel = override?.incentive_label || "Incentive";
+  const otherDeductionAmount = override?.other_deduction_amount != null ? Number(override.other_deduction_amount) : 0;
+  const otherDeductionLabel = override?.other_deduction_label || "Other Deduction";
+
+  const lwpDeduction = lwpDaysForCalc * dailyRate;
+  const grossBeforeAdvance = Math.max(
+    0,
+    effectiveBasicPay + extraDutyPayment + bonusAmount + incentiveAmount - lwpDeduction - otherDeductionAmount,
+  );
   const totalAllAdvances = totalAdvance + totalNextMonthAdvance;
   const netSalary = Math.max(0, grossBeforeAdvance - totalAllAdvances);
   const amountPaidNum = amountPaid ? Math.max(0, parseFloat(amountPaid) - totalAllAdvances) : netSalary;
@@ -1218,16 +1345,30 @@ ${isDraft ? `
       <tr>
         <td>Basic Salary (Gross)</td>
         <td>${maxDay}-day month</td>
-        <td class="earn">₹${formatCurr(parseFloat(basicPay))}</td>
+        <td class="earn">₹${formatCurr(effectiveBasicPay)}</td>
       </tr>
       ${extraDutyPayment > 0 ? `
       <tr>
-        <td>Extra Duty Allowance</td>
-        <td>13 days &times; ₹${formatCurr(dailyRate)}/day</td>
+        <td>${extraDutyLabel}</td>
+        <td>&#8212;</td>
         <td class="earn">+ ₹${formatCurr(extraDutyPayment)}</td>
       </tr>
       ` : ""}
-      ${lwpCount > 0 ? `
+      ${bonusAmount > 0 ? `
+      <tr>
+        <td>${bonusLabel}</td>
+        <td>&#8212;</td>
+        <td class="earn">+ ₹${formatCurr(bonusAmount)}</td>
+      </tr>
+      ` : ""}
+      ${incentiveAmount > 0 ? `
+      <tr>
+        <td>${incentiveLabel}</td>
+        <td>&#8212;</td>
+        <td class="earn">+ ₹${formatCurr(incentiveAmount)}</td>
+      </tr>
+      ` : ""}
+      ${lwpDaysForCalc > 0 ? `
       <tr>
         <td>Leave Without Pay (LWP)</td>
         <td>${lwpCountDisplay} days &times; ₹${formatCurr(dailyRate)}/day</td>
@@ -1240,6 +1381,13 @@ ${isDraft ? `
         <td style="color:#9ca3af">Nil</td>
       </tr>
       `}
+      ${otherDeductionAmount > 0 ? `
+      <tr>
+        <td>${otherDeductionLabel}</td>
+        <td>&#8212;</td>
+        <td class="deduct">&#8722; ₹${formatCurr(otherDeductionAmount)}</td>
+      </tr>
+      ` : ""}
       ${advanceRows.length > 0 ? advanceRows.map((adv: any) => `
       <tr>
         <td>Advance Deduction${adv.notes ? ` (${adv.notes})` : ""}</td>
@@ -1352,8 +1500,8 @@ ${isDraft ? `
 
   <div class="att-cards">
     <div class="att-card present"><div class="num">${presentCountDisplay}</div><div class="lbl">Days Present</div></div>
-    <div class="att-card cl"><div class="num">${clCount}<span style="font-size:13px;color:#6b7280;">/${CL_PER_MONTH}</span></div><div class="lbl">Weekly Off / CL</div></div>
-    <div class="att-card sl"><div class="num">${slCount}</div><div class="lbl">Sick Leave</div></div>
+    <div class="att-card cl"><div class="num">${clCountDisplay}<span style="font-size:13px;color:#6b7280;">/${CL_PER_MONTH}</span></div><div class="lbl">Weekly Off / CL</div></div>
+    <div class="att-card sl"><div class="num">${slCountDisplay}</div><div class="lbl">Sick Leave</div></div>
     <div class="att-card lwp"><div class="num">${lwpCountDisplay}</div><div class="lbl">LWP / Absent</div></div>
     <div class="att-card cf"><div class="num">${cfCount}</div><div class="lbl">CL Remaining</div></div>
   </div>

@@ -81,6 +81,18 @@ export default async function AttendancePage() {
     console.warn("Failed to fetch house helper payments (table may not exist yet):", err);
   }
 
+  let payrollOverrides: any[] = [];
+  try {
+    const { data: povData, error: povErr } = await supabase
+      .from("payroll_overrides")
+      .select("*");
+    if (!povErr && povData) {
+      payrollOverrides = povData;
+    }
+  } catch (err) {
+    console.warn("Failed to fetch payroll overrides (table may not exist yet):", err);
+  }
+
   let outlets: { id: string; name: string }[] = [];
   try {
     const { data: outletsData, error: outletsErr } = await supabase
@@ -102,6 +114,7 @@ export default async function AttendancePage() {
         initialDocuments={documents}
         initialAdvances={advances}
         initialHouseHelperPayments={houseHelperPayments}
+        initialPayrollOverrides={payrollOverrides}
         outlets={outlets}
         ownerProfile={currentProfile}
         attendanceChild={

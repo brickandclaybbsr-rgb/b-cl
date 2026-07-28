@@ -22,9 +22,10 @@ import {
   Wallet,
   CheckCircle2,
   Clock,
-  AlertCircle
+  AlertCircle,
+  SlidersHorizontal
 } from "lucide-react";
-import { updateLeaveStatus, uploadStaffDocument, deleteStaffDocument, generatePayslip, generateBatchPayslips, updateStaffProfile, uploadOwnerSignature, savePayrollAdvance, deletePayrollAdvance, togglePayslipVisibility, finalizePayslip } from "@/app/(app)/attendance/actions-hr";
+import { updateLeaveStatus, uploadStaffDocument, deleteStaffDocument, generatePayslip, generateBatchPayslips, updateStaffProfile, uploadOwnerSignature, savePayrollAdvance, deletePayrollAdvance, togglePayslipVisibility, finalizePayslip, savePayrollOverride, clearPayrollOverride } from "@/app/(app)/attendance/actions-hr";
 import { addHouseHelperPayment, deleteHouseHelperPayment } from "@/app/(app)/attendance/house-helper-actions";
 import { CL_PER_YEAR, SL_PER_YEAR } from "@/lib/leave-policy";
 import { Card } from "@/components/ui/card";
@@ -78,6 +79,26 @@ interface HouseHelperPayment {
   remarks: string | null;
 }
 
+interface PayrollOverride {
+  id: string;
+  profile_id: string;
+  month: string;
+  present_days: number | null;
+  cl_days: number | null;
+  sl_days: number | null;
+  lwp_days: number | null;
+  basic_pay_override: number | null;
+  extra_duty_amount: number | null;
+  extra_duty_label: string | null;
+  bonus_amount: number | null;
+  bonus_label: string | null;
+  incentive_amount: number | null;
+  incentive_label: string | null;
+  other_deduction_amount: number | null;
+  other_deduction_label: string | null;
+  notes: string | null;
+}
+
 interface LeaveRequest {
   id: string;
   profile_id: string;
@@ -124,6 +145,7 @@ interface Props {
   attendanceChild: React.ReactNode;
   outlets?: OutletOption[];
   initialHouseHelperPayments?: HouseHelperPayment[];
+  initialPayrollOverrides?: PayrollOverride[];
 }
 
 function getDurationInDays(startDateStr: string, endDateStr: string): number {
@@ -171,7 +193,7 @@ function calculateUsedLeaves(leaves: LeaveRequest[], profileId: string) {
   };
 }
 
-export function AttendanceHRClient({ staffList, initialLeaves, initialDocuments, initialAdvances, ownerProfile, attendanceChild, outlets = [], initialHouseHelperPayments = [] }: Props) {
+export function AttendanceHRClient({ staffList, initialLeaves, initialDocuments, initialAdvances, ownerProfile, attendanceChild, outlets = [], initialHouseHelperPayments = [], initialPayrollOverrides = [] }: Props) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<"attendance" | "leaves" | "documents" | "people" | "payroll">("people");
   const [reviewingLeaveId, setReviewingLeaveId] = useState<string | null>(null);
@@ -282,6 +304,9 @@ export function AttendanceHRClient({ staffList, initialLeaves, initialDocuments,
   const [advanceState, advanceFormAction] = useFormState(savePayrollAdvance, {});
   const [hhPaymentState, hhPaymentFormAction] = useFormState(addHouseHelperPayment, {});
   const hhPaymentFormRef = useRef<HTMLFormElement>(null);
+  const [overrideState, overrideFormAction] = useFormState(savePayrollOverride, {});
+  const [showOverridesFor, setShowOverridesFor] = useState<string | null>(null);
+  const [overrideMonth, setOverrideMonth] = useState(() => new Date().toISOString().slice(0, 7));
   const [deletingAdvanceId, setDeletingAdvanceId] = useState<string | null>(null);
   const [togglingDocId, setTogglingDocId] = useState<string | null>(null);
   const [finalizingDocId, setFinalizingDocId] = useState<string | null>(null);
@@ -325,6 +350,15 @@ export function AttendanceHRClient({ staffList, initialLeaves, initialDocuments,
       router.refresh();
     }
   }, [hhPaymentState]);
+
+  useEffect(() => {
+    if (overrideState.error) {
+      toast.error(overrideState.error);
+    } else if (overrideState.ok) {
+      toast.success(overrideState.message || "Overrides saved!");
+      router.refresh();
+    }
+  }, [overrideState]);
 
   // Signature upload state
   const sigFormRef = useRef<HTMLFormElement>(null);
@@ -1429,6 +1463,9 @@ export function AttendanceHRClient({ staffList, initialLeaves, initialDocuments,
                     .filter((a) => a.profile_id === staff.id)
                     .sort((a, b) => (b.advance_date || b.month).localeCompare(a.advance_date || a.month));
                   const staffAdvanceTotal = staffAdvances.reduce((sum, a) => sum + Number(a.amount), 0);
+                  const staffOverride = initialPayrollOverrides.find(
+                    (o) => o.profile_id === staff.id && o.month === overrideMonth,
+                  ) ?? null;
 
                   const currentMonthKey = new Date().toISOString().slice(0, 7);
                   const staffHHPayments = initialHouseHelperPayments
@@ -1728,6 +1765,95 @@ export function AttendanceHRClient({ staffList, initialLeaves, initialDocuments,
                         )}
                       </div>
 
+                      {/* Manual Overrides — edit ANY payslip figure, not just payment details */}
+                      <div className="space-y-2.5 pt-1 border-t border-border/20">
+                        <button
+                          type="button"
+                          onClick={() => setShowOverridesFor(showOverridesFor === staff.id ? null : staff.id)}
+                          className="flex w-full items-center justify-between text-left"
+                        >
+                          <h4 className="font-bold text-[10px] uppercase tracking-wider text-warm flex items-center gap-1.5">
+                            <SlidersHorizontal className="size-3" /> Manual Overrides
+                            {staffOverride && (
+                              <span className="rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/30 px-1.5 py-0 text-[9px] normal-case tracking-normal">Active</span>
+                            )}
+                          </h4>
+                          <span className="text-[10px] text-content-secondary">{showOverridesFor === staff.id ? "Hide" : "Edit"}</span>
+                        </button>
+
+                        {showOverridesFor === staff.id && (
+                          <div className="space-y-3 rounded-lg border border-border/30 bg-white/[0.015] p-3">
+                            <p className="text-[10px] text-content-secondary">
+                              Directly edit any payslip figure for a specific month — present/CL/SL/LWP days, basic
+                              pay, extra duty, bonus, incentive, or another deduction. Leave a field blank to use the
+                              computed value. Changes apply immediately, no re-generate needed.
+                            </p>
+
+                            <div className="space-y-1">
+                              <Label className="text-[9px] text-content-secondary">Month</Label>
+                              <Input
+                                type="month"
+                                value={overrideMonth}
+                                onChange={(e) => setOverrideMonth(e.target.value)}
+                                style={{ colorScheme: "dark" }}
+                                className="h-8 w-40 text-xs"
+                              />
+                            </div>
+
+                            <form action={overrideFormAction} className="space-y-3">
+                              <input type="hidden" name="profileId" value={staff.id} />
+                              <input type="hidden" name="month" value={overrideMonth} />
+
+                              <div className="grid grid-cols-4 gap-2">
+                                <OverrideField label="Present Days" name="presentDays" defaultValue={staffOverride?.present_days} />
+                                <OverrideField label="CL Days" name="clDays" defaultValue={staffOverride?.cl_days} />
+                                <OverrideField label="SL Days" name="slDays" defaultValue={staffOverride?.sl_days} />
+                                <OverrideField label="LWP Days" name="lwpDays" defaultValue={staffOverride?.lwp_days} />
+                              </div>
+
+                              <div className="grid grid-cols-2 gap-2">
+                                <OverrideField label="Basic Pay Override (₹)" name="basicPayOverride" defaultValue={staffOverride?.basic_pay_override} />
+                                <OverrideField label="Extra Duty Amount (₹)" name="extraDutyAmount" defaultValue={staffOverride?.extra_duty_amount} />
+                              </div>
+                              <OverrideTextField label="Extra Duty Label" name="extraDutyLabel" defaultValue={staffOverride?.extra_duty_label} placeholder="e.g. 13 days extra duty" />
+
+                              <div className="grid grid-cols-2 gap-2">
+                                <OverrideField label="Bonus (₹)" name="bonusAmount" defaultValue={staffOverride?.bonus_amount} />
+                                <OverrideTextField label="Bonus Label" name="bonusLabel" defaultValue={staffOverride?.bonus_label} placeholder="Bonus" />
+                              </div>
+                              <div className="grid grid-cols-2 gap-2">
+                                <OverrideField label="Incentive (₹)" name="incentiveAmount" defaultValue={staffOverride?.incentive_amount} />
+                                <OverrideTextField label="Incentive Label" name="incentiveLabel" defaultValue={staffOverride?.incentive_label} placeholder="Incentive" />
+                              </div>
+                              <div className="grid grid-cols-2 gap-2">
+                                <OverrideField label="Other Deduction (₹)" name="otherDeductionAmount" defaultValue={staffOverride?.other_deduction_amount} />
+                                <OverrideTextField label="Other Deduction Label" name="otherDeductionLabel" defaultValue={staffOverride?.other_deduction_label} placeholder="e.g. Uniform cost" />
+                              </div>
+                              <OverrideTextField label="Internal Note (not printed)" name="notes" defaultValue={staffOverride?.notes} placeholder="Why this override was made" />
+
+                              <div className="flex gap-2 pt-1">
+                                <SubmitButton pendingText="Saving…" className="h-8 px-3 text-[10px]">Save overrides</SubmitButton>
+                                {staffOverride && (
+                                  <button
+                                    type="button"
+                                    disabled={pending}
+                                    onClick={() => startTransition(async () => {
+                                      if (!confirm("Clear all overrides for this month? The slip will revert to computed values.")) return;
+                                      const res = await clearPayrollOverride(staff.id, overrideMonth);
+                                      if (res.error) toast.error(res.error);
+                                      else { toast.success("Overrides cleared."); router.refresh(); }
+                                    })}
+                                    className="h-8 px-3 text-[10px] rounded-lg border border-border text-content-secondary hover:text-danger hover:border-danger/40 transition-colors"
+                                  >
+                                    Clear overrides
+                                  </button>
+                                )}
+                              </div>
+                            </form>
+                          </div>
+                        )}
+                      </div>
+
                       {/* Advances */}
                       <div className="space-y-2.5 pt-1 border-t border-border/20">
                         <div className="flex items-center justify-between">
@@ -1871,6 +1997,54 @@ export function AttendanceHRClient({ staffList, initialLeaves, initialDocuments,
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+function OverrideField({
+  label,
+  name,
+  defaultValue,
+}: {
+  label: string;
+  name: string;
+  defaultValue?: number | null;
+}) {
+  return (
+    <div className="space-y-1">
+      <Label className="text-[9px] text-content-secondary">{label}</Label>
+      <Input
+        name={name}
+        type="number"
+        step="0.1"
+        defaultValue={defaultValue != null ? String(defaultValue) : ""}
+        placeholder="—"
+        className="h-8 text-xs"
+      />
+    </div>
+  );
+}
+
+function OverrideTextField({
+  label,
+  name,
+  defaultValue,
+  placeholder,
+}: {
+  label: string;
+  name: string;
+  defaultValue?: string | null;
+  placeholder?: string;
+}) {
+  return (
+    <div className="space-y-1">
+      <Label className="text-[9px] text-content-secondary">{label}</Label>
+      <Input
+        name={name}
+        defaultValue={defaultValue ?? ""}
+        placeholder={placeholder}
+        className="h-8 text-xs"
+      />
     </div>
   );
 }

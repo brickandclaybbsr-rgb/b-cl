@@ -281,6 +281,28 @@ export type CashExpense = {
   profile_id?: string | null;
 };
 
+export type PayrollOverride = {
+  id: string;
+  profile_id: string;
+  month: string; // YYYY-MM
+  present_days: number | null;
+  cl_days: number | null;
+  sl_days: number | null;
+  lwp_days: number | null;
+  basic_pay_override: number | null;
+  extra_duty_amount: number | null;
+  extra_duty_label: string | null;
+  bonus_amount: number | null;
+  bonus_label: string | null;
+  incentive_amount: number | null;
+  incentive_label: string | null;
+  other_deduction_amount: number | null;
+  other_deduction_label: string | null;
+  notes: string | null;
+  updated_by: string | null;
+  updated_at: string;
+};
+
 export type HouseHelperPayment = {
   id: string;
   profile_id: string;
@@ -378,6 +400,7 @@ export interface Database {
       attendance_checkins: Table<AttendanceCheckin>;
       qr_codes: Table<QrCode>;
       house_helper_payments: Table<HouseHelperPayment>;
+      payroll_overrides: Table<PayrollOverride>;
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;
