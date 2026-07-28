@@ -281,6 +281,16 @@ export type CashExpense = {
   profile_id?: string | null;
 };
 
+export type HouseHelperPayment = {
+  id: string;
+  profile_id: string;
+  date: string;          // yyyy-MM-dd
+  amount: number;
+  remarks: string | null;
+  recorded_by: string | null;
+  created_at: string;
+};
+
 export type Outlet = {
   id: string;
   name: string;
@@ -367,6 +377,7 @@ export interface Database {
       outlets: Table<Outlet>;
       attendance_checkins: Table<AttendanceCheckin>;
       qr_codes: Table<QrCode>;
+      house_helper_payments: Table<HouseHelperPayment>;
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;

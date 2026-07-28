@@ -68,6 +68,19 @@ export default async function AttendancePage() {
     console.warn("Failed to fetch payroll advances (table may not exist yet):", err);
   }
 
+  let houseHelperPayments: any[] = [];
+  try {
+    const { data: hhData, error: hhErr } = await supabase
+      .from("house_helper_payments")
+      .select("*")
+      .order("date", { ascending: false });
+    if (!hhErr && hhData) {
+      houseHelperPayments = hhData;
+    }
+  } catch (err) {
+    console.warn("Failed to fetch house helper payments (table may not exist yet):", err);
+  }
+
   let outlets: { id: string; name: string }[] = [];
   try {
     const { data: outletsData, error: outletsErr } = await supabase
@@ -88,6 +101,7 @@ export default async function AttendancePage() {
         initialLeaves={leaves}
         initialDocuments={documents}
         initialAdvances={advances}
+        initialHouseHelperPayments={houseHelperPayments}
         outlets={outlets}
         ownerProfile={currentProfile}
         attendanceChild={

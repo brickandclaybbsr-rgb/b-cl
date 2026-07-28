@@ -25,6 +25,7 @@ import {
   AlertCircle
 } from "lucide-react";
 import { updateLeaveStatus, uploadStaffDocument, deleteStaffDocument, generatePayslip, generateBatchPayslips, updateStaffProfile, uploadOwnerSignature, savePayrollAdvance, deletePayrollAdvance, togglePayslipVisibility, finalizePayslip } from "@/app/(app)/attendance/actions-hr";
+import { addHouseHelperPayment, deleteHouseHelperPayment } from "@/app/(app)/attendance/house-helper-actions";
 import { CL_PER_YEAR, SL_PER_YEAR } from "@/lib/leave-policy";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -67,6 +68,14 @@ interface StaffProfile {
 interface OutletOption {
   id: string;
   name: string;
+}
+
+interface HouseHelperPayment {
+  id: string;
+  profile_id: string;
+  date: string;
+  amount: number;
+  remarks: string | null;
 }
 
 interface LeaveRequest {
@@ -114,6 +123,7 @@ interface Props {
   ownerProfile: StaffProfile | null;
   attendanceChild: React.ReactNode;
   outlets?: OutletOption[];
+  initialHouseHelperPayments?: HouseHelperPayment[];
 }
 
 function getDurationInDays(startDateStr: string, endDateStr: string): number {
@@ -161,7 +171,7 @@ function calculateUsedLeaves(leaves: LeaveRequest[], profileId: string) {
   };
 }
 
-export function AttendanceHRClient({ staffList, initialLeaves, initialDocuments, initialAdvances, ownerProfile, attendanceChild, outlets = [] }: Props) {
+export function AttendanceHRClient({ staffList, initialLeaves, initialDocuments, initialAdvances, ownerProfile, attendanceChild, outlets = [], initialHouseHelperPayments = [] }: Props) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<"attendance" | "leaves" | "documents" | "people" | "payroll">("people");
   const [reviewingLeaveId, setReviewingLeaveId] = useState<string | null>(null);
@@ -270,6 +280,8 @@ export function AttendanceHRClient({ staffList, initialLeaves, initialDocuments,
   });
   const advanceFormRef = useRef<HTMLFormElement>(null);
   const [advanceState, advanceFormAction] = useFormState(savePayrollAdvance, {});
+  const [hhPaymentState, hhPaymentFormAction] = useFormState(addHouseHelperPayment, {});
+  const hhPaymentFormRef = useRef<HTMLFormElement>(null);
   const [deletingAdvanceId, setDeletingAdvanceId] = useState<string | null>(null);
   const [togglingDocId, setTogglingDocId] = useState<string | null>(null);
   const [finalizingDocId, setFinalizingDocId] = useState<string | null>(null);
@@ -303,6 +315,16 @@ export function AttendanceHRClient({ staffList, initialLeaves, initialDocuments,
       router.refresh();
     }
   }, [advanceState]);
+
+  useEffect(() => {
+    if (hhPaymentState.error) {
+      toast.error(hhPaymentState.error);
+    } else if (hhPaymentState.ok) {
+      toast.success(hhPaymentState.message || "Payment recorded!");
+      hhPaymentFormRef.current?.reset();
+      router.refresh();
+    }
+  }, [hhPaymentState]);
 
   // Signature upload state
   const sigFormRef = useRef<HTMLFormElement>(null);
@@ -1408,6 +1430,16 @@ export function AttendanceHRClient({ staffList, initialLeaves, initialDocuments,
                     .sort((a, b) => (b.advance_date || b.month).localeCompare(a.advance_date || a.month));
                   const staffAdvanceTotal = staffAdvances.reduce((sum, a) => sum + Number(a.amount), 0);
 
+                  const currentMonthKey = new Date().toISOString().slice(0, 7);
+                  const staffHHPayments = initialHouseHelperPayments
+                    .filter((p) => p.profile_id === staff.id)
+                    .sort((a, b) => b.date.localeCompare(a.date));
+                  const staffHHPaidThisMonth = staffHHPayments
+                    .filter((p) => p.date.startsWith(currentMonthKey))
+                    .reduce((sum, p) => sum + Number(p.amount), 0);
+                  const staffHHMonthlySalary = staff.basic_pay ? Number(staff.basic_pay) : 0;
+                  const staffHHRemaining = Math.max(0, staffHHMonthlySalary - staffHHPaidThisMonth);
+
                   return (
                     <div className="space-y-4">
                     <Card className="p-5 space-y-4 bg-white/[0.02] border-border/40 animate-fade-in">
@@ -1618,7 +1650,8 @@ export function AttendanceHRClient({ staffList, initialLeaves, initialDocuments,
                       </form>
                     </Card>
 
-                    {/* ── Per-employee payroll hub ──────────────────────── */}
+                    {/* ── Per-employee payroll hub (QR-attendance staff) ──── */}
+                    {!staff.is_house_helper && (
                     <Card className="p-5 space-y-5 bg-white/[0.02] border-border/40 animate-fade-in">
                       {/* Payslips */}
                       <div className="space-y-2.5">
@@ -1747,6 +1780,79 @@ export function AttendanceHRClient({ staffList, initialLeaves, initialDocuments,
                         </form>
                       </div>
                     </Card>
+                    )}
+
+                    {/* ── House helper cash payment ledger ────────────────── */}
+                    {staff.is_house_helper && (
+                    <Card className="p-5 space-y-4 bg-white/[0.02] border-border/40 animate-fade-in">
+                      <div>
+                        <h4 className="font-bold text-[10px] uppercase tracking-wider text-warm">House Helper — Payment Ledger</h4>
+                        <p className="text-[10px] text-content-secondary mt-0.5">Paid daily in cash. No QR attendance or payslip — track payments and the monthly balance here.</p>
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-2 text-center">
+                        <div className="rounded-lg border border-border/30 bg-white/[0.01] p-2.5">
+                          <p className="text-sm font-bold text-content-primary">₹{staffHHMonthlySalary.toLocaleString("en-IN")}</p>
+                          <p className="text-[9px] uppercase tracking-wider text-content-secondary mt-0.5">Monthly Salary</p>
+                        </div>
+                        <div className="rounded-lg border border-border/30 bg-white/[0.01] p-2.5">
+                          <p className="text-sm font-bold text-green-400">₹{staffHHPaidThisMonth.toLocaleString("en-IN")}</p>
+                          <p className="text-[9px] uppercase tracking-wider text-content-secondary mt-0.5">Paid This Month</p>
+                        </div>
+                        <div className="rounded-lg border border-border/30 bg-white/[0.01] p-2.5">
+                          <p className="text-sm font-bold text-amber-400">₹{staffHHRemaining.toLocaleString("en-IN")}</p>
+                          <p className="text-[9px] uppercase tracking-wider text-content-secondary mt-0.5">Remaining Balance</p>
+                        </div>
+                      </div>
+
+                      <form ref={hhPaymentFormRef} action={hhPaymentFormAction} className="flex flex-wrap items-end gap-2 rounded-lg border border-border/30 bg-white/[0.015] p-2.5">
+                        <input type="hidden" name="profileId" value={staff.id} />
+                        <div className="space-y-1">
+                          <Label className="text-[9px] text-content-secondary">Amount (₹)</Label>
+                          <Input name="amount" type="number" min="1" step="1" required placeholder="200" className="h-8 w-24 text-xs" />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-[9px] text-content-secondary">Date</Label>
+                          <Input name="date" type="date" defaultValue={new Date().toISOString().slice(0, 10)} style={{ colorScheme: "dark" }} className="h-8 text-xs" />
+                        </div>
+                        <div className="space-y-1 flex-1 min-w-[120px]">
+                          <Label className="text-[9px] text-content-secondary">Remarks (optional)</Label>
+                          <Input name="remarks" placeholder="e.g. daily wage" className="h-8 text-xs" />
+                        </div>
+                        <SubmitButton pendingText="Adding…" className="h-8 px-3 text-[10px]">Add payment</SubmitButton>
+                      </form>
+
+                      <div className="space-y-1.5 max-h-[260px] overflow-y-auto pr-1">
+                        {staffHHPayments.length === 0 ? (
+                          <p className="text-xs text-content-secondary">No payments recorded yet.</p>
+                        ) : (
+                          staffHHPayments.map((p) => (
+                            <div key={p.id} className="flex items-center gap-2 rounded-lg border border-border/30 bg-white/[0.01] px-3 py-2 text-xs">
+                              <span className="font-bold text-content-primary">₹{Number(p.amount).toLocaleString("en-IN")}</span>
+                              <span className="text-content-secondary">
+                                {new Date(p.date + "T00:00:00").toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                              </span>
+                              {p.remarks && <span className="text-content-secondary truncate">· {p.remarks}</span>}
+                              <button
+                                type="button"
+                                disabled={pending}
+                                onClick={() => startTransition(async () => {
+                                  if (!confirm("Delete this payment?")) return;
+                                  const res = await deleteHouseHelperPayment(p.id);
+                                  if (res.error) toast.error(res.error);
+                                  else { toast.success("Payment deleted."); router.refresh(); }
+                                })}
+                                className="ml-auto p-1 rounded text-red-400 hover:text-red-300 transition-colors"
+                                title="Delete payment"
+                              >
+                                <Trash2 className="size-3.5" />
+                              </button>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </Card>
+                    )}
                     </div>
                   );
                 })()
