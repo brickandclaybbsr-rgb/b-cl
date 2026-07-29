@@ -52,6 +52,12 @@ export default async function ReportsPage() {
           <h1 className="text-xl font-bold tracking-tight">Reports</h1>
           <p className="text-xs text-content-secondary mt-0.5">Last 14 days</p>
         </div>
+        <Link
+          href="/owner/closing-balance"
+          className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-xs font-semibold text-content-secondary transition-colors hover:border-white/30 hover:text-content-primary"
+        >
+          <Wallet className="size-3.5" /> Closing Balance Report
+        </Link>
       </div>
 
       {/* ── Tab switcher — pill style ──────────────────────────────────── */}

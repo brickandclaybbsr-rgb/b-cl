@@ -72,3 +72,93 @@ export async function getEodLog(limit = 14): Promise<EodReport[]> {
     .limit(limit);
   return data ?? [];
 }
+
+export interface ClosingBalanceDay {
+  date: string;
+  openingCash: number | null;
+  openingDiscrepancy: number | null;
+  openingDiscrepancyReason: string | null;
+  closingCash: number | null;
+  cashDeposited: number | null;
+  closingDiscrepancyNotes: string | null;
+  salesCash: number;
+  cashOutTotal: number;
+  cashOut: CashExpense[];
+}
+
+/**
+ * Full closing-balance picture for one specific date: opening/closing cash
+ * figures (from the front-desk checklist, which is the team that handles
+ * cash), that day's cash sales, and every cash-out entry with its total.
+ */
+export async function getClosingBalanceForDate(date: string): Promise<ClosingBalanceDay> {
+  const supabase = createClient();
+
+  const [{ data: opening }, { data: closing }, sales, cashOut] = await Promise.all([
+    supabase.from("opening_checklists").select("*").eq("date", date).eq("team", "front_desk").maybeSingle(),
+    supabase.from("closing_checklists").select("*").eq("date", date).eq("team", "front_desk").maybeSingle(),
+    getSalesRange(date, date),
+    (async () => {
+      const { data } = await supabase.from("cash_expenses").select("*").eq("date", date).order("submitted_at", { ascending: true });
+      return (data ?? []) as CashExpense[];
+    })(),
+  ]);
+
+  return {
+    date,
+    openingCash: opening?.opening_cash ?? null,
+    openingDiscrepancy: opening?.cash_discrepancy ?? null,
+    openingDiscrepancyReason: opening?.cash_discrepancy_reason ?? null,
+    closingCash: closing?.closing_cash ?? null,
+    cashDeposited: closing?.cash_deposited ?? null,
+    closingDiscrepancyNotes: closing?.discrepancy_notes ?? null,
+    salesCash: sales[0] ? Number(sales[0].cash_sales) : 0,
+    cashOutTotal: cashOut.reduce((sum, e) => sum + Number(e.amount), 0),
+    cashOut,
+  };
+}
+
+/** Compact day-by-day closing-balance table for a date range, newest first. */
+export async function getClosingBalanceRange(from: string, to: string): Promise<ClosingBalanceDay[]> {
+  const supabase = createClient();
+
+  const [{ data: openingRows }, { data: closingRows }, sales, { data: expenseRows }] = await Promise.all([
+    supabase.from("opening_checklists").select("*").eq("team", "front_desk").gte("date", from).lte("date", to),
+    supabase.from("closing_checklists").select("*").eq("team", "front_desk").gte("date", from).lte("date", to),
+    getSalesRange(from, to),
+    supabase.from("cash_expenses").select("*").gte("date", from).lte("date", to),
+  ]);
+
+  const openingByDate = new Map((openingRows ?? []).map((r: any) => [r.date, r]));
+  const closingByDate = new Map((closingRows ?? []).map((r: any) => [r.date, r]));
+  const salesByDate = new Map(sales.map((s) => [s.date, s]));
+  const cashOutByDate = new Map<string, CashExpense[]>();
+  for (const e of (expenseRows ?? []) as CashExpense[]) {
+    if (!cashOutByDate.has(e.date)) cashOutByDate.set(e.date, []);
+    cashOutByDate.get(e.date)!.push(e);
+  }
+
+  const out: ClosingBalanceDay[] = [];
+  const start = new Date(from + "T00:00:00");
+  const end = new Date(to + "T00:00:00");
+  for (let d = new Date(end); d >= start; d.setDate(d.getDate() - 1)) {
+    const date = d.toISOString().slice(0, 10);
+    const opening = openingByDate.get(date) as any;
+    const closing = closingByDate.get(date) as any;
+    const sale = salesByDate.get(date);
+    const cashOut = cashOutByDate.get(date) ?? [];
+    out.push({
+      date,
+      openingCash: opening?.opening_cash ?? null,
+      openingDiscrepancy: opening?.cash_discrepancy ?? null,
+      openingDiscrepancyReason: opening?.cash_discrepancy_reason ?? null,
+      closingCash: closing?.closing_cash ?? null,
+      cashDeposited: closing?.cash_deposited ?? null,
+      closingDiscrepancyNotes: closing?.discrepancy_notes ?? null,
+      salesCash: sale ? Number(sale.cash_sales) : 0,
+      cashOutTotal: cashOut.reduce((sum, e) => sum + Number(e.amount), 0),
+      cashOut,
+    });
+  }
+  return out;
+}
