@@ -73,6 +73,61 @@ export async function getEodLog(limit = 14): Promise<EodReport[]> {
   return data ?? [];
 }
 
+export interface AttendanceStatusDay {
+  date: string;
+  openingFiled: boolean;
+  closingFiled: boolean;
+}
+
+/** Whether the opening/closing checklist was filed on each day in the range. */
+export async function getAttendanceStatusRange(from: string, to: string): Promise<AttendanceStatusDay[]> {
+  const supabase = createClient();
+  const [{ data: opening }, { data: closing }] = await Promise.all([
+    supabase.from("opening_checklists").select("date").gte("date", from).lte("date", to),
+    supabase.from("closing_checklists").select("date").gte("date", from).lte("date", to),
+  ]);
+  const openSet = new Set((opening ?? []).map((r: any) => r.date));
+  const closeSet = new Set((closing ?? []).map((r: any) => r.date));
+
+  const out: AttendanceStatusDay[] = [];
+  const start = new Date(from + "T00:00:00");
+  const end = new Date(to + "T00:00:00");
+  for (let d = new Date(end); d >= start; d.setDate(d.getDate() - 1)) {
+    const date = d.toISOString().slice(0, 10);
+    out.push({ date, openingFiled: openSet.has(date), closingFiled: closeSet.has(date) });
+  }
+  return out;
+}
+
+export interface LeaveInRange {
+  profile_id: string;
+  employeeName: string;
+  leave_type: "cl" | "sl" | "lwp";
+  start_date: string;
+  end_date: string;
+  status: string;
+  reason: string;
+}
+
+/** Leave requests overlapping a date range, newest first, with employee names resolved. */
+export async function getLeavesInRange(from: string, to: string): Promise<LeaveInRange[]> {
+  const supabase = createClient();
+  const [{ data: leaves }, { data: profiles }] = await Promise.all([
+    supabase.from("leaves").select("*").lte("start_date", to).gte("end_date", from).order("start_date", { ascending: false }),
+    supabase.from("profiles").select("id, name"),
+  ]);
+  const nameMap = new Map((profiles ?? []).map((p: any) => [p.id, p.name]));
+  return (leaves ?? []).map((l: any) => ({
+    profile_id: l.profile_id,
+    employeeName: nameMap.get(l.profile_id) ?? "Unknown",
+    leave_type: l.leave_type,
+    start_date: l.start_date,
+    end_date: l.end_date,
+    status: l.status,
+    reason: l.reason,
+  }));
+}
+
 export interface ClosingBalanceDay {
   date: string;
   openingCash: number | null;

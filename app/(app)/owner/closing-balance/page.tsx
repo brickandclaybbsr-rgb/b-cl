@@ -37,12 +37,18 @@ export default async function ClosingBalancePage({
         >
           <ArrowLeft className="size-5" />
         </Link>
-        <div>
+        <div className="flex-1">
           <h1 className="text-lg font-bold text-content-primary">Closing Balance Report</h1>
           <p className="text-xs text-content-secondary">
             Opening/closing cash, deposits, discrepancies, and cash-outs for any date.
           </p>
         </div>
+        <Link
+          href="/owner/export-report"
+          className="shrink-0 rounded-lg bg-white px-3 py-2 text-xs font-bold text-black transition-opacity hover:opacity-90"
+        >
+          Export PDF
+        </Link>
       </div>
 
       <ClosingBalanceClient
