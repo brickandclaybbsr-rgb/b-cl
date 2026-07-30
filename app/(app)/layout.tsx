@@ -16,8 +16,17 @@ export default async function AppLayout({
   // ── QR + geofence attendance gate ──────────────────────────────────────────
   // From the rollout date, on-site staff must scan an outlet QR (within its
   // geofence) before they can use the app. Owner & inventory manager are exempt.
+  //
+  // App-store review accounts are also exempt: a reviewer can't scan a physical
+  // QR inside the restaurant, so gating them would block the review entirely.
+  const isReviewAccount =
+    profile.name?.toLowerCase().startsWith("reviewer.") ||
+    profile.email?.toLowerCase().startsWith("reviewer.");
+
   const gateApplies =
-    profile.role === "staff" && todayIST() >= ATTENDANCE_ROLLOUT_DATE;
+    profile.role === "staff" &&
+    !isReviewAccount &&
+    todayIST() >= ATTENDANCE_ROLLOUT_DATE;
 
   if (gateApplies) {
     let checkedIn = false;

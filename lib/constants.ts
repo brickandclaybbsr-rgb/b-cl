@@ -12,7 +12,7 @@ export const APP_START_DATE = "2026-06-14";
  * dormant (staff use the app normally); on/after it, staff must scan an outlet
  * QR within its geofence before they can use the app for the day.
  */
-export const ATTENDANCE_ROLLOUT_DATE = "2026-08-01";
+export const ATTENDANCE_ROLLOUT_DATE = "2026-07-31";
 
 export type ChecklistType = "opening" | "closing";
 
