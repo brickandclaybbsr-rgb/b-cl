@@ -963,19 +963,19 @@ async function generatePayslipInternal(
       .eq("profile_id", profileId)
       .eq("month", nextMonthStr);
     if (nextAdvs && nextAdvs.length > 0) {
+      // Advances carry the payroll month they are CHARGED TO (`month`), separate
+      // from when they were taken (`advance_date`). An advance taken in early
+      // July but charged to June is stored with month = June, so it is already
+      // covered by totalAdvance above.
+      //
+      // Next-month advances therefore belong to NEXT month's payslip and are
+      // never deducted here — they're shown as upcoming information only.
+      // (Previously drafts auto-deducted them, which double-counted the ones
+      // charged to this month and made a finalised month's figures drift every
+      // time a new advance was recorded in the following month.)
       nextMonthAdvancesAll = nextAdvs;
-      if (isDraft) {
-        // All next-month advances deducted in draft
-        nextMonthAdvancesDeducted = nextAdvs;
-        totalNextMonthAdvance = nextAdvs.reduce((sum: number, a: any) => sum + Number(a.amount), 0);
-      } else if (paymentDate) {
-        // Final: split by advance_date vs paymentDate
-        nextMonthAdvancesDeducted = nextAdvs.filter((a: any) => a.advance_date && a.advance_date <= paymentDate);
-        nextMonthAdvancesUpcoming = nextAdvs.filter((a: any) => !a.advance_date || a.advance_date > paymentDate);
-        totalNextMonthAdvance = nextMonthAdvancesDeducted.reduce((sum: number, a: any) => sum + Number(a.amount), 0);
-      } else {
-        nextMonthAdvancesUpcoming = nextAdvs;
-      }
+      nextMonthAdvancesUpcoming = nextAdvs;
+      totalNextMonthAdvance = 0;
     }
   } catch {
     // silently skip
