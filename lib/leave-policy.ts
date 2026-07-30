@@ -21,7 +21,8 @@ export type DayStatus =
   | "sl"      // sick leave
   | "lwp"     // leave without pay (approved, unpaid)
   | "absent"  // no attendance, no approved leave → treated as LWP for pay
-  | "future"; // hasn't happened yet — never counted as absent
+  | "future"  // hasn't happened yet — never counted as absent
+  | "not_employed"; // before the joining date (mid-month joiner) — pay is pro-rated instead
 
 export interface DayDetail {
   dayNum: number;
@@ -41,6 +42,12 @@ export interface MonthAttendance {
   daysInMonth: number;
   /** Days already elapsed this month (all of them for a past month). */
   countedDays: number;
+  /**
+   * Days in the month the employee was actually employed for. Equals
+   * daysInMonth unless they joined (or will join) mid-month — pay is
+   * pro-rated by employedDays / daysInMonth.
+   */
+  employedDays: number;
   presentCount: number;
   clCount: number;
   slCount: number;
@@ -70,8 +77,10 @@ export function buildMonthAttendance(opts: {
   attendedDates: Set<string>;  // yyyy-MM-dd with proven attendance
   /** Treat every non-leave day as present (legacy manual overrides). */
   assumePresent?: boolean;
+  /** Employee's joining date (yyyy-MM-dd). Days before it are "not employed". */
+  joiningDate?: string | null;
 }): MonthAttendance {
-  const { year, monthNum, today, leaves, attendedDates, assumePresent } = opts;
+  const { year, monthNum, today, leaves, attendedDates, assumePresent, joiningDate } = opts;
 
   const daysInMonth = new Date(year, monthNum, 0).getDate();
   const days: DayDetail[] = [];
@@ -82,9 +91,18 @@ export function buildMonthAttendance(opts: {
   let lwpCount = 0;
   let absentCount = 0;
   let countedDays = 0;
+  let employedDays = 0;
 
   for (let day = 1; day <= daysInMonth; day++) {
     const date = `${year}-${String(monthNum).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+
+    // Before the employee joined: not their absence, and not paid either —
+    // the basic pay is pro-rated by employedDays instead.
+    if (joiningDate && date < joiningDate) {
+      days.push({ dayNum: day, date, status: "not_employed" });
+      continue;
+    }
+    employedDays++;
 
     if (date > today) {
       days.push({ dayNum: day, date, status: "future" });
@@ -116,6 +134,7 @@ export function buildMonthAttendance(opts: {
     days,
     daysInMonth,
     countedDays,
+    employedDays,
     presentCount,
     clCount,
     slCount,

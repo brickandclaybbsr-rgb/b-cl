@@ -1006,6 +1006,7 @@ async function generatePayslipInternal(
     leaves: (leaves ?? []) as any,
     attendedDates,
     assumePresent: isBiswajeetJune2026,
+    joiningDate: employee.date_of_joining ?? null,
   });
 
   const presentCount = summary.presentCount;
@@ -1023,6 +1024,7 @@ async function generatePayslipInternal(
       case "lwp":     return { dayNum: d.dayNum, class: "lwp-day", statusLabel: "LWP" };
       case "absent":  return { dayNum: d.dayNum, class: "lwp-day", statusLabel: "LWP" };
       case "future":  return { dayNum: d.dayNum, class: "empty",   statusLabel: "" };
+      case "not_employed": return { dayNum: d.dayNum, class: "empty", statusLabel: "—" };
       default:        return { dayNum: d.dayNum, class: "present", statusLabel: "" };
     }
   });
@@ -1057,12 +1059,24 @@ async function generatePayslipInternal(
   const lwpDaysForCalc = override?.lwp_days != null ? Number(override.lwp_days)
     : isManojJune2026 ? 5.5 : lwpCount;
 
-  const effectiveBasicPay = override?.basic_pay_override != null
-    ? Number(override.basic_pay_override)
+  // Mid-month joiner: pro-rate the monthly basic by the days actually employed,
+  // rather than docking the pre-joining days as if they were unpaid leave.
+  const isPartialMonth = summary.employedDays < summary.daysInMonth;
+  const proRatedBasic = isPartialMonth
+    ? (parseFloat(basicPay) * summary.employedDays) / summary.daysInMonth
     : parseFloat(basicPay);
 
+  const effectiveBasicPay = override?.basic_pay_override != null
+    ? Number(override.basic_pay_override)
+    : proRatedBasic;
+
   // 4. Calculate LWP deduction, advance deduction, and net salary
-  const dailyRate = effectiveBasicPay / maxDay;
+  // Daily rate is always the FULL monthly basic ÷ days in month, so an LWP day
+  // is docked at the same rate regardless of a mid-month joining pro-rate.
+  const fullMonthlyBasic = override?.basic_pay_override != null
+    ? Number(override.basic_pay_override)
+    : parseFloat(basicPay);
+  const dailyRate = fullMonthlyBasic / maxDay;
   const extraDutyPayment = override?.extra_duty_amount != null
     ? Number(override.extra_duty_amount)
     : isBiswajeetJune2026 ? 13 * dailyRate : 0;
@@ -1343,8 +1357,10 @@ ${isDraft ? `
     </thead>
     <tbody>
       <tr>
-        <td>Basic Salary (Gross)</td>
-        <td>${maxDay}-day month</td>
+        <td>Basic Salary (Gross)${isPartialMonth ? ` <span style="font-size:9px;color:#6b7280;">&mdash; pro-rated from date of joining</span>` : ""}</td>
+        <td>${isPartialMonth
+          ? `${summary.employedDays} of ${maxDay} days &times; ₹${formatCurr(dailyRate)}/day`
+          : `${maxDay}-day month`}</td>
         <td class="earn">₹${formatCurr(effectiveBasicPay)}</td>
       </tr>
       ${extraDutyPayment > 0 ? `
