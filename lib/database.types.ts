@@ -298,6 +298,8 @@ export type PayrollOverride = {
   incentive_label: string | null;
   other_deduction_amount: number | null;
   other_deduction_label: string | null;
+  /** Comma-separated day numbers that were half days, e.g. "13,18". */
+  half_days: string | null;
   notes: string | null;
   updated_by: string | null;
   updated_at: string;

@@ -96,6 +96,7 @@ interface PayrollOverride {
   incentive_label: string | null;
   other_deduction_amount: number | null;
   other_deduction_label: string | null;
+  half_days: string | null;
   notes: string | null;
 }
 
@@ -1841,6 +1842,7 @@ export function AttendanceHRClient({ staffList, initialLeaves, initialDocuments,
                                 <OverrideField label="Other Deduction (₹)" name="otherDeductionAmount" defaultValue={staffOverride?.other_deduction_amount} />
                                 <OverrideTextField label="Other Deduction Label" name="otherDeductionLabel" defaultValue={staffOverride?.other_deduction_label} placeholder="e.g. Uniform cost" />
                               </div>
+                              <OverrideTextField label="Half Days (day numbers, e.g. 13,18)" name="halfDays" defaultValue={staffOverride?.half_days} placeholder="13,18" />
                               <OverrideTextField label="Internal Note (not printed)" name="notes" defaultValue={staffOverride?.notes} placeholder="Why this override was made" />
 
                               <div className="flex gap-2 pt-1">

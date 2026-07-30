@@ -661,6 +661,7 @@ export async function savePayrollOverride(
         incentive_label: str("incentiveLabel"),
         other_deduction_amount: num("otherDeductionAmount"),
         other_deduction_label: str("otherDeductionLabel"),
+        half_days: str("halfDays"),
         notes: str("notes"),
         updated_by: owner.id,
         updated_at: new Date().toISOString(),
@@ -1041,6 +1042,20 @@ async function generatePayslipInternal(
   if (isManojJune2026) {
     const halfDay = calendarDays.find((c) => c.dayNum === 30);
     if (halfDay) { halfDay.statusLabel = "½ LWP"; }
+  }
+
+  // Half days recorded on the override (e.g. "13,18") — the schema stores only
+  // whole days, so these are flagged here and the pay impact comes from the
+  // present_days / lwp_days override values.
+  if (override?.half_days) {
+    const halfDayNums = String(override.half_days)
+      .split(",")
+      .map((s: string) => parseInt(s.trim(), 10))
+      .filter((n: number) => Number.isFinite(n));
+    for (const dayNum of halfDayNums) {
+      const cell = calendarDays.find((c) => c.dayNum === dayNum);
+      if (cell) { cell.class = "cf-day"; cell.statusLabel = "½ Day"; }
+    }
   }
 
   // Display-only overrides for the two June 2026 corrections above — the
