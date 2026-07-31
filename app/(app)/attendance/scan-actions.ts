@@ -23,6 +23,14 @@ export type ScanResult = {
   details?: string[];
   /** Where to send the user next. */
   redirectTo?: string;
+  /**
+   * Set when the scan would check the user OUT. The UI asks them to confirm
+   * first, then re-scans with confirmCheckout — a second scan should never
+   * silently end someone's shift.
+   */
+  needsCheckoutConfirm?: boolean;
+  /** The token to replay when confirming the check-out. */
+  token?: string;
 };
 
 /**
@@ -35,6 +43,7 @@ export type ScanResult = {
 export async function handleScan(
   token: string,
   coords?: { latitude: number; longitude: number },
+  opts?: { confirmCheckout?: boolean },
 ): Promise<ScanResult> {
   const cleaned = token.trim();
   if (!cleaned) return { error: "No QR code detected. Please try again." };
@@ -58,7 +67,7 @@ export async function handleScan(
 
   switch (qr.qr_type) {
     case "attendance":
-      return handleAttendanceScan(qr, coords);
+      return handleAttendanceScan(qr, coords, opts);
 
     // Future workflows are added here. Until then, a recognised-but-unhandled
     // QR gives a clear message rather than a silent failure.
@@ -76,6 +85,7 @@ export async function handleScan(
 async function handleAttendanceScan(
   qr: any,
   coords?: { latitude: number; longitude: number },
+  opts?: { confirmCheckout?: boolean },
 ): Promise<ScanResult> {
   const profile = await requireProfile();
   const supabase = createClient();
@@ -144,6 +154,22 @@ async function handleAttendanceScan(
           dateLabel,
           `In ${timeLabel(existing.checked_in_at)} · Out ${timeLabel(existing.checked_out_at)}`,
           outlet.name,
+        ],
+      };
+    }
+
+    // Never end a shift on a stray second scan — ask first.
+    if (!opts?.confirmCheckout) {
+      return {
+        ok: true,
+        qrType: "attendance",
+        needsCheckoutConfirm: true,
+        token: qr.token,
+        title: "Check out?",
+        details: [
+          `You checked in at ${timeLabel(existing.checked_in_at)}`,
+          outlet.name,
+          "Only confirm if your shift has ended.",
         ],
       };
     }

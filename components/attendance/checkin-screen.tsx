@@ -3,14 +3,14 @@
 import { useEffect, useRef, useState } from "react";
 import { Html5Qrcode } from "html5-qrcode";
 import { toast } from "sonner";
-import { QrCode, MapPin, Loader2, CheckCircle2, AlertCircle, Camera } from "lucide-react";
+import { QrCode, MapPin, Loader2, CheckCircle2, AlertCircle, Camera, Clock } from "lucide-react";
 import { handleScan } from "@/app/(app)/attendance/scan-actions";
 import { SignOutButton } from "@/components/layout/sign-out-button";
 import { BrandLogo } from "@/components/brand-logo";
 import { cn } from "@/lib/utils";
 import { getCurrentCoords } from "@/lib/native";
 
-type Phase = "start" | "scanning" | "processing" | "success";
+type Phase = "start" | "scanning" | "processing" | "confirm" | "success";
 
 const QR_REGION_ID = "qr-reader-region";
 
@@ -22,6 +22,8 @@ export function CheckInScreen({ name, redirectTo, embedded }: { name: string; re
   const [error, setError] = useState("");
   const [resultTitle, setResultTitle] = useState("");
   const [resultDetails, setResultDetails] = useState<string[]>([]);
+  const [pendingToken, setPendingToken] = useState<string | null>(null);
+  const confirmingRef = useRef(false);
 
   const stopScan = async () => {
     const s = scannerRef.current;
@@ -79,7 +81,18 @@ export function CheckInScreen({ name, redirectTo, embedded }: { name: string; re
       // the runtime location prompt; the browser API is used on the web.
       const coords = await getCurrentCoords();
 
-      const res = await handleScan(token, coords);
+      const res = await handleScan(token, coords, { confirmCheckout: confirmingRef.current });
+      confirmingRef.current = false;
+
+      if (res.needsCheckoutConfirm) {
+        setResultTitle(res.title || "Check out?");
+        setResultDetails(res.details || []);
+        setPendingToken(res.token ?? token);
+        setPhase("confirm");
+        busyRef.current = false;
+        return;
+      }
+
       if (res.ok) {
         setResultTitle(res.title || "Done");
         setResultDetails(res.details || []);
@@ -159,6 +172,40 @@ export function CheckInScreen({ name, redirectTo, embedded }: { name: string; re
               <p className="flex items-center gap-1.5 text-sm text-content-secondary">
                 <MapPin className="size-4" /> {message}
               </p>
+            </div>
+          )}
+
+          {phase === "confirm" && (
+            <div className="space-y-4 py-6 text-center">
+              <div className="flex flex-col items-center gap-2">
+                <Clock className="size-10 text-amber-400" />
+                <p className="text-base font-bold text-content-primary">{resultTitle}</p>
+                {resultDetails.map((line) => (
+                  <p key={line} className="text-sm text-content-secondary">{line}</p>
+                ))}
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => { setPendingToken(null); setPhase("start"); }}
+                  className="flex-1 rounded-xl border border-border py-3 text-sm font-semibold text-content-secondary"
+                >
+                  Not yet
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!pendingToken) return;
+                    confirmingRef.current = true;
+                    setPhase("processing");
+                    setMessage("Checking you out…");
+                    void handleDecoded(pendingToken);
+                  }}
+                  className="flex-1 rounded-xl bg-white py-3 text-sm font-bold text-black transition-opacity hover:opacity-90"
+                >
+                  Yes, check out
+                </button>
+              </div>
             </div>
           )}
 
