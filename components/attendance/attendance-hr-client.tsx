@@ -144,6 +144,7 @@ interface Props {
   initialAdvances: PayrollAdvance[];
   ownerProfile: StaffProfile | null;
   attendanceChild: React.ReactNode;
+  todayAttendance?: React.ReactNode;
   outlets?: OutletOption[];
   initialHouseHelperPayments?: HouseHelperPayment[];
   initialPayrollOverrides?: PayrollOverride[];
@@ -194,7 +195,7 @@ function calculateUsedLeaves(leaves: LeaveRequest[], profileId: string) {
   };
 }
 
-export function AttendanceHRClient({ staffList, initialLeaves, initialDocuments, initialAdvances, ownerProfile, attendanceChild, outlets = [], initialHouseHelperPayments = [], initialPayrollOverrides = [] }: Props) {
+export function AttendanceHRClient({ staffList, initialLeaves, initialDocuments, initialAdvances, ownerProfile, attendanceChild, todayAttendance, outlets = [], initialHouseHelperPayments = [], initialPayrollOverrides = [] }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
   type TabKey = "attendance" | "leaves" | "documents" | "people" | "payroll";
@@ -543,7 +544,8 @@ export function AttendanceHRClient({ staffList, initialLeaves, initialDocuments,
       <div className="space-y-4">
         {/* 1. ATTENDANCE CLIENT */}
         {activeTab === "attendance" && (
-          <div className="animate-fade-in">
+          <div className="animate-fade-in space-y-4">
+            {todayAttendance}
             {attendanceChild}
           </div>
         )}

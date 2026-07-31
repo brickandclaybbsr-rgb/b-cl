@@ -3,6 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import { AttendanceClient } from "@/components/attendance/attendance-client";
 import { AttendanceHRClient } from "@/components/attendance/attendance-hr-client";
 import { getStaff } from "@/lib/data/profiles";
+import { getTodayAttendance } from "@/lib/data/attendance";
+import { TodayAttendancePanel } from "@/components/attendance/today-attendance";
 import { redirect } from "next/navigation";
 
 export const metadata = { title: "Peoples" };
@@ -14,6 +16,7 @@ export default async function AttendancePage() {
     redirect("/profile");
   }
   const staffList = await getStaff();
+  const todayAttendance = await getTodayAttendance();
   const supabase = createClient();
 
   // Load all punches
@@ -117,6 +120,7 @@ export default async function AttendancePage() {
         initialPayrollOverrides={payrollOverrides}
         outlets={outlets}
         ownerProfile={currentProfile}
+        todayAttendance={<TodayAttendancePanel data={todayAttendance} />}
         attendanceChild={
           <AttendanceClient
             staffList={staffList}
