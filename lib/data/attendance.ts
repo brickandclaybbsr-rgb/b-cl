@@ -29,6 +29,14 @@ export interface MyAttendanceDay {
   leaveType: "cl" | "sl" | "lwp" | null;
   /** Days before this employee joined — never counted against them. */
   notEmployed: boolean;
+  /**
+   * Where the day's attendance came from. History spans the switch-over:
+   * everything up to 30 Jul 2026 is biometric, from 31 Jul it's QR.
+   */
+  source: "qr" | "biometric" | null;
+  /** Biometric days store clock times (HH:MM:SS) rather than timestamps. */
+  punchIn: string | null;
+  punchOut: string | null;
 }
 
 export interface MyAttendance {
@@ -49,23 +57,43 @@ export async function getMyAttendance(profileId: string, days = 60): Promise<MyA
   const from = new Date(new Date(today + "T00:00:00").getTime() - (days - 1) * 86_400_000)
     .toISOString().slice(0, 10);
 
-  const [{ data: profile }, { data: checkins }, { data: leaves }, { data: outlets }] = await Promise.all([
-    supabase.from("profiles").select("date_of_joining").eq("id", profileId).maybeSingle(),
-    supabase.from("attendance_checkins").select("*").eq("profile_id", profileId).gte("date", from).lte("date", today),
-    supabase.from("leaves").select("leave_type,start_date,end_date")
-      .eq("profile_id", profileId).eq("status", "approved").lte("start_date", today).gte("end_date", from),
-    supabase.from("outlets").select("id,name"),
-  ]);
+  // Attendance spans two systems: biometric punches up to the QR switch-over,
+  // QR check-ins from then on. The history unions both so nothing before the
+  // switch shows up as a false absence.
+  const [{ data: profile }, { data: checkins }, { data: punches }, { data: leaves }, { data: outlets }] =
+    await Promise.all([
+      supabase.from("profiles").select("date_of_joining").eq("id", profileId).maybeSingle(),
+      supabase.from("attendance_checkins").select("*").eq("profile_id", profileId).gte("date", from).lte("date", today),
+      supabase.from("attendance_punches").select("date,time").eq("profile_id", profileId).gte("date", from).lte("date", today),
+      supabase.from("leaves").select("leave_type,start_date,end_date")
+        .eq("profile_id", profileId).eq("status", "approved").lte("start_date", today).gte("end_date", from),
+      supabase.from("outlets").select("id,name"),
+    ]);
 
   const outletName = Object.fromEntries((outlets ?? []).map((o: any) => [o.id, o.name]));
   const ciBy = Object.fromEntries((checkins ?? []).map((c: any) => [c.date, c]));
   const joining = profile?.date_of_joining ?? null;
 
+  // Biometric: keep the earliest and latest punch of each day as in/out.
+  const punchBy: Record<string, { first: string; last: string }> = {};
+  for (const p of (punches ?? []) as any[]) {
+    const t = String(p.time ?? "");
+    if (!t) continue;
+    const cur = punchBy[p.date];
+    if (!cur) punchBy[p.date] = { first: t, last: t };
+    else {
+      if (t < cur.first) cur.first = t;
+      if (t > cur.last) cur.last = t;
+    }
+  }
+
   const rows: MyAttendanceDay[] = [];
   for (let d = new Date(today + "T00:00:00"); d >= new Date(from + "T00:00:00"); d.setDate(d.getDate() - 1)) {
     const date = d.toISOString().slice(0, 10);
     const ci = ciBy[date];
+    const bio = punchBy[date];
     const lv = (leaves ?? []).find((l: any) => l.start_date <= date && l.end_date >= date);
+
     rows.push({
       date,
       checkedInAt: ci?.checked_in_at ?? null,
@@ -73,16 +101,20 @@ export async function getMyAttendance(profileId: string, days = 60): Promise<MyA
       outletName: ci?.outlet_id ? outletName[ci.outlet_id] ?? null : null,
       leaveType: (lv?.leave_type as any) ?? null,
       notEmployed: !!joining && date < joining,
+      source: ci ? "qr" : bio ? "biometric" : null,
+      punchIn: !ci && bio ? bio.first : null,
+      punchOut: !ci && bio && bio.last !== bio.first ? bio.last : null,
     });
   }
 
+  const present = (r: MyAttendanceDay) => !!r.checkedInAt || r.source === "biometric";
   const counted = rows.filter((r) => !r.notEmployed);
   return {
     today: rows.find((r) => r.date === today) ?? null,
     days: rows,
-    presentCount: counted.filter((r) => r.checkedInAt).length,
-    leaveCount: counted.filter((r) => !r.checkedInAt && r.leaveType).length,
-    absentCount: counted.filter((r) => !r.checkedInAt && !r.leaveType).length,
+    presentCount: counted.filter(present).length,
+    leaveCount: counted.filter((r) => !present(r) && r.leaveType).length,
+    absentCount: counted.filter((r) => !present(r) && !r.leaveType).length,
   };
 }
 

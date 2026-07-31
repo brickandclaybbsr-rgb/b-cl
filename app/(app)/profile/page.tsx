@@ -58,8 +58,9 @@ export default async function ProfilePage() {
   let documents: any[] = [];
   // Head chef gets a read-only view of everyone's leave requests.
   const headChef = isHeadChef(currentProfile);
-  // Staff see their own QR attendance history. Owners don't use QR check-in.
-  const myAttendance = currentProfile.role === "staff"
+  // Staff see their own attendance history. Owners don't use QR check-in, and
+  // house helpers are paid daily in cash without attendance records at all.
+  const myAttendance = currentProfile.role === "staff" && !currentProfile.is_house_helper
     ? await getMyAttendance(currentProfile.id, 60).catch(() => null)
     : null;
   let allLeaves: any[] = [];

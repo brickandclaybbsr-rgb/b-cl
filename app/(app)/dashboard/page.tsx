@@ -47,8 +47,9 @@ export default async function StaffDashboard() {
   const alerts = snap.lowItems.length + snap.outItems.length;
   const kitchenOnly = profile.team === "kitchen";
 
-  // Staff see their own QR attendance for today. Owners don't use QR check-in.
-  const myAttendance = profile.role === "staff"
+  // Staff see their own attendance. Owners don't use QR check-in, and house
+  // helpers are paid daily in cash without attendance records at all.
+  const myAttendance = profile.role === "staff" && !profile.is_house_helper
     ? await getMyAttendance(profile.id, 60).catch(() => null)
     : null;
 

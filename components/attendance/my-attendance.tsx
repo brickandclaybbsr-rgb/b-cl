@@ -121,40 +121,55 @@ export function MyAttendanceHistory({ data }: { data: MyAttendance }) {
   );
 }
 
+/** "14:05:00" -> "2:05 pm" */
+function clock(hhmmss: string) {
+  const [h, m] = hhmmss.split(":");
+  const hour = parseInt(h, 10);
+  const suffix = hour >= 12 ? "pm" : "am";
+  const h12 = hour % 12 === 0 ? 12 : hour % 12;
+  return `${h12}:${m} ${suffix}`;
+}
+
 function Row({ day }: { day: MyAttendanceDay }) {
-  const isIn = !!day.checkedInAt;
-  const onLeave = !isIn && !!day.leaveType;
+  const isQr = !!day.checkedInAt;
+  const isBio = day.source === "biometric";
+  const isPresent = isQr || isBio;
+  const onLeave = !isPresent && !!day.leaveType;
 
   return (
     <div className="flex items-center gap-3 px-3 py-2.5 text-xs">
       <span
         className={cn(
           "flex size-6 shrink-0 items-center justify-center rounded-full",
-          isIn ? "bg-green-500/15 text-green-400"
+          isPresent ? "bg-green-500/15 text-green-400"
             : onLeave ? "bg-bg-elevated text-content-secondary"
             : "bg-danger/15 text-danger",
         )}
       >
-        {isIn ? <CheckCircle2 className="size-3.5" />
+        {isPresent ? <CheckCircle2 className="size-3.5" />
           : onLeave ? <CalendarOff className="size-3.5" />
           : <AlertCircle className="size-3.5" />}
       </span>
 
       <div className="min-w-0 flex-1">
         <p className="font-semibold text-content-primary">{dayLabel(day.date)}</p>
-        {isIn && day.outletName && (
-          <p className="text-[11px] text-content-secondary truncate">{day.outletName}</p>
-        )}
+        <p className="text-[11px] text-content-secondary truncate">
+          {isQr ? day.outletName ?? "QR check-in" : isBio ? "Biometric" : ""}
+        </p>
       </div>
 
       <div className="shrink-0 text-right">
-        {isIn ? (
+        {isQr ? (
           <>
             <p className="font-mono font-semibold text-content-primary">
               {time(day.checkedInAt!)}{day.checkedOutAt ? ` – ${time(day.checkedOutAt)}` : ""}
             </p>
             {!day.checkedOutAt && <p className="text-[10px] text-content-secondary">no check-out</p>}
           </>
+        ) : isBio ? (
+          <p className="font-mono font-semibold text-content-primary">
+            {clock(day.punchIn!)}{day.punchOut ? ` – ${clock(day.punchOut)}` : ""}
+          </p>
         ) : onLeave ? (
           <Badge variant="default" className="text-[9px] uppercase px-1.5 py-0 bg-bg-elevated text-content-secondary border border-border/30">
             {day.leaveType!.toUpperCase()}
