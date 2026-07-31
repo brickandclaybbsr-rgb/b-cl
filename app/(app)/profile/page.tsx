@@ -1,6 +1,8 @@
 import { AlertTriangle, MessageCircle, Settings, Shield, User, Bell, CalendarClock } from "lucide-react";
 import { requireProfile, isHeadChef } from "@/lib/auth";
 import { getStaff, getProfileNameMap } from "@/lib/data/profiles";
+import { getMyAttendance } from "@/lib/data/attendance";
+import { MyAttendanceHistory } from "@/components/attendance/my-attendance";
 import { getAllStockItems } from "@/lib/data/stock";
 import { getAllVendors } from "@/lib/data/vendors";
 import { getAllChecklistItems, getAppSetting } from "@/lib/data/settings";
@@ -56,6 +58,10 @@ export default async function ProfilePage() {
   let documents: any[] = [];
   // Head chef gets a read-only view of everyone's leave requests.
   const headChef = isHeadChef(currentProfile);
+  // Staff see their own QR attendance history. Owners don't use QR check-in.
+  const myAttendance = currentProfile.role === "staff"
+    ? await getMyAttendance(currentProfile.id, 60).catch(() => null)
+    : null;
   let allLeaves: any[] = [];
   let staffNames: Record<string, string> = {};
 
@@ -189,6 +195,7 @@ export default async function ProfilePage() {
             initialDocuments={documents}
             allLeaves={headChef ? allLeaves : undefined}
             staffNames={headChef ? staffNames : undefined}
+            myAttendance={myAttendance ? <MyAttendanceHistory data={myAttendance} /> : undefined}
             attendanceChild={
               <AttendanceClient
                 staffList={[currentProfile]}

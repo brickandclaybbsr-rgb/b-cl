@@ -21,6 +21,71 @@ export interface TodayAttendance {
   checkedOutCount: number;
 }
 
+export interface MyAttendanceDay {
+  date: string;
+  checkedInAt: string | null;
+  checkedOutAt: string | null;
+  outletName: string | null;
+  leaveType: "cl" | "sl" | "lwp" | null;
+  /** Days before this employee joined — never counted against them. */
+  notEmployed: boolean;
+}
+
+export interface MyAttendance {
+  today: MyAttendanceDay | null;
+  days: MyAttendanceDay[];   // newest first
+  presentCount: number;
+  leaveCount: number;
+  absentCount: number;
+}
+
+/**
+ * One employee's own attendance record, newest first, from the QR rollout
+ * onwards. Used on their dashboard (today) and profile (full history).
+ */
+export async function getMyAttendance(profileId: string, days = 60): Promise<MyAttendance> {
+  const supabase = createClient();
+  const today = todayIST();
+  const from = new Date(new Date(today + "T00:00:00").getTime() - (days - 1) * 86_400_000)
+    .toISOString().slice(0, 10);
+
+  const [{ data: profile }, { data: checkins }, { data: leaves }, { data: outlets }] = await Promise.all([
+    supabase.from("profiles").select("date_of_joining").eq("id", profileId).maybeSingle(),
+    supabase.from("attendance_checkins").select("*").eq("profile_id", profileId).gte("date", from).lte("date", today),
+    supabase.from("leaves").select("leave_type,start_date,end_date")
+      .eq("profile_id", profileId).eq("status", "approved").lte("start_date", today).gte("end_date", from),
+    supabase.from("outlets").select("id,name"),
+  ]);
+
+  const outletName = Object.fromEntries((outlets ?? []).map((o: any) => [o.id, o.name]));
+  const ciBy = Object.fromEntries((checkins ?? []).map((c: any) => [c.date, c]));
+  const joining = profile?.date_of_joining ?? null;
+
+  const rows: MyAttendanceDay[] = [];
+  for (let d = new Date(today + "T00:00:00"); d >= new Date(from + "T00:00:00"); d.setDate(d.getDate() - 1)) {
+    const date = d.toISOString().slice(0, 10);
+    const ci = ciBy[date];
+    const lv = (leaves ?? []).find((l: any) => l.start_date <= date && l.end_date >= date);
+    rows.push({
+      date,
+      checkedInAt: ci?.checked_in_at ?? null,
+      checkedOutAt: ci?.checked_out_at ?? null,
+      outletName: ci?.outlet_id ? outletName[ci.outlet_id] ?? null : null,
+      leaveType: (lv?.leave_type as any) ?? null,
+      notEmployed: !!joining && date < joining,
+    });
+  }
+
+  const counted = rows.filter((r) => !r.notEmployed);
+  return {
+    today: rows.find((r) => r.date === today) ?? null,
+    days: rows,
+    presentCount: counted.filter((r) => r.checkedInAt).length,
+    leaveCount: counted.filter((r) => !r.checkedInAt && r.leaveType).length,
+    absentCount: counted.filter((r) => !r.checkedInAt && !r.leaveType).length,
+  };
+}
+
 /**
  * Live attendance picture for today: who has scanned in, who has scanned out,
  * who is on approved leave, and who is still missing. House helpers are

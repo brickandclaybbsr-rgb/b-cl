@@ -20,6 +20,8 @@ import { formatDateLabel, formatTimeIST, daysAgoIST } from "@/lib/date";
 import { APP_START_DATE } from "@/lib/constants";
 import { formatINR } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/server";
+import { getMyAttendance } from "@/lib/data/attendance";
+import { MyAttendanceToday } from "@/components/attendance/my-attendance";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import type { CashExpense, StaffLeave } from "@/lib/database.types";
@@ -44,6 +46,11 @@ export default async function StaffDashboard() {
   const firstName = profile.name.split(" ")[0];
   const alerts = snap.lowItems.length + snap.outItems.length;
   const kitchenOnly = profile.team === "kitchen";
+
+  // Staff see their own QR attendance for today. Owners don't use QR check-in.
+  const myAttendance = profile.role === "staff"
+    ? await getMyAttendance(profile.id, 60).catch(() => null)
+    : null;
 
   // Fetch sales range (front desk / owner only — skip for kitchen)
   const salesInWindow = !kitchenOnly
@@ -155,6 +162,13 @@ export default async function StaffDashboard() {
           {greeting()}, {firstName} 👋
         </h1>
       </div>
+
+      {/* My attendance today */}
+      {myAttendance && (
+        <div className="mb-5">
+          <MyAttendanceToday data={myAttendance} />
+        </div>
+      )}
 
       {/* progress */}
       <Card className="mb-5 p-4">

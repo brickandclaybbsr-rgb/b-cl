@@ -60,6 +60,7 @@ interface Props {
   initialLeaves: LeaveRequest[];
   initialDocuments: StaffDocument[];
   attendanceChild: React.ReactNode;
+  myAttendance?: React.ReactNode;
   /** Head chef only: all staff leave requests (read-only). */
   allLeaves?: LeaveRequest[];
   /** Head chef only: profile id → name map for the read-only list. */
@@ -117,7 +118,7 @@ function calculateOwnUsedLeaves(leaves: LeaveRequest[]) {
   };
 }
 
-export function ProfileClient({ initialLeaves, initialDocuments, attendanceChild, allLeaves, staffNames }: Props) {
+export function ProfileClient({ initialLeaves, initialDocuments, attendanceChild, myAttendance, allLeaves, staffNames }: Props) {
   const isHeadChef = Array.isArray(allLeaves);
   const [activeTab, setActiveTab] = useState<"attendance" | "documents" | "leaves">("attendance");
   const [leaves, setLeaves] = useState<LeaveRequest[]>(initialLeaves);
@@ -276,7 +277,8 @@ export function ProfileClient({ initialLeaves, initialDocuments, attendanceChild
       <div className="space-y-4">
         {/* ATTENDANCE TAB */}
         {activeTab === "attendance" && (
-          <div className="animate-fade-in">
+          <div className="animate-fade-in space-y-4">
+            {myAttendance}
             {attendanceChild}
           </div>
         )}
