@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { daysAgoIST, todayIST } from "@/lib/date";
+import { daysAgoIST, todayIST, datesDescending } from "@/lib/date";
 import { getSalesRange, salesTotal } from "@/lib/data/sales";
 import type { EodReport, DailySales, CashExpense } from "@/lib/database.types";
 
@@ -90,10 +90,7 @@ export async function getAttendanceStatusRange(from: string, to: string): Promis
   const closeSet = new Set((closing ?? []).map((r: any) => r.date));
 
   const out: AttendanceStatusDay[] = [];
-  const start = new Date(from + "T00:00:00");
-  const end = new Date(to + "T00:00:00");
-  for (let d = new Date(end); d >= start; d.setDate(d.getDate() - 1)) {
-    const date = d.toISOString().slice(0, 10);
+  for (const date of datesDescending(from, to)) {
     out.push({ date, openingFiled: openSet.has(date), closingFiled: closeSet.has(date) });
   }
   return out;
@@ -194,10 +191,7 @@ export async function getClosingBalanceRange(from: string, to: string): Promise<
   }
 
   const out: ClosingBalanceDay[] = [];
-  const start = new Date(from + "T00:00:00");
-  const end = new Date(to + "T00:00:00");
-  for (let d = new Date(end); d >= start; d.setDate(d.getDate() - 1)) {
-    const date = d.toISOString().slice(0, 10);
+  for (const date of datesDescending(from, to)) {
     const opening = openingByDate.get(date) as any;
     const closing = closingByDate.get(date) as any;
     const sale = salesByDate.get(date);

@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { todayIST } from "@/lib/date";
+import { todayIST, datesDescending, dateMinusDays } from "@/lib/date";
 
 export interface TodayAttendanceRow {
   profileId: string;
@@ -54,8 +54,7 @@ export interface MyAttendance {
 export async function getMyAttendance(profileId: string, days = 60): Promise<MyAttendance> {
   const supabase = createClient();
   const today = todayIST();
-  const from = new Date(new Date(today + "T00:00:00").getTime() - (days - 1) * 86_400_000)
-    .toISOString().slice(0, 10);
+  const from = dateMinusDays(today, days - 1);
 
   // Attendance spans two systems: biometric punches up to the QR switch-over,
   // QR check-ins from then on. The history unions both so nothing before the
@@ -88,8 +87,7 @@ export async function getMyAttendance(profileId: string, days = 60): Promise<MyA
   }
 
   const rows: MyAttendanceDay[] = [];
-  for (let d = new Date(today + "T00:00:00"); d >= new Date(from + "T00:00:00"); d.setDate(d.getDate() - 1)) {
-    const date = d.toISOString().slice(0, 10);
+  for (const date of datesDescending(from, today)) {
     const ci = ciBy[date];
     const bio = punchBy[date];
     const lv = (leaves ?? []).find((l: any) => l.start_date <= date && l.end_date >= date);

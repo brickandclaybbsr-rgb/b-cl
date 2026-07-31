@@ -278,8 +278,9 @@ export function ProfileClient({ initialLeaves, initialDocuments, attendanceChild
         {/* ATTENDANCE TAB */}
         {activeTab === "attendance" && (
           <div className="animate-fade-in space-y-4">
-            {myAttendance}
-            {attendanceChild}
+            {/* One combined month-wise record (biometric + QR). The older raw
+                punch list is only shown when that view isn't available. */}
+            {myAttendance ?? attendanceChild}
           </div>
         )}
 

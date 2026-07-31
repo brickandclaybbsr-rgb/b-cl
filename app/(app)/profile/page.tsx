@@ -61,7 +61,7 @@ export default async function ProfilePage() {
   // Staff see their own attendance history. Owners don't use QR check-in, and
   // house helpers are paid daily in cash without attendance records at all.
   const myAttendance = currentProfile.role === "staff" && !currentProfile.is_house_helper
-    ? await getMyAttendance(currentProfile.id, 60).catch(() => null)
+    ? await getMyAttendance(currentProfile.id, 120).catch(() => null)
     : null;
   let allLeaves: any[] = [];
   let staffNames: Record<string, string> = {};

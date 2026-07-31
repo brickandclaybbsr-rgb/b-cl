@@ -1,5 +1,11 @@
+"use client";
+
+import { useState } from "react";
 import Link from "next/link";
-import { CheckCircle2, CalendarOff, AlertCircle, MapPin, QrCode, LogOut } from "lucide-react";
+import {
+  CheckCircle2, CalendarOff, AlertCircle, MapPin, QrCode, LogOut,
+  ChevronDown, ChevronRight,
+} from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -17,13 +23,34 @@ function time(iso: string) {
   });
 }
 
-function dayLabel(date: string) {
-  return new Date(date + "T00:00:00").toLocaleDateString("en-IN", {
-    weekday: "short", day: "numeric", month: "short",
-  });
+/** "14:05:00" -> "2:05 pm" */
+function clock(hhmmss: string) {
+  const [h, m] = hhmmss.split(":");
+  const hour = parseInt(h, 10);
+  const suffix = hour >= 12 ? "pm" : "am";
+  const h12 = hour % 12 === 0 ? 12 : hour % 12;
+  return `${h12}:${m} ${suffix}`;
 }
 
-/** Compact "today" card for the staff dashboard. */
+function dayNum(date: string) {
+  return new Date(date + "T00:00:00").toLocaleDateString("en-IN", { day: "2-digit" });
+}
+function weekday(date: string) {
+  return new Date(date + "T00:00:00").toLocaleDateString("en-IN", { weekday: "short" });
+}
+function monthKey(date: string) {
+  return date.slice(0, 7);
+}
+function monthLabel(key: string) {
+  const [y, m] = key.split("-");
+  return new Date(parseInt(y), parseInt(m) - 1, 1)
+    .toLocaleDateString("en-IN", { month: "long", year: "numeric" });
+}
+
+const isPresent = (d: MyAttendanceDay) => !!d.checkedInAt || d.source === "biometric";
+
+/* ── Dashboard: today only ─────────────────────────────────────────────── */
+
 export function MyAttendanceToday({ data }: { data: MyAttendance }) {
   const t = data.today;
   const isIn = !!t?.checkedInAt;
@@ -96,88 +123,125 @@ export function MyAttendanceToday({ data }: { data: MyAttendance }) {
   );
 }
 
-/** Full date-wise history for the profile page. */
+/* ── Profile: month-by-month history ───────────────────────────────────── */
+
 export function MyAttendanceHistory({ data }: { data: MyAttendance }) {
   const visible = data.days.filter((d) => !d.notEmployed);
 
+  // Group into months, newest first (data.days is already newest-first).
+  const months: { key: string; days: MyAttendanceDay[] }[] = [];
+  for (const d of visible) {
+    const key = monthKey(d.date);
+    let bucket = months.find((m) => m.key === key);
+    if (!bucket) { bucket = { key, days: [] }; months.push(bucket); }
+    bucket.days.push(d);
+  }
+
+  const [open, setOpen] = useState<string | null>(months[0]?.key ?? null);
+
+  if (visible.length === 0) {
+    return (
+      <Card className="p-5 text-center text-xs text-content-secondary">
+        No attendance records yet.
+      </Card>
+    );
+  }
+
   return (
     <div className="space-y-3">
+      {/* Overall totals */}
       <div className="grid grid-cols-3 gap-2.5">
         <Stat label="Present" value={data.presentCount} tone="success" />
         <Stat label="Leave" value={data.leaveCount} tone="muted" />
         <Stat label="Absent" value={data.absentCount} tone={data.absentCount > 0 ? "danger" : "muted"} />
       </div>
 
-      {visible.length === 0 ? (
-        <Card className="p-5 text-center text-xs text-content-secondary">
-          No attendance records yet.
-        </Card>
-      ) : (
-        <Card className="divide-y divide-border/30 overflow-hidden">
-          {visible.map((d) => <Row key={d.date} day={d} />)}
-        </Card>
-      )}
+      {months.map((m) => {
+        const present = m.days.filter(isPresent).length;
+        const leave = m.days.filter((d) => !isPresent(d) && d.leaveType).length;
+        const absent = m.days.filter((d) => !isPresent(d) && !d.leaveType).length;
+        const isOpen = open === m.key;
+
+        return (
+          <Card key={m.key} className="overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setOpen(isOpen ? null : m.key)}
+              className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-bg-elevated/40"
+            >
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-bold text-content-primary">{monthLabel(m.key)}</p>
+                <p className="mt-0.5 flex flex-wrap gap-x-3 text-[11px] text-content-secondary">
+                  <span className="text-green-400">{present} present</span>
+                  {leave > 0 && <span>{leave} leave</span>}
+                  {absent > 0 && <span className="text-danger">{absent} absent</span>}
+                </p>
+              </div>
+              {isOpen
+                ? <ChevronDown className="size-4 shrink-0 text-content-secondary" />
+                : <ChevronRight className="size-4 shrink-0 text-content-secondary" />}
+            </button>
+
+            {isOpen && (
+              <div className="divide-y divide-border/30 border-t border-border/40">
+                {m.days.map((d) => <Row key={d.date} day={d} />)}
+              </div>
+            )}
+          </Card>
+        );
+      })}
     </div>
   );
-}
-
-/** "14:05:00" -> "2:05 pm" */
-function clock(hhmmss: string) {
-  const [h, m] = hhmmss.split(":");
-  const hour = parseInt(h, 10);
-  const suffix = hour >= 12 ? "pm" : "am";
-  const h12 = hour % 12 === 0 ? 12 : hour % 12;
-  return `${h12}:${m} ${suffix}`;
 }
 
 function Row({ day }: { day: MyAttendanceDay }) {
   const isQr = !!day.checkedInAt;
   const isBio = day.source === "biometric";
-  const isPresent = isQr || isBio;
-  const onLeave = !isPresent && !!day.leaveType;
+  const present = isQr || isBio;
+  const onLeave = !present && !!day.leaveType;
 
   return (
-    <div className="flex items-center gap-3 px-3 py-2.5 text-xs">
+    <div className="flex items-center gap-3 px-4 py-2 text-xs">
+      {/* Date */}
+      <div className="w-9 shrink-0 text-center">
+        <p className="font-mono text-sm font-bold leading-none text-content-primary">{dayNum(day.date)}</p>
+        <p className="mt-0.5 text-[10px] uppercase text-content-secondary">{weekday(day.date)}</p>
+      </div>
+
       <span
         className={cn(
-          "flex size-6 shrink-0 items-center justify-center rounded-full",
-          isPresent ? "bg-green-500/15 text-green-400"
+          "flex size-5 shrink-0 items-center justify-center rounded-full",
+          present ? "bg-green-500/15 text-green-400"
             : onLeave ? "bg-bg-elevated text-content-secondary"
             : "bg-danger/15 text-danger",
         )}
       >
-        {isPresent ? <CheckCircle2 className="size-3.5" />
-          : onLeave ? <CalendarOff className="size-3.5" />
-          : <AlertCircle className="size-3.5" />}
+        {present ? <CheckCircle2 className="size-3" />
+          : onLeave ? <CalendarOff className="size-3" />
+          : <AlertCircle className="size-3" />}
       </span>
 
+      {/* Times / status */}
       <div className="min-w-0 flex-1">
-        <p className="font-semibold text-content-primary">{dayLabel(day.date)}</p>
-        <p className="text-[11px] text-content-secondary truncate">
-          {isQr ? day.outletName ?? "QR check-in" : isBio ? "Biometric" : ""}
-        </p>
-      </div>
-
-      <div className="shrink-0 text-right">
-        {isQr ? (
-          <>
-            <p className="font-mono font-semibold text-content-primary">
-              {time(day.checkedInAt!)}{day.checkedOutAt ? ` – ${time(day.checkedOutAt)}` : ""}
-            </p>
-            {!day.checkedOutAt && <p className="text-[10px] text-content-secondary">no check-out</p>}
-          </>
-        ) : isBio ? (
+        {present ? (
           <p className="font-mono font-semibold text-content-primary">
-            {clock(day.punchIn!)}{day.punchOut ? ` – ${clock(day.punchOut)}` : ""}
+            {isQr
+              ? `${time(day.checkedInAt!)}${day.checkedOutAt ? ` – ${time(day.checkedOutAt)}` : ""}`
+              : `${clock(day.punchIn!)}${day.punchOut ? ` – ${clock(day.punchOut)}` : ""}`}
           </p>
         ) : onLeave ? (
-          <Badge variant="default" className="text-[9px] uppercase px-1.5 py-0 bg-bg-elevated text-content-secondary border border-border/30">
-            {day.leaveType!.toUpperCase()}
-          </Badge>
+          <p className="text-content-secondary">{LEAVE_LABEL[day.leaveType!] ?? day.leaveType}</p>
         ) : (
-          <Badge variant="danger" className="text-[9px] uppercase px-1.5 py-0">Absent</Badge>
+          <p className="text-danger">Absent</p>
         )}
       </div>
+
+      {/* Source — only meaningful on present days */}
+      {present && (
+        <span className="shrink-0 text-[10px] uppercase tracking-wider text-content-secondary/70">
+          {isQr ? "QR" : "Bio"}
+        </span>
+      )}
     </div>
   );
 }

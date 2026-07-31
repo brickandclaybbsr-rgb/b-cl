@@ -60,3 +60,30 @@ export function formatTimeIST(ts: string | Date): string {
 export function formatTimestampIST(ts: string | Date): string {
   return formatInTimeZone(new Date(ts), IST_TZ, "dd MMM yyyy, h:mm a");
 }
+
+/**
+ * Every business date from `to` back to `from`, inclusive, newest first.
+ *
+ * Built on UTC deliberately: `new Date("2026-07-31T00:00:00")` parses in the
+ * server's local zone, so calling `.toISOString()` on it shifts the date back
+ * a day for any zone ahead of UTC (IST is +5:30). Anchoring to UTC keeps the
+ * calendar date stable regardless of where the server runs.
+ */
+export function datesDescending(from: string, to: string): string[] {
+  const start = Date.parse(from + "T00:00:00Z");
+  const end = Date.parse(to + "T00:00:00Z");
+  if (isNaN(start) || isNaN(end) || end < start) return [];
+
+  const out: string[] = [];
+  for (let t = end; t >= start; t -= 86_400_000) {
+    out.push(new Date(t).toISOString().slice(0, 10));
+  }
+  return out;
+}
+
+/** `days` calendar days before `date` (inclusive window start), as yyyy-MM-dd. */
+export function dateMinusDays(date: string, days: number): string {
+  return new Date(Date.parse(date + "T00:00:00Z") - days * 86_400_000)
+    .toISOString()
+    .slice(0, 10);
+}
