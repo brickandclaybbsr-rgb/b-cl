@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SubmitButton } from "@/components/ui/submit-button";
 import type { Outlet } from "@/lib/database.types";
+import { getCurrentCoords } from "@/lib/native";
 import { saveOutlet, deleteOutlet, type OutletActionState } from "@/app/(app)/attendance/checkin-actions";
 
 export function OutletsClient({
@@ -100,25 +101,20 @@ function OutletForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state]);
 
-  const useMyLocation = () => {
-    if (!("geolocation" in navigator)) {
-      toast.error("Geolocation not available on this device.");
-      return;
-    }
+  const useMyLocation = async () => {
     setLocating(true);
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setLat(pos.coords.latitude.toFixed(6));
-        setLng(pos.coords.longitude.toFixed(6));
-        setLocating(false);
-        toast.success("Location captured");
-      },
-      () => {
-        setLocating(false);
-        toast.error("Could not get your location. Enable location access.");
-      },
-      { enableHighAccuracy: true, timeout: 15000 },
-    );
+    try {
+      // Uses the Capacitor plugin inside the app shell so Android prompts for
+      // the runtime location permission; browser API on the web.
+      const coords = await getCurrentCoords();
+      setLat(coords.latitude.toFixed(6));
+      setLng(coords.longitude.toFixed(6));
+      toast.success("Location captured");
+    } catch (err: any) {
+      toast.error(err?.message || "Could not get your location. Enable location access.");
+    } finally {
+      setLocating(false);
+    }
   };
 
   return (

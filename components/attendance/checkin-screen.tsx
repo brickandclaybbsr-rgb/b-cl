@@ -8,6 +8,7 @@ import { handleScan } from "@/app/(app)/attendance/scan-actions";
 import { SignOutButton } from "@/components/layout/sign-out-button";
 import { BrandLogo } from "@/components/brand-logo";
 import { cn } from "@/lib/utils";
+import { getCurrentCoords } from "@/lib/native";
 
 type Phase = "start" | "scanning" | "processing" | "success";
 
@@ -73,48 +74,31 @@ export function CheckInScreen({ name, redirectTo, embedded }: { name: string; re
     setMessage("QR scanned — confirming your location…");
     await stopScan();
 
-    if (!("geolocation" in navigator)) {
-      setError("This device can't share its location, which is required to check in.");
-      setPhase("start");
-      busyRef.current = false;
-      return;
+    try {
+      // Native builds go through the Capacitor plugin so Android actually shows
+      // the runtime location prompt; the browser API is used on the web.
+      const coords = await getCurrentCoords();
+
+      const res = await handleScan(token, coords);
+      if (res.ok) {
+        setResultTitle(res.title || "Done");
+        setResultDetails(res.details || []);
+        setPhase("success");
+        toast.success(res.title || "Done");
+        const target = res.redirectTo ?? redirectTo;
+        setTimeout(() => {
+          if (target) window.location.assign(target);
+          else window.location.reload();
+        }, 1400);
+        return;
+      }
+      setError(res.error || "Scan failed. Please try again.");
+    } catch (err: any) {
+      setError(err?.message || "Something went wrong. Please try again.");
     }
 
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        try {
-          const res = await handleScan(token, {
-            latitude: pos.coords.latitude,
-            longitude: pos.coords.longitude,
-          });
-          if (res.ok) {
-            setResultTitle(res.title || "Done");
-            setResultDetails(res.details || []);
-            setPhase("success");
-            toast.success(res.title || "Done");
-            const target = res.redirectTo ?? redirectTo;
-            setTimeout(() => {
-              if (target) window.location.assign(target);
-              else window.location.reload();
-            }, 1400);
-          } else {
-            setError(res.error || "Scan failed. Please try again.");
-            setPhase("start");
-            busyRef.current = false;
-          }
-        } catch {
-          setError("Something went wrong. Please try again.");
-          setPhase("start");
-          busyRef.current = false;
-        }
-      },
-      () => {
-        setError("Location access is required to mark attendance. Enable location and try again.");
-        setPhase("start");
-        busyRef.current = false;
-      },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 },
-    );
+    setPhase("start");
+    busyRef.current = false;
   };
 
   return (
