@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, useMemo, useCallback } from "react";
+import { useState, useTransition, useMemo, useCallback, useEffect } from "react";
 import { toast } from "sonner";
 import {
   Upload,
@@ -16,6 +16,7 @@ import {
   CalendarDays,
   User,
   ImageDown,
+  X,
 } from "lucide-react";
 import { parseBiometricCSV, type BiometricRow } from "./csv-parser";
 import { saveAttendancePunches, clearAttendanceForMonth } from "@/app/(app)/attendance/actions";
@@ -105,7 +106,9 @@ export function AttendanceClient({ staffList, currentProfile, initialPunches, in
   const [dbPunches, setDbPunches] = useState<DBAttendancePunch[]>(initialPunches);
   const [expandedStaffId, setExpandedStaffId] = useState<string | null>(null);
 
-  // CSV upload state
+  // CSV upload state. Attendance is QR-first now, so the uploader lives behind
+  // a button — it's only needed for months before the switch-over.
+  const [uploadOpen, setUploadOpen] = useState(false);
   const [parsedRows, setParsedRows] = useState<BiometricRow[]>([]);
   const [unmatchedNames, setUnmatchedNames] = useState<string[]>([]);
   const [tempMappings, setTempMappings] = useState<Record<string, string>>({});
@@ -113,6 +116,13 @@ export function AttendanceClient({ staffList, currentProfile, initialPunches, in
   const [isDragging, setIsDragging] = useState(false);
 
   const [pending, startTransition] = useTransition();
+
+  useEffect(() => {
+    if (!uploadOpen) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setUploadOpen(false); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [uploadOpen]);
 
   const yearOptions = [now.getFullYear() - 1, now.getFullYear(), now.getFullYear() + 1];
   const monthString = `${selectedYear}-${String(selectedMonth).padStart(2, "0")}`;
@@ -513,11 +523,10 @@ export function AttendanceClient({ staffList, currentProfile, initialPunches, in
 
   // ── Owner CSV upload panel ─────────────────────────────────────────────────
 
+  // Called as a plain function, not <OwnerUpload />, so the dropzone keeps its
+  // state instead of remounting on every parent render.
   const OwnerUpload = () => (
-    <Card className="p-4 space-y-4">
-      <h2 className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-warm">
-        <Upload className="size-4" /> Upload Biometric CSV
-      </h2>
+    <div className="space-y-4">
       <div
         onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
         onDragLeave={() => setIsDragging(false)}
@@ -599,7 +608,40 @@ export function AttendanceClient({ staffList, currentProfile, initialPunches, in
           </Button>
         </div>
       )}
-    </Card>
+    </div>
+  );
+
+  const UploadDialog = () => (
+    <div
+      className="fixed inset-0 z-[200] flex items-center justify-center p-4"
+      onClick={() => setUploadOpen(false)}
+    >
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+      <div
+        className="relative flex max-h-[85vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-border bg-bg-card shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-3 border-b border-border px-4 py-3">
+          <div>
+            <h2 className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-warm">
+              <Upload className="size-4" /> Upload Biometric CSV
+            </h2>
+            <p className="mt-0.5 text-[11px] text-content-secondary">
+              Only needed for months before the QR switch-over.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setUploadOpen(false)}
+            className="shrink-0 rounded-lg p-1.5 text-content-secondary transition-colors hover:bg-white/5 hover:text-content-primary"
+            aria-label="Close"
+          >
+            <X className="size-4" />
+          </button>
+        </div>
+        <div className="overflow-y-auto p-4">{OwnerUpload()}</div>
+      </div>
+    </div>
   );
 
   // ── Owner staff cards view ────────────────────────────────────────────────
@@ -613,6 +655,15 @@ export function AttendanceClient({ staffList, currentProfile, initialPunches, in
         </p>
         <div className="flex items-center gap-2">
           <span className="text-[10px] text-content-secondary">{staffStats.length} staff</span>
+          <button
+            type="button"
+            onClick={() => setUploadOpen(true)}
+            className="flex items-center gap-1.5 rounded-lg border border-border bg-bg-elevated px-2.5 py-1.5 text-xs font-semibold text-content-primary hover:border-border-strong transition-colors"
+            title="Upload biometric CSV — for months before the QR switch-over"
+          >
+            <Upload className="size-3.5 text-warm" />
+            Upload CSV
+          </button>
           <button
             type="button"
             onClick={downloadReport}
@@ -742,11 +793,9 @@ export function AttendanceClient({ staffList, currentProfile, initialPunches, in
         </Card>
       )}
 
-      {/* Owner: CSV upload */}
-      {isOwner && <OwnerUpload />}
-
-      {/* Owner: staff ledger cards */}
+      {/* Owner: staff ledger cards, with the CSV uploader behind its button */}
       {isOwner && <OwnerLedger />}
+      {isOwner && uploadOpen && UploadDialog()}
 
       {/* Staff: personal view */}
       {!isOwner && (
