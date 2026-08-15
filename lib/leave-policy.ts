@@ -15,6 +15,21 @@ export const CL_PER_MONTH = 4;
 export const CL_PER_YEAR = CL_PER_MONTH * 12; // 48
 export const SL_PER_YEAR = 6;
 
+/**
+ * From this month onwards, a day with no attendance and no applied leave is
+ * treated as the employee's weekly off / CL rather than an unpaid absence —
+ * up to the 4/month allowance, with any CL they did apply for counting towards
+ * the same four. The fifth such day in a month is still an absence.
+ *
+ * Staff largely stopped filing leave once QR check-in replaced the biometric
+ * machine, and the weekly off is an entitlement they were taking regardless.
+ *
+ * Earlier months are deliberately left alone: payslips re-render live from
+ * this module, so applying the rule to history would silently rewrite pay
+ * records that have already been issued.
+ */
+export const AUTO_CL_FROM_MONTH = "2026-08";
+
 export type DayStatus =
   | "present"
   | "cl"      // weekly off / casual leave
@@ -28,6 +43,8 @@ export interface DayDetail {
   dayNum: number;
   date: string;      // yyyy-MM-dd
   status: DayStatus;
+  /** CL granted by the auto-CL rule rather than an applied-for leave. */
+  autoCl?: boolean;
 }
 
 export interface LeaveRow {
@@ -50,6 +67,8 @@ export interface MonthAttendance {
   employedDays: number;
   presentCount: number;
   clCount: number;
+  /** Of `clCount`, how many were granted by the auto-CL rule. */
+  autoClCount: number;
   slCount: number;
   /** Approved LWP days. */
   lwpCount: number;
@@ -87,11 +106,18 @@ export function buildMonthAttendance(opts: {
 
   let presentCount = 0;
   let clCount = 0;
+  let autoClCount = 0;
   let slCount = 0;
   let lwpCount = 0;
   let absentCount = 0;
   let countedDays = 0;
   let employedDays = 0;
+
+  // Indexes into `days` of the unexplained absences, in date order. The auto-CL
+  // rule is applied after the loop rather than inside it: a CL the employee
+  // actually applied for must always take one of the four monthly slots, even
+  // if it falls later in the month than an unmarked day.
+  const unexplained: number[] = [];
 
   for (let day = 1; day <= daysInMonth; day++) {
     const date = `${year}-${String(monthNum).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
@@ -127,7 +153,25 @@ export function buildMonthAttendance(opts: {
     }
 
     absentCount++;
+    unexplained.push(days.length);
     days.push({ dayNum: day, date, status: "absent" });
+  }
+
+  // Auto-CL: unmarked days become the weekly off / CL the employee would have
+  // applied for, until the monthly allowance is used up. Anything past that
+  // stays an unpaid absence.
+  const monthKey = `${year}-${String(monthNum).padStart(2, "0")}`;
+  if (monthKey >= AUTO_CL_FROM_MONTH) {
+    let remaining = Math.max(0, CL_PER_MONTH - clCount);
+    for (const idx of unexplained) {
+      if (remaining === 0) break;
+      days[idx].status = "cl";
+      days[idx].autoCl = true;
+      clCount++;
+      autoClCount++;
+      absentCount--;
+      remaining--;
+    }
   }
 
   return {
@@ -137,6 +181,7 @@ export function buildMonthAttendance(opts: {
     employedDays,
     presentCount,
     clCount,
+    autoClCount,
     slCount,
     lwpCount,
     absentCount,

@@ -140,6 +140,7 @@ export default async function AttendancePage() {
             currentProfile={currentProfile}
             initialPunches={punches ?? []}
             initialCheckins={checkins ?? []}
+            initialLeaves={leaves}
           />
         }
       />

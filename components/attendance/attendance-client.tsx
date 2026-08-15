@@ -25,6 +25,8 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { buildMonthAttendance, CL_PER_MONTH, type LeaveRow } from "@/lib/leave-policy";
+import { todayIST } from "@/lib/date";
 
 interface StaffProfile {
   id: string;
@@ -32,6 +34,7 @@ interface StaffProfile {
   biometric_pin: string | null;
   biometric_name: string | null;
   role: string;
+  date_of_joining?: string | null;
 }
 
 interface DBAttendancePunch {
@@ -71,6 +74,7 @@ interface Props {
   currentProfile: StaffProfile;
   initialPunches: DBAttendancePunch[];
   initialCheckins?: DBAttendanceCheckin[];
+  initialLeaves?: (LeaveRow & { profile_id: string })[];
 }
 
 /** Clock time of a timestamp in IST, 24h — same shape as a biometric punch time. */
@@ -97,7 +101,13 @@ const MONTHS = [
   { value: 12, label: "December" },
 ];
 
-export function AttendanceClient({ staffList, currentProfile, initialPunches, initialCheckins = [] }: Props) {
+export function AttendanceClient({
+  staffList,
+  currentProfile,
+  initialPunches,
+  initialCheckins = [],
+  initialLeaves = [],
+}: Props) {
   const isOwner = currentProfile.role === "owner";
 
   const now = new Date();
@@ -139,23 +149,7 @@ export function AttendanceClient({ staffList, currentProfile, initialPunches, in
 
   const staffStats = useMemo(() => {
     const maxDay = new Date(selectedYear, selectedMonth, 0).getDate();
-    const isCurrentMonth =
-      selectedYear === now.getFullYear() && selectedMonth === now.getMonth() + 1;
-    const dayOf = (date: string) => parseInt(date.split("-")[2], 10);
-    // For the current month: use the latest day either system has data for as
-    // the denominator, so "absent" means absent in the record rather than "the
-    // biometric CSV hasn't been uploaded yet". Falls back to today if empty.
-    let elapsedDays: number;
-    if (isCurrentMonth) {
-      const latestDay = Math.max(
-        0,
-        ...filteredPunches.map((p) => dayOf(p.date)),
-        ...filteredCheckins.map((c) => dayOf(c.date)),
-      );
-      elapsedDays = latestDay > 0 ? Math.min(latestDay, now.getDate()) : now.getDate();
-    } else {
-      elapsedDays = maxDay;
-    }
+    const today = todayIST();
 
     return staffList
       .filter((s) => s.role !== "owner")
@@ -197,18 +191,43 @@ export function AttendanceClient({ staffList, currentProfile, initialPunches, in
         }
 
         const days = Object.values(byDate).sort((a, b) => b.date.localeCompare(a.date));
+
+        // Present / CL / absent all come from the shared policy module — the
+        // same one payroll uses — so this screen and the payslip can never
+        // disagree about a month. It also applies the auto-CL rule: unmarked
+        // days become the weekly off, up to the monthly allowance.
+        const summary = buildMonthAttendance({
+          year: selectedYear,
+          monthNum: selectedMonth,
+          today,
+          leaves: initialLeaves.filter(
+            (l) => l.profile_id === staff.id && (l.status ?? "approved") === "approved",
+          ),
+          attendedDates: new Set(days.map((d) => d.date)),
+          joiningDate: staff.date_of_joining ?? null,
+        });
+
+        // Days they were actually expected to work — leave isn't a no-show.
+        const expected = Math.max(
+          0,
+          summary.countedDays - summary.clCount - summary.slCount - summary.lwpCount,
+        );
+
         return {
           staff,
-          present: days.length,
-          absent: Math.max(0, elapsedDays - days.length),
-          total: elapsedDays,
+          present: summary.presentCount,
+          cl: summary.clCount,
+          autoCl: summary.autoClCount,
+          absent: summary.absentCount,
+          total: summary.countedDays,
+          expected,
           fullMonthDays: maxDay,
           days,
           // Only biometric rows can be cleared — QR check-ins aren't uploads.
           biometricDays: Object.keys(bio).length,
         };
       });
-  }, [staffList, filteredPunches, filteredCheckins, selectedYear, selectedMonth]);
+  }, [staffList, filteredPunches, filteredCheckins, initialLeaves, selectedYear, selectedMonth]);
 
   // ── CSV handling ─────────────────────────────────────────────────────────
 
@@ -401,8 +420,8 @@ export function AttendanceClient({ staffList, currentProfile, initialPunches, in
     ctx.fillRect(0, HEADER_H, CANVAS_W, COL_H);
 
     // Column headers
-    const colX = [24, 260, 340, 420, 500, 560];
-    const colLabels = ["Staff Name", "Present", "Absent", "Total", "%"];
+    const colX = [24, 250, 320, 390, 460, 540];
+    const colLabels = ["Staff Name", "Present", "CL", "Absent", "Total", "%"];
     ctx.fillStyle = "#888888";
     ctx.font = "bold 11px system-ui, sans-serif";
     colLabels.forEach((label, i) => {
@@ -410,8 +429,8 @@ export function AttendanceClient({ staffList, currentProfile, initialPunches, in
     });
 
     // Rows
-    staffStats.forEach(({ staff, present, absent, total }, i) => {
-      const pct = total > 0 ? Math.round((present / total) * 100) : 0;
+    staffStats.forEach(({ staff, present, cl, absent, total, expected }, i) => {
+      const pct = expected > 0 ? Math.round((present / expected) * 100) : 0;
       const y = HEADER_H + COL_H + i * ROW_H;
 
       ctx.fillStyle = i % 2 === 0 ? "#111111" : "#0e0e0e";
@@ -427,20 +446,24 @@ export function AttendanceClient({ staffList, currentProfile, initialPunches, in
       ctx.font = "bold 13px system-ui, sans-serif";
       ctx.fillText(String(present), colX[1], y + 25);
 
+      // Weekly off / CL (warm)
+      ctx.fillStyle = "#fbbf24";
+      ctx.fillText(String(cl), colX[2], y + 25);
+
       // Absent (red)
       ctx.fillStyle = "#f87171";
-      ctx.fillText(String(absent), colX[2], y + 25);
+      ctx.fillText(String(absent), colX[3], y + 25);
 
       // Total (muted)
       ctx.fillStyle = "#888888";
       ctx.font = "13px system-ui, sans-serif";
-      ctx.fillText(String(total), colX[3], y + 25);
+      ctx.fillText(String(total), colX[4], y + 25);
 
       // Percentage (color-coded)
       const pctColor = pct >= 90 ? "#4ade80" : pct >= 75 ? "#fbbf24" : "#f87171";
       ctx.fillStyle = pctColor;
       ctx.font = "bold 13px system-ui, sans-serif";
-      ctx.fillText(`${pct}%`, colX[4], y + 25);
+      ctx.fillText(`${pct}%`, colX[5], y + 25);
     });
 
     // Footer
@@ -676,9 +699,9 @@ export function AttendanceClient({ staffList, currentProfile, initialPunches, in
         </div>
       </div>
 
-      {staffStats.map(({ staff, present, absent, total, days, biometricDays }) => {
+      {staffStats.map(({ staff, present, cl, autoCl, absent, total, expected, days, biometricDays }) => {
         const isExpanded = expandedStaffId === staff.id;
-        const pct = total > 0 ? Math.round((present / total) * 100) : 0;
+        const pct = expected > 0 ? Math.round((present / expected) * 100) : 0;
         const hasUploads = biometricDays > 0;
 
         return (
@@ -700,6 +723,14 @@ export function AttendanceClient({ staffList, currentProfile, initialPunches, in
                 {/* Compact stats inline */}
                 <div className="mt-1.5 flex items-center gap-3 text-xs">
                   <span className="font-semibold text-success">{present}P</span>
+                  {cl > 0 && (
+                    <span
+                      className="font-semibold text-warm"
+                      title={autoCl > 0 ? `${autoCl} auto-applied as weekly off` : undefined}
+                    >
+                      {cl}CL{autoCl > 0 && <span className="text-content-secondary">*</span>}
+                    </span>
+                  )}
                   <span className="font-semibold text-danger">{absent}A</span>
                   <span className="text-content-secondary">{total} days</span>
                   <span className={cn("font-bold ml-auto", pct >= 90 ? "text-success" : pct >= 75 ? "text-warning" : "text-danger")}>
@@ -752,6 +783,14 @@ export function AttendanceClient({ staffList, currentProfile, initialPunches, in
       {staffStats.length === 0 && (
         <Card className="p-8 text-center text-xs text-content-secondary">No staff found.</Card>
       )}
+
+      {staffStats.some((s) => s.autoCl > 0) && (
+        <p className="px-1 text-[10px] leading-relaxed text-content-secondary">
+          <span className="text-warm">*</span> A day with no check-in and no applied
+          leave counts as the weekly off / CL, up to {CL_PER_MONTH} a month. Beyond
+          that it stays absent and unpaid.
+        </p>
+      )}
     </div>
   );
 
@@ -761,8 +800,9 @@ export function AttendanceClient({ staffList, currentProfile, initialPunches, in
   const myPresent = myStats?.present ?? 0;
   const myAbsent = myStats?.absent ?? 0;
   const myTotal = myStats?.total ?? 0;
+  const myExpected = myStats?.expected ?? 0;
   const myFullMonth = myStats?.fullMonthDays ?? new Date(selectedYear, selectedMonth, 0).getDate();
-  const myPct = myTotal > 0 ? Math.round((myPresent / myTotal) * 100) : 0;
+  const myPct = myExpected > 0 ? Math.round((myPresent / myExpected) * 100) : 0;
 
   // ── Render ────────────────────────────────────────────────────────────────
 
