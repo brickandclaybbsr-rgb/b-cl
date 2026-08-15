@@ -54,6 +54,7 @@ export default async function ProfilePage() {
   
   // Staff variables
   let punches: any[] = [];
+  let checkins: any[] = [];
   let leaves: any[] = [];
   let documents: any[] = [];
   // Head chef gets a read-only view of everyone's leave requests.
@@ -84,6 +85,16 @@ export default async function ProfilePage() {
       .order("date", { ascending: false })
       .order("time", { ascending: true });
     punches = punchesData ?? [];
+
+    // Same two-system split as the owner ledger: biometric punches up to the
+    // QR switch-over, QR check-ins after. Without both, every day since the
+    // rollout shows up here as an absence.
+    const { data: checkinsData } = await supabase
+      .from("attendance_checkins")
+      .select("id,profile_id,date,checked_in_at,checked_out_at")
+      .eq("profile_id", currentProfile.id)
+      .order("date", { ascending: false });
+    checkins = checkinsData ?? [];
 
     try {
       const { data: leavesData, error: leavesErr } = await supabase
@@ -202,6 +213,7 @@ export default async function ProfilePage() {
                 staffList={[currentProfile]}
                 currentProfile={currentProfile}
                 initialPunches={punches}
+                initialCheckins={checkins}
               />
             }
           />
