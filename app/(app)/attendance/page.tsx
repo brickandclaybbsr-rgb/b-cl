@@ -30,6 +30,19 @@ export default async function AttendancePage() {
     .order("date", { ascending: false })
     .order("time", { ascending: true });
 
+  // Attendance spans two systems: biometric punches uploaded from the LX50 CSV
+  // up to the QR switch-over, and QR check-ins from then on. The ledger needs
+  // both, otherwise every post-rollout day reads as an absence.
+  let checkinsQuery = supabase
+    .from("attendance_checkins")
+    .select("id,profile_id,date,checked_in_at,checked_out_at");
+
+  if (currentProfile.role !== "owner") {
+    checkinsQuery = checkinsQuery.eq("profile_id", currentProfile.id);
+  }
+
+  const { data: checkins } = await checkinsQuery.order("date", { ascending: false });
+
   // Load all leaves and staff documents for owner view (wrapped in try-catch)
   let leaves: any[] = [];
   let documents: any[] = [];
@@ -126,6 +139,7 @@ export default async function AttendancePage() {
             staffList={staffList}
             currentProfile={currentProfile}
             initialPunches={punches ?? []}
+            initialCheckins={checkins ?? []}
           />
         }
       />

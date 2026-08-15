@@ -45,10 +45,40 @@ interface DBAttendancePunch {
   uploaded_at: string;
 }
 
+interface DBAttendanceCheckin {
+  id: string;
+  profile_id: string;
+  date: string;
+  checked_in_at: string;
+  checked_out_at: string | null;
+}
+
+/**
+ * One attended day, whichever system recorded it. Biometric punches (CSV
+ * uploads) cover everything up to the QR switch-over; QR check-ins cover
+ * everything after, so the ledger has to read from both.
+ */
+interface DayLog {
+  date: string;
+  inTime: string;         // "HH:MM"
+  outTime: string | null; // "HH:MM"
+  source: "qr" | "biometric";
+}
+
 interface Props {
   staffList: StaffProfile[];
   currentProfile: StaffProfile;
   initialPunches: DBAttendancePunch[];
+  initialCheckins?: DBAttendanceCheckin[];
+}
+
+/** Clock time of a timestamp in IST, 24h — same shape as a biometric punch time. */
+function istClock(ts: string): string {
+  return new Date(ts).toLocaleTimeString("en-GB", {
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "Asia/Kolkata",
+  });
 }
 
 const MONTHS = [
@@ -66,7 +96,7 @@ const MONTHS = [
   { value: 12, label: "December" },
 ];
 
-export function AttendanceClient({ staffList, currentProfile, initialPunches }: Props) {
+export function AttendanceClient({ staffList, currentProfile, initialPunches, initialCheckins = [] }: Props) {
   const isOwner = currentProfile.role === "owner";
 
   const now = new Date();
@@ -92,23 +122,27 @@ export function AttendanceClient({ staffList, currentProfile, initialPunches }: 
     [dbPunches, monthString],
   );
 
+  const filteredCheckins = useMemo(
+    () => initialCheckins.filter((c) => c.date.startsWith(monthString)),
+    [initialCheckins, monthString],
+  );
+
   const staffStats = useMemo(() => {
     const maxDay = new Date(selectedYear, selectedMonth, 0).getDate();
     const isCurrentMonth =
       selectedYear === now.getFullYear() && selectedMonth === now.getMonth() + 1;
-    // For the current month: use the latest punch day in the uploaded data as the
-    // denominator so that "absent" means absent in the biometric report, not
-    // "not yet uploaded for today". Falls back to today if no data exists.
+    const dayOf = (date: string) => parseInt(date.split("-")[2], 10);
+    // For the current month: use the latest day either system has data for as
+    // the denominator, so "absent" means absent in the record rather than "the
+    // biometric CSV hasn't been uploaded yet". Falls back to today if empty.
     let elapsedDays: number;
     if (isCurrentMonth) {
-      if (filteredPunches.length > 0) {
-        const maxPunchDay = Math.max(
-          ...filteredPunches.map((p) => parseInt(p.date.split("-")[2], 10))
-        );
-        elapsedDays = Math.min(maxPunchDay, now.getDate());
-      } else {
-        elapsedDays = now.getDate();
-      }
+      const latestDay = Math.max(
+        0,
+        ...filteredPunches.map((p) => dayOf(p.date)),
+        ...filteredCheckins.map((c) => dayOf(c.date)),
+      );
+      elapsedDays = latestDay > 0 ? Math.min(latestDay, now.getDate()) : now.getDate();
     } else {
       elapsedDays = maxDay;
     }
@@ -116,20 +150,55 @@ export function AttendanceClient({ staffList, currentProfile, initialPunches }: 
     return staffList
       .filter((s) => s.role !== "owner")
       .map((staff) => {
-        const punches = filteredPunches
-          .filter((p) => p.profile_id === staff.id)
-          .sort((a, b) => `${a.date}T${a.time}`.localeCompare(`${b.date}T${b.time}`));
-        const daysPresent = new Set(punches.map((p) => p.date)).size;
+        // Biometric: the earliest and latest punch of a day are its in/out.
+        const bio: Record<string, { first: string; last: string }> = {};
+        for (const p of filteredPunches) {
+          if (p.profile_id !== staff.id) continue;
+          const t = String(p.time ?? "").slice(0, 5);
+          if (!t) continue;
+          const cur = bio[p.date];
+          if (!cur) bio[p.date] = { first: t, last: t };
+          else {
+            if (t < cur.first) cur.first = t;
+            if (t > cur.last) cur.last = t;
+          }
+        }
+
+        const byDate: Record<string, DayLog> = {};
+        for (const [date, { first, last }] of Object.entries(bio)) {
+          byDate[date] = {
+            date,
+            inTime: first,
+            outTime: last !== first ? last : null,
+            source: "biometric",
+          };
+        }
+
+        // QR is the live source from the rollout onwards, so it wins on any day
+        // that also happens to carry a stale biometric punch.
+        for (const c of filteredCheckins) {
+          if (c.profile_id !== staff.id) continue;
+          byDate[c.date] = {
+            date: c.date,
+            inTime: istClock(c.checked_in_at),
+            outTime: c.checked_out_at ? istClock(c.checked_out_at) : null,
+            source: "qr",
+          };
+        }
+
+        const days = Object.values(byDate).sort((a, b) => b.date.localeCompare(a.date));
         return {
           staff,
-          present: daysPresent,
-          absent: Math.max(0, elapsedDays - daysPresent),
+          present: days.length,
+          absent: Math.max(0, elapsedDays - days.length),
           total: elapsedDays,
           fullMonthDays: maxDay,
-          punches,
+          days,
+          // Only biometric rows can be cleared — QR check-ins aren't uploads.
+          biometricDays: Object.keys(bio).length,
         };
       });
-  }, [staffList, filteredPunches, selectedYear, selectedMonth]);
+  }, [staffList, filteredPunches, filteredCheckins, selectedYear, selectedMonth]);
 
   // ── CSV handling ─────────────────────────────────────────────────────────
 
@@ -228,43 +297,37 @@ export function AttendanceClient({ staffList, currentProfile, initialPunches }: 
 
   // ── Punch log detail ──────────────────────────────────────────────────────
 
-  const PunchLog = ({ punches }: { punches: DBAttendancePunch[] }) => {
-    if (punches.length === 0) {
+  const PunchLog = ({ days }: { days: DayLog[] }) => {
+    if (days.length === 0) {
       return (
         <div className="py-8 text-center text-xs text-content-secondary">
-          No logs uploaded for this month yet.
+          No attendance recorded for this month yet.
         </div>
       );
     }
 
-    const groups: Record<string, DBAttendancePunch[]> = {};
-    punches.forEach((p) => {
-      (groups[p.date] ??= []).push(p);
-    });
-    const sortedDates = Object.keys(groups).sort((a, b) => b.localeCompare(a));
-
     return (
       <div className="space-y-1.5 max-h-72 overflow-y-auto pr-0.5">
-        {sortedDates.map((dateStr) => {
-          const dayPunches = groups[dateStr].sort((a, b) => a.time.localeCompare(b.time));
-          const checkIn = dayPunches[0];
-          const checkOut = dayPunches.length > 1 ? dayPunches[dayPunches.length - 1] : null;
-          const d = new Date(dateStr + "T00:00:00");
+        {days.map((day) => {
+          const d = new Date(day.date + "T00:00:00");
           const label = d.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" });
 
           return (
-            <div key={dateStr} className="flex items-center justify-between rounded-lg border border-border/30 bg-white/[0.015] px-3 py-2 gap-2">
+            <div key={day.date} className="flex items-center justify-between rounded-lg border border-border/30 bg-white/[0.015] px-3 py-2 gap-2">
               <span className="text-xs font-semibold text-content-primary min-w-[110px]">{label}</span>
               <div className="flex items-center gap-2 ml-auto">
-                <span className="rounded bg-success/10 border border-success/20 px-2 py-0.5 font-mono text-[11px] text-success">
-                  In {checkIn.time.slice(0, 5)}
+                <span className="rounded border border-border bg-bg-elevated px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-content-secondary">
+                  {day.source === "qr" ? "QR" : "Bio"}
                 </span>
-                {checkOut ? (
+                <span className="rounded bg-success/10 border border-success/20 px-2 py-0.5 font-mono text-[11px] text-success">
+                  In {day.inTime}
+                </span>
+                {day.outTime ? (
                   <span className="rounded bg-fire/10 border border-fire/20 px-2 py-0.5 font-mono text-[11px] text-fire">
-                    Out {checkOut.time.slice(0, 5)}
+                    Out {day.outTime}
                   </span>
                 ) : (
-                  <span className="text-[10px] text-content-secondary italic">1 punch</span>
+                  <span className="text-[10px] text-content-secondary italic">No check-out</span>
                 )}
               </div>
             </div>
@@ -562,10 +625,10 @@ export function AttendanceClient({ staffList, currentProfile, initialPunches }: 
         </div>
       </div>
 
-      {staffStats.map(({ staff, present, absent, total, punches }) => {
+      {staffStats.map(({ staff, present, absent, total, days, biometricDays }) => {
         const isExpanded = expandedStaffId === staff.id;
         const pct = total > 0 ? Math.round((present / total) * 100) : 0;
-        const hasLogs = punches.length > 0;
+        const hasUploads = biometricDays > 0;
 
         return (
           <Card key={staff.id} className="overflow-hidden">
@@ -602,12 +665,12 @@ export function AttendanceClient({ staffList, currentProfile, initialPunches }: 
               </div>
               {/* Actions */}
               <div className="flex items-center gap-1 shrink-0">
-                {hasLogs && (
+                {hasUploads && (
                   <button
                     type="button"
                     onClick={() => handleClearMonth(staff.id, staff.name)}
                     className="rounded-lg p-1.5 text-content-secondary hover:bg-danger/10 hover:text-danger transition-colors"
-                    title="Clear logs"
+                    title="Clear uploaded biometric logs"
                   >
                     <Trash2 className="size-4" />
                   </button>
@@ -626,9 +689,9 @@ export function AttendanceClient({ staffList, currentProfile, initialPunches }: 
             {isExpanded && (
               <div className="border-t border-border/50 bg-bg-elevated/30 px-4 py-3">
                 <p className="mb-2 flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-content-secondary">
-                  <Clock className="size-3" /> Punch Log
+                  <Clock className="size-3" /> Attendance Log
                 </p>
-                <PunchLog punches={punches} />
+                <PunchLog days={days} />
               </div>
             )}
           </Card>
@@ -661,7 +724,7 @@ export function AttendanceClient({ staffList, currentProfile, initialPunches }: 
             <CalendarDays className="size-4 text-warm" />
             {isOwner ? "Staff Attendance" : "My Attendance"}
           </h2>
-          <p className="mt-0.5 text-xs text-content-secondary">Monthly biometric check-in logs</p>
+          <p className="mt-0.5 text-xs text-content-secondary">QR check-ins + uploaded biometric logs</p>
         </div>
         <MonthPicker />
       </div>
@@ -731,7 +794,7 @@ export function AttendanceClient({ staffList, currentProfile, initialPunches }: 
             <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-content-secondary border-b border-border/40 pb-3">
               <CalendarIcon className="size-3.5 text-warm" /> Daily Log — {monthString}
             </p>
-            <PunchLog punches={myStats?.punches ?? []} />
+            <PunchLog days={myStats?.days ?? []} />
           </Card>
         </div>
       )}
