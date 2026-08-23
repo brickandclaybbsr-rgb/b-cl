@@ -25,7 +25,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { buildMonthAttendance, CL_PER_MONTH, type LeaveRow } from "@/lib/leave-policy";
+import { attendanceRate, buildMonthAttendance, CL_PER_MONTH, type LeaveRow } from "@/lib/leave-policy";
 import { todayIST } from "@/lib/date";
 
 interface StaffProfile {
@@ -207,20 +207,17 @@ export function AttendanceClient({
           joiningDate: staff.date_of_joining ?? null,
         });
 
-        // Days they were actually expected to work — leave isn't a no-show.
-        const expected = Math.max(
-          0,
-          summary.countedDays - summary.clCount - summary.slCount - summary.lwpCount,
-        );
-
         return {
           staff,
           present: summary.presentCount,
           cl: summary.clCount,
           autoCl: summary.autoClCount,
           absent: summary.absentCount,
+          lwp: summary.lwpCount,
           total: summary.countedDays,
-          expected,
+          // Rated against rostered days — the weekly-off entitlement is free,
+          // a fifth off / LWP / an absence is not. See attendanceRate.
+          pct: attendanceRate(summary),
           fullMonthDays: maxDay,
           days,
           // Only biometric rows can be cleared — QR check-ins aren't uploads.
@@ -372,7 +369,7 @@ export function AttendanceClient({
     const monthLabel = MONTHS.find((m) => m.value === selectedMonth)?.label ?? "";
     const title = `${monthLabel} ${selectedYear}`;
 
-    const CANVAS_W = 620;
+    const CANVAS_W = 690;
     const HEADER_H = 110;
     const COL_H = 38;
     const ROW_H = 40;
@@ -420,8 +417,10 @@ export function AttendanceClient({
     ctx.fillRect(0, HEADER_H, CANVAS_W, COL_H);
 
     // Column headers
-    const colX = [24, 250, 320, 390, 460, 540];
-    const colLabels = ["Staff Name", "Present", "CL", "Absent", "Total", "%"];
+    // LWP earns a column of its own: it pulls the rate down like an absence
+    // does, so without it the % has no visible explanation on the report.
+    const colX = [24, 250, 320, 385, 455, 525, 600];
+    const colLabels = ["Staff Name", "Present", "CL", "LWP", "Absent", "Total", "%"];
     ctx.fillStyle = "#888888";
     ctx.font = "bold 11px system-ui, sans-serif";
     colLabels.forEach((label, i) => {
@@ -429,8 +428,7 @@ export function AttendanceClient({
     });
 
     // Rows
-    staffStats.forEach(({ staff, present, cl, absent, total, expected }, i) => {
-      const pct = expected > 0 ? Math.round((present / expected) * 100) : 0;
+    staffStats.forEach(({ staff, present, cl, lwp, absent, total, pct }, i) => {
       const y = HEADER_H + COL_H + i * ROW_H;
 
       ctx.fillStyle = i % 2 === 0 ? "#111111" : "#0e0e0e";
@@ -450,20 +448,26 @@ export function AttendanceClient({
       ctx.fillStyle = "#fbbf24";
       ctx.fillText(String(cl), colX[2], y + 25);
 
+      // LWP (warm, unpaid)
+      ctx.fillStyle = "#fb923c";
+      ctx.fillText(String(lwp), colX[3], y + 25);
+
       // Absent (red)
       ctx.fillStyle = "#f87171";
-      ctx.fillText(String(absent), colX[3], y + 25);
+      ctx.fillText(String(absent), colX[4], y + 25);
 
       // Total (muted)
       ctx.fillStyle = "#888888";
       ctx.font = "13px system-ui, sans-serif";
-      ctx.fillText(String(total), colX[4], y + 25);
+      ctx.fillText(String(total), colX[5], y + 25);
 
-      // Percentage (color-coded)
-      const pctColor = pct >= 90 ? "#4ade80" : pct >= 75 ? "#fbbf24" : "#f87171";
+      // Percentage (color-coded). Null = nothing to rate, e.g. a month before
+      // the employee joined — a dash, not a damning 0%.
+      const pctColor =
+        pct == null ? "#666666" : pct >= 90 ? "#4ade80" : pct >= 75 ? "#fbbf24" : "#f87171";
       ctx.fillStyle = pctColor;
       ctx.font = "bold 13px system-ui, sans-serif";
-      ctx.fillText(`${pct}%`, colX[5], y + 25);
+      ctx.fillText(pct == null ? "—" : `${pct}%`, colX[6], y + 25);
     });
 
     // Footer
@@ -699,9 +703,8 @@ export function AttendanceClient({
         </div>
       </div>
 
-      {staffStats.map(({ staff, present, cl, autoCl, absent, total, expected, days, biometricDays }) => {
+      {staffStats.map(({ staff, present, cl, autoCl, lwp, absent, total, pct, days, biometricDays }) => {
         const isExpanded = expandedStaffId === staff.id;
-        const pct = expected > 0 ? Math.round((present / expected) * 100) : 0;
         const hasUploads = biometricDays > 0;
 
         return (
@@ -731,17 +734,31 @@ export function AttendanceClient({
                       {cl}CL{autoCl > 0 && <span className="text-content-secondary">*</span>}
                     </span>
                   )}
+                  {lwp > 0 && <span className="font-semibold text-warning">{lwp}LWP</span>}
                   <span className="font-semibold text-danger">{absent}A</span>
                   <span className="text-content-secondary">{total} days</span>
-                  <span className={cn("font-bold ml-auto", pct >= 90 ? "text-success" : pct >= 75 ? "text-warning" : "text-danger")}>
-                    {pct}%
+                  <span
+                    className={cn(
+                      "font-bold ml-auto",
+                      pct == null ? "text-content-secondary"
+                        : pct >= 90 ? "text-success"
+                        : pct >= 75 ? "text-warning"
+                        : "text-danger",
+                    )}
+                  >
+                    {pct == null ? "—" : `${pct}%`}
                   </span>
                 </div>
                 {/* Progress bar */}
                 <div className="mt-2 h-1.5 rounded-full bg-bg-elevated overflow-hidden">
                   <div
-                    className={cn("h-full rounded-full transition-all duration-500", pct >= 90 ? "bg-success" : pct >= 75 ? "bg-warning" : "bg-danger")}
-                    style={{ width: `${pct}%` }}
+                    className={cn(
+                      "h-full rounded-full transition-all duration-500",
+                      pct != null && pct >= 90 ? "bg-success"
+                        : pct != null && pct >= 75 ? "bg-warning"
+                        : "bg-danger",
+                    )}
+                    style={{ width: `${pct ?? 0}%` }}
                   />
                 </div>
               </div>
@@ -784,13 +801,19 @@ export function AttendanceClient({
         <Card className="p-8 text-center text-xs text-content-secondary">No staff found.</Card>
       )}
 
-      {staffStats.some((s) => s.autoCl > 0) && (
-        <p className="px-1 text-[10px] leading-relaxed text-content-secondary">
-          <span className="text-warm">*</span> A day with no check-in and no applied
-          leave counts as the weekly off / CL, up to {CL_PER_MONTH} a month. Beyond
-          that it stays absent and unpaid.
+      <div className="space-y-1 px-1 text-[10px] leading-relaxed text-content-secondary">
+        {staffStats.some((s) => s.autoCl > 0) && (
+          <p>
+            <span className="text-warm">*</span> A day with no check-in and no applied
+            leave counts as the weekly off / CL, up to {CL_PER_MONTH} a month. Beyond
+            that it stays absent and unpaid.
+          </p>
+        )}
+        <p>
+          % is of the days rostered — {CL_PER_MONTH} weekly offs a month are free,
+          so a fifth off, LWP or an absence pulls it down. Sick leave is neutral.
         </p>
-      )}
+      </div>
     </div>
   );
 
@@ -800,9 +823,8 @@ export function AttendanceClient({
   const myPresent = myStats?.present ?? 0;
   const myAbsent = myStats?.absent ?? 0;
   const myTotal = myStats?.total ?? 0;
-  const myExpected = myStats?.expected ?? 0;
   const myFullMonth = myStats?.fullMonthDays ?? new Date(selectedYear, selectedMonth, 0).getDate();
-  const myPct = myExpected > 0 ? Math.round((myPresent / myExpected) * 100) : 0;
+  const myPct = myStats?.pct ?? null;
 
   // ── Render ────────────────────────────────────────────────────────────────
 
@@ -866,16 +888,33 @@ export function AttendanceClient({
           <Card className="p-4 space-y-2">
             <div className="flex items-center justify-between text-xs font-semibold">
               <span className="text-content-secondary">Monthly Attendance Rate</span>
-              <span className={cn("font-bold", myPct >= 90 ? "text-success" : myPct >= 75 ? "text-warning" : "text-danger")}>
-                {myPct}%
+              <span
+                className={cn(
+                  "font-bold",
+                  myPct == null ? "text-content-secondary"
+                    : myPct >= 90 ? "text-success"
+                    : myPct >= 75 ? "text-warning"
+                    : "text-danger",
+                )}
+              >
+                {myPct == null ? "—" : `${myPct}%`}
               </span>
             </div>
             <div className="h-2.5 rounded-full bg-bg-elevated overflow-hidden">
               <div
-                className={cn("h-full rounded-full transition-all duration-500", myPct >= 90 ? "bg-success" : myPct >= 75 ? "bg-warning" : "bg-danger")}
-                style={{ width: `${myPct}%` }}
+                className={cn(
+                  "h-full rounded-full transition-all duration-500",
+                  myPct != null && myPct >= 90 ? "bg-success"
+                    : myPct != null && myPct >= 75 ? "bg-warning"
+                    : "bg-danger",
+                )}
+                style={{ width: `${myPct ?? 0}%` }}
               />
             </div>
+            <p className="text-[10px] leading-relaxed text-content-secondary">
+              Out of the days you were rostered — your {CL_PER_MONTH} weekly offs a
+              month don&apos;t count against you.
+            </p>
           </Card>
 
           {/* Daily log */}

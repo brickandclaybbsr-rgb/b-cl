@@ -190,6 +190,42 @@ export function buildMonthAttendance(opts: {
 }
 
 /**
+ * Attendance rate for a month: of the days the employee was rostered to work,
+ * what share did they actually turn up for?
+ *
+ * The rostered denominator is the elapsed employed days minus their weekly-off
+ * *entitlement* — not minus whatever leave they happened to take. That
+ * distinction is the whole point: subtracting every leave day (as this used to)
+ * makes the denominator follow the employee around, so `present` and the
+ * denominator move together and the only thing left that can pull the number
+ * below 100% is an unexplained absence. Six days of LWP then read as a perfect
+ * month, and the auto-CL rule — which exists precisely to clear unexplained
+ * absences — pinned nearly everyone at 100%.
+ *
+ * So: CL up to the allowance is free, and everything past it counts as a
+ * no-show — a fifth weekly off, LWP, and a plain absence all pull the rate
+ * down. Approved SL stays neutral; it is medical leave, not a no-show. (SL was
+ * withdrawn from 1 Aug 2026 but still appears on earlier months.)
+ *
+ * The allowance is pro-rated by how much of the month has elapsed, so a rate
+ * read on the 8th is measured against eight days' worth of entitlement rather
+ * than a whole month's.
+ *
+ * Returns null when there is nothing to rate (no elapsed employed days).
+ */
+export function attendanceRate(summary: MonthAttendance): number | null {
+  const { countedDays, daysInMonth, presentCount, clCount, slCount } = summary;
+  if (countedDays <= 0 || daysInMonth <= 0) return null;
+
+  const allowance = (CL_PER_MONTH * countedDays) / daysInMonth;
+  const entitledOff = Math.min(clCount, allowance);
+  const rostered = countedDays - entitledOff - slCount;
+  if (rostered <= 0) return null;
+
+  return Math.max(0, Math.min(100, Math.round((presentCount / rostered) * 100)));
+}
+
+/**
  * Leave balances. CL is a monthly allowance; SL is a yearly one.
  * `slUsedThisYear` should count approved SL days across the whole calendar year.
  */
