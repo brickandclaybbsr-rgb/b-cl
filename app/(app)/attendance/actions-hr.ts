@@ -30,12 +30,20 @@ export async function applyLeave(
     const profile = await requireProfile();
     const supabase = createClient();
 
-    const leaveType = String(formData.get("leaveType") ?? "").trim() as "cl" | "sl" | "lwp";
+    const leaveType = String(formData.get("leaveType") ?? "").trim() as "cl" | "lwp";
     const startDateStr = String(formData.get("startDate") ?? "").trim();
     const endDateStr = String(formData.get("endDate") ?? "").trim();
     const reason = String(formData.get("reason") ?? "").trim();
 
-    if (!leaveType || (leaveType !== "cl" && leaveType !== "sl" && leaveType !== "lwp")) {
+    // Sick leave was withdrawn from 1 Aug 2026. It is gone from the apply form,
+    // but reject it here too so a stale client or a hand-crafted request can't
+    // create new SL rows. Existing SL records stay untouched and still count on
+    // July 2026 and earlier payslips.
+    if (String(leaveType) === "sl") {
+      return { error: "Sick Leave is no longer available. Please apply for Weekly Leave / CL or LWP." };
+    }
+
+    if (!leaveType || (leaveType !== "cl" && leaveType !== "lwp")) {
       return { error: "Please select a valid leave type." };
     }
     if (!startDateStr || !endDateStr) {

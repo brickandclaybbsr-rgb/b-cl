@@ -28,7 +28,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select } from "@/components/ui/select";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { cn } from "@/lib/utils";
-import { CL_PER_YEAR, SL_PER_YEAR } from "@/lib/leave-policy";
+import { CL_PER_YEAR } from "@/lib/leave-policy";
 
 interface LeaveRequest {
   id: string;
@@ -95,26 +95,27 @@ function getDurationInDays(startDateStr: string, endDateStr: string): number {
   return diffDays;
 }
 
+/**
+ * Sick leave was withdrawn from 1 Aug 2026 — staff can no longer apply for it,
+ * so no SL balance is shown. Historical SL records (July 2026 and earlier) are
+ * still rendered in the leave history and on past payslips.
+ */
 function calculateOwnUsedLeaves(leaves: LeaveRequest[]) {
   let clUsed = 0;
-  let slUsed = 0;
   const currentYear = new Date().getFullYear().toString();
-  
+
   leaves.forEach((leave) => {
     if (leave.status === "approved") {
       if (leave.start_date.startsWith(currentYear)) {
         const days = getDurationInDays(leave.start_date, leave.end_date);
         if (leave.leave_type === "cl") clUsed += days;
-        if (leave.leave_type === "sl") slUsed += days;
       }
     }
   });
-  
+
   return {
     clUsed,
-    slUsed,
     clRemaining: Math.max(0, CL_PER_YEAR - clUsed),
-    slRemaining: Math.max(0, SL_PER_YEAR - slUsed),
   };
 }
 
@@ -130,7 +131,7 @@ export function ProfileClient({ initialLeaves, initialDocuments, attendanceChild
   const formRef = useRef<HTMLFormElement>(null);
 
   // Form input state for policy validations
-  const [leaveType, setLeaveType] = useState<"cl" | "sl" | "lwp">("cl");
+  const [leaveType, setLeaveType] = useState<"cl" | "lwp">("cl");
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
   const [agreeNotice, setAgreeNotice] = useState<boolean>(false);
@@ -198,7 +199,7 @@ export function ProfileClient({ initialLeaves, initialDocuments, attendanceChild
 
   const isSubmitDisabled = leaveType === "cl" && isLessThan2DaysCL && !agreeNotice;
 
-  const { clRemaining, slRemaining } = calculateOwnUsedLeaves(leaves);
+  const { clRemaining } = calculateOwnUsedLeaves(leaves);
 
   const handleCancelLeave = (leaveId: string) => {
     if (!confirm("Are you sure you want to cancel this leave request?")) return;
@@ -384,16 +385,11 @@ export function ProfileClient({ initialLeaves, initialDocuments, attendanceChild
                 <h4 className="font-bold text-sm text-content-primary pb-1.5 border-b border-border/40">
                   My Leave Balances ({new Date().getFullYear()})
                 </h4>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 gap-3">
                   <div className="space-y-1 bg-white/[0.01] border border-border/20 p-2.5 rounded-xl text-center">
                     <span className="text-[10px] uppercase font-bold text-content-secondary text-left block">Weekly Leave / CL</span>
                     <p className="text-xl font-bold text-warm font-mono text-left">{clRemaining} <span className="text-xs font-normal text-content-secondary">/ 48</span></p>
                     <span className="text-[9px] text-content-secondary block text-left">Days Remaining (4/month)</span>
-                  </div>
-                  <div className="space-y-1 bg-white/[0.01] border border-border/20 p-2.5 rounded-xl text-center">
-                    <span className="text-[10px] uppercase font-bold text-content-secondary text-left block">Sick Leave (SL)</span>
-                    <p className="text-xl font-bold text-warm font-mono text-left">{slRemaining} <span className="text-xs font-normal text-content-secondary">/ 6</span></p>
-                    <span className="text-[9px] text-content-secondary block text-left">Days Remaining</span>
                   </div>
                 </div>
               </Card>
@@ -414,13 +410,12 @@ export function ProfileClient({ initialLeaves, initialDocuments, attendanceChild
                       required 
                       value={leaveType}
                       onChange={(e) => {
-                        const val = e.target.value as "cl" | "sl" | "lwp";
+                        const val = e.target.value as "cl" | "lwp";
                         setLeaveType(val);
                         setAgreeNotice(false);
                       }}
                     >
                       <option value="cl">Weekly Leave / CL — 48 days/yr (4 per month)</option>
-                      <option value="sl">Sick Leave (SL) — 6 days/yr</option>
                       <option value="lwp">Leave Without Pay (LWP)</option>
                     </Select>
                   </div>
@@ -547,17 +542,7 @@ export function ProfileClient({ initialLeaves, initialDocuments, attendanceChild
                       <span className="text-content-secondary font-mono">48 days/yr (4/mo)</span>
                     </div>
                     <p className="text-[10px] text-content-secondary leading-relaxed">
-                      Also called Weekly Leave by staff. Prior approval required. Not allowed on Fridays, Saturdays, or Sundays unless medical emergency (requires SL + certificate).
-                    </p>
-                  </div>
-
-                  <div className="space-y-2">
-                    <div className="flex justify-between border-b border-border/30 pb-1">
-                      <span className="font-semibold text-content-primary">Sick Leave (SL)</span>
-                      <span className="text-content-secondary font-mono">6 days/yr</span>
-                    </div>
-                    <p className="text-[10px] text-content-secondary leading-relaxed">
-                      Lapses at year-end. Requires a **medical certificate** if leave exceeds 2 consecutive days.
+                      Also called Weekly Leave by staff. Prior approval required. Not allowed on Fridays, Saturdays, or Sundays unless it is a medical emergency, which needs a certificate.
                     </p>
                   </div>
 
@@ -567,7 +552,7 @@ export function ProfileClient({ initialLeaves, initialDocuments, attendanceChild
                       <span className="text-content-secondary font-mono">As applicable</span>
                     </div>
                     <p className="text-[10px] text-content-secondary leading-relaxed">
-                      Can only be applied after CL and SL balances have been completely exhausted.
+                      Can only be applied after the CL balance has been completely exhausted.
                     </p>
                   </div>
 
