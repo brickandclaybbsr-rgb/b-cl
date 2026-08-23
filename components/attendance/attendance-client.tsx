@@ -32,7 +32,7 @@ import {
   type DayStatus,
   type LeaveRow,
 } from "@/lib/leave-policy";
-import { todayIST } from "@/lib/date";
+import { todayIST, isTodaySettledIST } from "@/lib/date";
 
 interface StaffProfile {
   id: string;
@@ -124,6 +124,8 @@ const DAY_STATUS_STYLE: Record<DayStatus, { label: string; pill: string; row: st
   // so it reads as a neutral chip. It is history-only from 1 Aug 2026 anyway.
   sl:           { label: "SL",      pill: "border-border-strong bg-bg-elevated text-content-primary", row: "border-border/40 bg-white/[0.03]" },
   absent:       { label: "Absent",  pill: "border-danger/30 bg-danger/10 text-danger",           row: "border-danger/20 bg-danger/[0.04]" },
+  // Today, shift still running. Deliberately neutral — it is not a verdict.
+  pending:      { label: "Pending", pill: "border-border-strong bg-bg-elevated text-content-secondary", row: "border-border/30 bg-white/[0.015]" },
   future:       { label: "—",       pill: "border-border bg-bg-elevated text-content-secondary", row: "border-border/30 bg-white/[0.015]" },
   not_employed: { label: "—",       pill: "border-border bg-bg-elevated text-content-secondary", row: "border-border/30 bg-white/[0.015]" },
 };
@@ -177,6 +179,9 @@ export function AttendanceClient({
   const staffStats = useMemo(() => {
     const maxDay = new Date(selectedYear, selectedMonth, 0).getDate();
     const today = todayIST();
+    // Nothing about the current day is settled until the shift ends, so an
+    // unmarked today stays pending rather than becoming CL or LWP.
+    const todaySettled = isTodaySettledIST();
 
     return staffList
       .filter((s) => s.role !== "owner")
@@ -228,6 +233,7 @@ export function AttendanceClient({
           ),
           attendedDates: new Set(Object.keys(punchBy)),
           joiningDate: staff.date_of_joining ?? null,
+          todaySettled,
         });
 
         // The log covers every elapsed day, not just the attended ones — days
@@ -422,7 +428,11 @@ export function AttendanceClient({
                 </div>
               ) : (
                 <span className="ml-auto text-[10px] text-content-secondary italic">
-                  {auto ? "No QR scan" : "Applied leave"}
+                  {day.status === "pending"
+                    ? "Shift still running"
+                    : auto
+                      ? "No QR scan"
+                      : "Applied leave"}
                 </span>
               )}
             </div>

@@ -39,6 +39,7 @@ export type DayStatus =
   | "sl"      // sick leave
   | "lwp"     // leave without pay (approved, unpaid)
   | "absent"  // no attendance, no approved leave → treated as LWP for pay
+  | "pending" // today, shift not over yet — nobody is a no-show mid-shift
   | "future"  // hasn't happened yet — never counted as absent
   | "not_employed"; // before the joining date (mid-month joiner) — pay is pro-rated instead
 
@@ -109,8 +110,22 @@ export function buildMonthAttendance(opts: {
   assumePresent?: boolean;
   /** Employee's joining date (yyyy-MM-dd). Days before it are "not employed". */
   joiningDate?: string | null;
+  /**
+   * Has today's shift ended? Pass `isTodaySettledIST()`. While false, an
+   * unmarked `today` is left "pending" instead of being resolved into CL or
+   * LWP — mid-shift there is no such thing as a no-show yet. A day with a
+   * scan or an approved leave still resolves normally, because that is
+   * positive evidence rather than the absence of it.
+   *
+   * Defaults to true so existing callers keep their behaviour; every caller
+   * that renders the current month should pass it.
+   */
+  todaySettled?: boolean;
 }): MonthAttendance {
-  const { year, monthNum, today, leaves, attendedDates, assumePresent, joiningDate } = opts;
+  const {
+    year, monthNum, today, leaves, attendedDates, assumePresent, joiningDate,
+    todaySettled = true,
+  } = opts;
 
   const daysInMonth = new Date(year, monthNum, 0).getDate();
   const days: DayDetail[] = [];
@@ -161,6 +176,16 @@ export function buildMonthAttendance(opts: {
     if (attendedDates.has(date) || assumePresent) {
       presentCount++;
       days.push({ dayNum: day, date, status: "present" });
+      continue;
+    }
+
+    // Today, mid-shift, with nothing recorded: the day is still running, so it
+    // is neither present nor a no-show. Roll countedDays back so it stays out
+    // of the attendance rate and out of payroll's unpaid tally until the shift
+    // ends and the day settles.
+    if (date === today && !todaySettled) {
+      countedDays--;
+      days.push({ dayNum: day, date, status: "pending" });
       continue;
     }
 

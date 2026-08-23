@@ -2,11 +2,9 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { hasServiceRole } from "@/lib/supabase/env";
 import { sendPushToProfile } from "@/lib/push";
 import { todayIST, nowIST } from "@/lib/date";
-import { ATTENDANCE_ROLLOUT_DATE } from "@/lib/constants";
+import { ATTENDANCE_ROLLOUT_DATE, SHIFT_START_HOUR, SHIFT_END_HOUR } from "@/lib/constants";
 
-/** Business hours (IST): staff are expected on shift 11:30 – 23:30. */
-export const SHIFT_START_HOUR = 11.5;
-export const SHIFT_END_HOUR = 23.5;
+export { SHIFT_START_HOUR, SHIFT_END_HOUR };
 
 type Reminded = { remindedCheckIn: number; remindedCheckOut: number; skipped: string };
 

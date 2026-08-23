@@ -1,4 +1,5 @@
 import { formatInTimeZone, toZonedTime } from "date-fns-tz";
+import { DAY_ROLLOVER_HOUR, SHIFT_END_HOUR } from "@/lib/constants";
 
 /**
  * The restaurant operates in IST. All "business day" logic must be anchored
@@ -13,7 +14,7 @@ export function todayIST(): string {
   const hours = parseInt(hoursStr, 10);
   
   let dateObj = now;
-  if (hours < 4) {
+  if (hours < DAY_ROLLOVER_HOUR) {
     dateObj = new Date(now.getTime() - 24 * 60 * 60 * 1000);
   }
   return formatInTimeZone(dateObj, IST_TZ, "yyyy-MM-dd");
@@ -24,6 +25,27 @@ export function nowIST(): Date {
   return toZonedTime(new Date(), IST_TZ);
 }
 
+/**
+ * Has today's business day finished — i.e. is the shift over, so a day with no
+ * check-in is genuinely a no-show rather than one still in progress?
+ *
+ * Attendance must never resolve the current day into CL or LWP before this is
+ * true: at 11 AM a staff member who has not scanned yet is simply early, not
+ * absent, and marking them unpaid mid-shift is both wrong and visible to them.
+ */
+export function isTodaySettledIST(): boolean {
+  const now = new Date();
+  const hour = parseInt(formatInTimeZone(now, IST_TZ, "H"), 10);
+  const minute = parseInt(formatInTimeZone(now, IST_TZ, "m"), 10);
+  const clock = hour + minute / 60;
+
+  // Between midnight and the 4 AM rollover the business date is still
+  // yesterday (see todayIST), and yesterday's shift ended hours ago.
+  if (clock < DAY_ROLLOVER_HOUR) return true;
+
+  return clock >= SHIFT_END_HOUR;
+}
+
 /** "yyyy-MM-dd" for N days before today (IST), using the business date. */
 export function daysAgoIST(days: number): string {
   const now = new Date();
@@ -31,7 +53,7 @@ export function daysAgoIST(days: number): string {
   const hours = parseInt(hoursStr, 10);
   
   let dateObj = now;
-  if (hours < 4) {
+  if (hours < DAY_ROLLOVER_HOUR) {
     dateObj = new Date(now.getTime() - 24 * 60 * 60 * 1000);
   }
   

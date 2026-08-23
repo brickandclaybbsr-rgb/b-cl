@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { requireProfile, requireOwner } from "@/lib/auth";
-import { todayIST } from "@/lib/date";
+import { todayIST, isTodaySettledIST } from "@/lib/date";
 import { uploadPublicFile, deletePublicFile } from "@/lib/storage";
 import { whatsappNotify } from "@/lib/whatsapp-notify";
 import { notifyOwner, notifyStaff, sendPushToProfile } from "@/lib/push";
@@ -1016,6 +1016,8 @@ async function generatePayslipInternal(
     attendedDates,
     assumePresent: isBiswajeetJune2026,
     joiningDate: employee.date_of_joining ?? null,
+    // A mid-month payslip must not deduct for a shift still in progress.
+    todaySettled: isTodaySettledIST(),
   });
 
   const presentCount = summary.presentCount;
@@ -1032,6 +1034,9 @@ async function generatePayslipInternal(
       case "sl":      return { dayNum: d.dayNum, class: "sl-day",  statusLabel: "SL" };
       case "lwp":     return { dayNum: d.dayNum, class: "lwp-day", statusLabel: "LWP" };
       case "absent":  return { dayNum: d.dayNum, class: "lwp-day", statusLabel: "LWP" };
+      // Today, still on shift — blank like a future day. Nothing is deducted
+      // for it until the day settles.
+      case "pending": return { dayNum: d.dayNum, class: "empty",   statusLabel: "" };
       case "future":  return { dayNum: d.dayNum, class: "empty",   statusLabel: "" };
       case "not_employed": return { dayNum: d.dayNum, class: "empty", statusLabel: "—" };
       default:        return { dayNum: d.dayNum, class: "present", statusLabel: "" };

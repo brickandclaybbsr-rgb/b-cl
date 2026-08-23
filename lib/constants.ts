@@ -14,6 +14,24 @@ export const APP_START_DATE = "2026-06-14";
  */
 export const ATTENDANCE_ROLLOUT_DATE = "2026-07-31";
 
+/**
+ * Business hours (IST): staff are expected on shift 11:30 – 23:30.
+ *
+ * These live here rather than beside the reminder job because attendance
+ * screens need SHIFT_END_HOUR to decide whether the current day has closed,
+ * and importing the reminder module would drag the Supabase admin client into
+ * the browser bundle.
+ */
+export const SHIFT_START_HOUR = 11.5;
+export const SHIFT_END_HOUR = 23.5;
+
+/**
+ * The business date rolls over at 4:00 AM IST, not midnight — the kitchen is
+ * still closing down after a 23:30 finish, and those punches belong to the day
+ * that is ending rather than the one starting.
+ */
+export const DAY_ROLLOVER_HOUR = 4;
+
 export type ChecklistType = "opening" | "closing";
 
 export interface ChecklistItemDef {
