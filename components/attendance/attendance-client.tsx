@@ -25,7 +25,13 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { attendanceRate, buildMonthAttendance, CL_PER_MONTH, type LeaveRow } from "@/lib/leave-policy";
+import {
+  attendanceRate,
+  buildMonthAttendance,
+  CL_PER_MONTH,
+  type DayStatus,
+  type LeaveRow,
+} from "@/lib/leave-policy";
 import { todayIST } from "@/lib/date";
 
 interface StaffProfile {
@@ -58,15 +64,23 @@ interface DBAttendanceCheckin {
 }
 
 /**
- * One attended day, whichever system recorded it. Biometric punches (CSV
- * uploads) cover everything up to the QR switch-over; QR check-ins cover
- * everything after, so the ledger has to read from both.
+ * One day of the month with the status the policy module gave it, plus the
+ * punch times when somebody actually scanned. Every elapsed day appears, not
+ * just the attended ones — the whole point of the log is to show which days
+ * went to CL and which to LWP.
+ *
+ * Biometric punches (CSV uploads) cover everything up to the QR switch-over;
+ * QR check-ins cover everything after, so the times read from both.
  */
 interface DayLog {
   date: string;
-  inTime: string;         // "HH:MM"
+  status: DayStatus;
+  /** CL granted / LWP assigned by the auto rule rather than applied for. */
+  autoCl: boolean;
+  autoLwp: boolean;
+  inTime: string | null;  // "HH:MM"
   outTime: string | null; // "HH:MM"
-  source: "qr" | "biometric";
+  source: "qr" | "biometric" | null;
 }
 
 interface Props {
@@ -100,6 +114,19 @@ const MONTHS = [
   { value: 11, label: "November" },
   { value: 12, label: "December" },
 ];
+
+/** How each day status reads in the log — pill label, pill and row tints. */
+const DAY_STATUS_STYLE: Record<DayStatus, { label: string; pill: string; row: string }> = {
+  present:      { label: "Present", pill: "border-success/30 bg-success/10 text-success",        row: "border-border/30 bg-white/[0.015]" },
+  cl:           { label: "CL",      pill: "border-warm/30 bg-warm/10 text-warm",                 row: "border-warm/20 bg-warm/[0.04]" },
+  lwp:          { label: "LWP",     pill: "border-warning/30 bg-warning/10 text-warning",        row: "border-warning/20 bg-warning/[0.04]" },
+  // No dedicated token for SL — the palette is monochrome plus three states —
+  // so it reads as a neutral chip. It is history-only from 1 Aug 2026 anyway.
+  sl:           { label: "SL",      pill: "border-border-strong bg-bg-elevated text-content-primary", row: "border-border/40 bg-white/[0.03]" },
+  absent:       { label: "Absent",  pill: "border-danger/30 bg-danger/10 text-danger",           row: "border-danger/20 bg-danger/[0.04]" },
+  future:       { label: "—",       pill: "border-border bg-bg-elevated text-content-secondary", row: "border-border/30 bg-white/[0.015]" },
+  not_employed: { label: "—",       pill: "border-border bg-bg-elevated text-content-secondary", row: "border-border/30 bg-white/[0.015]" },
+};
 
 export function AttendanceClient({
   staffList,
@@ -168,34 +195,30 @@ export function AttendanceClient({
           }
         }
 
-        const byDate: Record<string, DayLog> = {};
+        // Punch times keyed by date. Presence itself comes from the policy
+        // module below; this only supplies the in/out clock for a day it
+        // already calls present.
+        type Punch = { inTime: string; outTime: string | null; source: "qr" | "biometric" };
+        const punchBy: Record<string, Punch> = {};
         for (const [date, { first, last }] of Object.entries(bio)) {
-          byDate[date] = {
-            date,
-            inTime: first,
-            outTime: last !== first ? last : null,
-            source: "biometric",
-          };
+          punchBy[date] = { inTime: first, outTime: last !== first ? last : null, source: "biometric" };
         }
 
         // QR is the live source from the rollout onwards, so it wins on any day
         // that also happens to carry a stale biometric punch.
         for (const c of filteredCheckins) {
           if (c.profile_id !== staff.id) continue;
-          byDate[c.date] = {
-            date: c.date,
+          punchBy[c.date] = {
             inTime: istClock(c.checked_in_at),
             outTime: c.checked_out_at ? istClock(c.checked_out_at) : null,
             source: "qr",
           };
         }
 
-        const days = Object.values(byDate).sort((a, b) => b.date.localeCompare(a.date));
-
-        // Present / CL / absent all come from the shared policy module — the
-        // same one payroll uses — so this screen and the payslip can never
-        // disagree about a month. It also applies the auto-CL rule: unmarked
-        // days become the weekly off, up to the monthly allowance.
+        // Present / CL / LWP all come from the shared policy module — the same
+        // one payroll uses — so this screen and the payslip can never disagree
+        // about a month. It also applies the auto rule: the first four unmarked
+        // days become the weekly off, the rest LWP.
         const summary = buildMonthAttendance({
           year: selectedYear,
           monthNum: selectedMonth,
@@ -203,9 +226,26 @@ export function AttendanceClient({
           leaves: initialLeaves.filter(
             (l) => l.profile_id === staff.id && (l.status ?? "approved") === "approved",
           ),
-          attendedDates: new Set(days.map((d) => d.date)),
+          attendedDates: new Set(Object.keys(punchBy)),
           joiningDate: staff.date_of_joining ?? null,
         });
+
+        // The log covers every elapsed day, not just the attended ones — days
+        // that went to CL or LWP are exactly what the owner needs to see. Days
+        // still to come, and days before the joining date, have no status worth
+        // showing. Newest first, matching how the ledger reads elsewhere.
+        const days: DayLog[] = summary.days
+          .filter((d) => d.status !== "future" && d.status !== "not_employed")
+          .map((d) => ({
+            date: d.date,
+            status: d.status,
+            autoCl: !!d.autoCl,
+            autoLwp: !!d.autoLwp,
+            inTime: punchBy[d.date]?.inTime ?? null,
+            outTime: punchBy[d.date]?.outTime ?? null,
+            source: punchBy[d.date]?.source ?? null,
+          }))
+          .reverse();
 
         return {
           staff,
@@ -214,6 +254,7 @@ export function AttendanceClient({
           autoCl: summary.autoClCount,
           absent: summary.absentCount,
           lwp: summary.lwpCount,
+          autoLwp: summary.autoLwpCount,
           total: summary.countedDays,
           // Rated against rostered days — the weekly-off entitlement is free,
           // a fifth off / LWP / an absence is not. See attendanceRate.
@@ -327,35 +368,63 @@ export function AttendanceClient({
     if (days.length === 0) {
       return (
         <div className="py-8 text-center text-xs text-content-secondary">
-          No attendance recorded for this month yet.
+          Nothing to show for this month yet.
         </div>
       );
     }
 
     return (
-      <div className="space-y-1.5 max-h-72 overflow-y-auto pr-0.5">
+      <div className="space-y-1.5 max-h-96 overflow-y-auto pr-0.5">
         {days.map((day) => {
           const d = new Date(day.date + "T00:00:00");
           const label = d.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" });
+          const style = DAY_STATUS_STYLE[day.status];
+          // Auto-assigned days are marked so the owner can tell a day the
+          // employee filed for from one the rule resolved on their behalf.
+          const auto = day.autoCl || day.autoLwp;
 
           return (
-            <div key={day.date} className="flex items-center justify-between rounded-lg border border-border/30 bg-white/[0.015] px-3 py-2 gap-2">
+            <div
+              key={day.date}
+              className={cn(
+                "flex flex-wrap items-center gap-2 rounded-lg border px-3 py-2",
+                day.status === "present" ? "border-border/30 bg-white/[0.015]" : style.row,
+              )}
+            >
               <span className="text-xs font-semibold text-content-primary min-w-[110px]">{label}</span>
-              <div className="flex items-center gap-2 ml-auto">
-                <span className="rounded border border-border bg-bg-elevated px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-content-secondary">
-                  {day.source === "qr" ? "QR" : "Bio"}
-                </span>
-                <span className="rounded bg-success/10 border border-success/20 px-2 py-0.5 font-mono text-[11px] text-success">
-                  In {day.inTime}
-                </span>
-                {day.outTime ? (
-                  <span className="rounded bg-fire/10 border border-fire/20 px-2 py-0.5 font-mono text-[11px] text-fire">
-                    Out {day.outTime}
-                  </span>
-                ) : (
-                  <span className="text-[10px] text-content-secondary italic">No check-out</span>
+
+              <span
+                className={cn(
+                  "rounded border px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider",
+                  style.pill,
                 )}
-              </div>
+                title={auto ? "Assigned automatically — no check-in and no applied leave" : undefined}
+              >
+                {style.label}
+                {auto && "*"}
+              </span>
+
+              {day.status === "present" ? (
+                <div className="flex items-center gap-2 ml-auto">
+                  <span className="rounded border border-border bg-bg-elevated px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-content-secondary">
+                    {day.source === "qr" ? "QR" : "Bio"}
+                  </span>
+                  <span className="rounded bg-success/10 border border-success/20 px-2 py-0.5 font-mono text-[11px] text-success">
+                    In {day.inTime}
+                  </span>
+                  {day.outTime ? (
+                    <span className="rounded bg-fire/10 border border-fire/20 px-2 py-0.5 font-mono text-[11px] text-fire">
+                      Out {day.outTime}
+                    </span>
+                  ) : (
+                    <span className="text-[10px] text-content-secondary italic">No check-out</span>
+                  )}
+                </div>
+              ) : (
+                <span className="ml-auto text-[10px] text-content-secondary italic">
+                  {auto ? "No QR scan" : "Applied leave"}
+                </span>
+              )}
             </div>
           );
         })}
@@ -703,7 +772,7 @@ export function AttendanceClient({
         </div>
       </div>
 
-      {staffStats.map(({ staff, present, cl, autoCl, lwp, absent, total, pct, days, biometricDays }) => {
+      {staffStats.map(({ staff, present, cl, autoCl, lwp, autoLwp, absent, total, pct, days, biometricDays }) => {
         const isExpanded = expandedStaffId === staff.id;
         const hasUploads = biometricDays > 0;
 
@@ -734,8 +803,17 @@ export function AttendanceClient({
                       {cl}CL{autoCl > 0 && <span className="text-content-secondary">*</span>}
                     </span>
                   )}
-                  {lwp > 0 && <span className="font-semibold text-warning">{lwp}LWP</span>}
-                  <span className="font-semibold text-danger">{absent}A</span>
+                  {lwp > 0 && (
+                    <span
+                      className="font-semibold text-warning"
+                      title={autoLwp > 0 ? `${autoLwp} unmarked day(s) past the ${CL_PER_MONTH}-day CL allowance` : undefined}
+                    >
+                      {lwp}LWP{autoLwp > 0 && <span className="text-content-secondary">*</span>}
+                    </span>
+                  )}
+                  {/* From Aug 2026 the auto rule leaves nothing as a bare absence,
+                      so this only ever shows for the untouched earlier months. */}
+                  {absent > 0 && <span className="font-semibold text-danger">{absent}A</span>}
                   <span className="text-content-secondary">{total} days</span>
                   <span
                     className={cn(
@@ -802,16 +880,17 @@ export function AttendanceClient({
       )}
 
       <div className="space-y-1 px-1 text-[10px] leading-relaxed text-content-secondary">
-        {staffStats.some((s) => s.autoCl > 0) && (
+        {staffStats.some((s) => s.autoCl > 0 || s.autoLwp > 0) && (
           <p>
-            <span className="text-warm">*</span> A day with no check-in and no applied
-            leave counts as the weekly off / CL, up to {CL_PER_MONTH} a month. Beyond
-            that it stays absent and unpaid.
+            <span className="text-warm">*</span> A day with no QR scan and no applied
+            leave is resolved automatically: the first {CL_PER_MONTH} in a month
+            become the weekly off / CL, every one after that becomes LWP (unpaid).
+            Open a staff member to see which day went where.
           </p>
         )}
         <p>
           % is of the days rostered — {CL_PER_MONTH} weekly offs a month are free,
-          so a fifth off, LWP or an absence pulls it down. Sick leave is neutral.
+          so a fifth off or an LWP day pulls it down. Sick leave is neutral.
         </p>
       </div>
     </div>
@@ -821,7 +900,10 @@ export function AttendanceClient({
 
   const myStats = staffStats.find((s) => s.staff.id === currentProfile.id);
   const myPresent = myStats?.present ?? 0;
-  const myAbsent = myStats?.absent ?? 0;
+  // From Aug 2026 the auto rule leaves nothing as a bare absence, so an
+  // "Absent" tile would read 0 while unpaid days sat in the log. Show the
+  // unpaid total — LWP plus any absence still on the untouched history.
+  const myUnpaid = (myStats?.lwp ?? 0) + (myStats?.absent ?? 0);
   const myTotal = myStats?.total ?? 0;
   const myFullMonth = myStats?.fullMonthDays ?? new Date(selectedYear, selectedMonth, 0).getDate();
   const myPct = myStats?.pct ?? null;
@@ -869,8 +951,9 @@ export function AttendanceClient({
               <p className="mt-1 text-[11px] font-semibold text-content-secondary">Days Present</p>
             </div>
             <div className="rounded-xl border border-danger/20 bg-danger/5 p-4 text-center">
-              <p className="text-3xl font-extrabold text-danger">{myAbsent}</p>
-              <p className="mt-1 text-[11px] font-semibold text-content-secondary">Days Absent</p>
+              <p className="text-3xl font-extrabold text-danger">{myUnpaid}</p>
+              <p className="mt-1 text-[11px] font-semibold text-content-secondary">Unpaid Days</p>
+              <p className="mt-0.5 text-[10px] text-content-secondary/60">LWP — beyond your {CL_PER_MONTH} offs</p>
             </div>
             <div className="rounded-xl border border-border bg-white/[0.02] p-4 text-center">
               <p className="text-3xl font-extrabold text-content-primary">{myTotal}</p>

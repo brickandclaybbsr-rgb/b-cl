@@ -17,12 +17,15 @@ export const SL_PER_YEAR = 6;
 
 /**
  * From this month onwards, a day with no attendance and no applied leave is
- * treated as the employee's weekly off / CL rather than an unpaid absence —
- * up to the 4/month allowance, with any CL they did apply for counting towards
- * the same four. The fifth such day in a month is still an absence.
+ * resolved automatically rather than left as an unexplained absence: the first
+ * four in a month become the employee's weekly off / CL, and every one beyond
+ * that becomes LWP. Any CL they did apply for counts towards the same four.
  *
  * Staff largely stopped filing leave once QR check-in replaced the biometric
  * machine, and the weekly off is an entitlement they were taking regardless.
+ * Naming the overflow LWP rather than "absent" matches what payroll already
+ * did with it — both were deducted as unpaid — so the ledger, the payslip and
+ * the day log now all call the same day by the same name.
  *
  * Earlier months are deliberately left alone: payslips re-render live from
  * this module, so applying the rule to history would silently rewrite pay
@@ -45,6 +48,8 @@ export interface DayDetail {
   status: DayStatus;
   /** CL granted by the auto-CL rule rather than an applied-for leave. */
   autoCl?: boolean;
+  /** LWP assigned by the auto rule — an unmarked day past the CL allowance. */
+  autoLwp?: boolean;
 }
 
 export interface LeaveRow {
@@ -70,9 +75,15 @@ export interface MonthAttendance {
   /** Of `clCount`, how many were granted by the auto-CL rule. */
   autoClCount: number;
   slCount: number;
-  /** Approved LWP days. */
+  /** Approved LWP days, plus any assigned by the auto rule. */
   lwpCount: number;
-  /** No attendance and no approved leave. */
+  /** Of `lwpCount`, how many were assigned by the auto rule. */
+  autoLwpCount: number;
+  /**
+   * No attendance and no approved leave. From AUTO_CL_FROM_MONTH onwards the
+   * auto rule resolves every such day into CL or LWP, so this is 0 for those
+   * months and only carries a value for the untouched history before it.
+   */
   absentCount: number;
   /** Unpaid days = lwp + absent. This is what payroll deducts. */
   unpaidCount: number;
@@ -107,6 +118,7 @@ export function buildMonthAttendance(opts: {
   let presentCount = 0;
   let clCount = 0;
   let autoClCount = 0;
+  let autoLwpCount = 0;
   let slCount = 0;
   let lwpCount = 0;
   let absentCount = 0;
@@ -157,20 +169,27 @@ export function buildMonthAttendance(opts: {
     days.push({ dayNum: day, date, status: "absent" });
   }
 
-  // Auto-CL: unmarked days become the weekly off / CL the employee would have
-  // applied for, until the monthly allowance is used up. Anything past that
-  // stays an unpaid absence.
+  // Auto-resolve: unmarked days become the weekly off / CL the employee would
+  // have applied for until the monthly allowance is used up, then LWP. Nothing
+  // is left as a bare "absent" — payroll deducted those as unpaid anyway, so
+  // calling them LWP just gives the day the name it already had on the payslip.
   const monthKey = `${year}-${String(monthNum).padStart(2, "0")}`;
   if (monthKey >= AUTO_CL_FROM_MONTH) {
     let remaining = Math.max(0, CL_PER_MONTH - clCount);
     for (const idx of unexplained) {
-      if (remaining === 0) break;
-      days[idx].status = "cl";
-      days[idx].autoCl = true;
-      clCount++;
-      autoClCount++;
       absentCount--;
-      remaining--;
+      if (remaining > 0) {
+        days[idx].status = "cl";
+        days[idx].autoCl = true;
+        clCount++;
+        autoClCount++;
+        remaining--;
+      } else {
+        days[idx].status = "lwp";
+        days[idx].autoLwp = true;
+        lwpCount++;
+        autoLwpCount++;
+      }
     }
   }
 
@@ -184,6 +203,7 @@ export function buildMonthAttendance(opts: {
     autoClCount,
     slCount,
     lwpCount,
+    autoLwpCount,
     absentCount,
     unpaidCount: lwpCount + absentCount,
   };
