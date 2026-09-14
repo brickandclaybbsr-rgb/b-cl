@@ -15,7 +15,10 @@ export default async function AttendancePage() {
   if (currentProfile.role !== "owner") {
     redirect("/profile");
   }
-  const staffList = await getStaff();
+  // The People tab manages leavers too (documents, reactivation), so it needs
+  // the full list; the attendance ledger below shows only current staff.
+  const staffList = await getStaff({ includeInactive: true });
+  const activeStaff = staffList.filter((s) => s.is_active);
   const todayAttendance = await getTodayAttendance();
   const supabase = createClient();
 
@@ -136,7 +139,7 @@ export default async function AttendancePage() {
         todayAttendance={<TodayAttendancePanel data={todayAttendance} />}
         attendanceChild={
           <AttendanceClient
-            staffList={staffList}
+            staffList={activeStaff}
             currentProfile={currentProfile}
             initialPunches={punches ?? []}
             initialCheckins={checkins ?? []}
