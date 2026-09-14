@@ -111,11 +111,16 @@ async function handleAttendanceScan(
 
   if (!outlet) return { error: "This outlet is no longer active." };
 
-  // Employees may only mark attendance at their assigned outlet. Unassigned
-  // employees (outlet_id null) may use any outlet.
-  if (profile.outlet_id && profile.outlet_id !== outlet.id) {
-    return { error: `You must be within your assigned outlet to mark attendance. This QR belongs to ${outlet.name}.` };
-  }
+  // Attendance may be marked at ANY active outlet, not just the assigned one.
+  // Staff are assigned an outlet, but cover across sites often enough that
+  // enforcing it here just locked people out of marking a shift they actually
+  // worked — and the owner then had to enter the day by hand.
+  //
+  // profiles.outlet_id stays as the employee's home outlet for reporting; the
+  // geofence below is the real control, since it requires physically standing
+  // at whichever outlet the QR belongs to. A day may also start at one outlet
+  // and end at another: check-out is matched on (profile, date), so scanning
+  // out at the other site works and the row keeps the outlet they started at.
 
   const distance = haversineMeters(coords.latitude, coords.longitude, outlet.latitude, outlet.longitude);
   if (distance > outlet.radius_m) {
