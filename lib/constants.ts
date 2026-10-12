@@ -16,6 +16,23 @@ export const APP_START_DATE = "2026-06-14";
 export const DEFAULT_OUTLET_ID = "e840db26-9c52-4212-a484-2b41175646f0";
 
 /**
+ * First business date each outlet's daily records (sales, checklists, cash
+ * outs) are kept from. Patia traded from mid-September, but its front desk
+ * couldn't file separately until per-outlet records went live, so its books
+ * start fresh on 13 Oct 2026. Days before an outlet's start are neither
+ * "missing" nor ₹0 — they are simply not shown. A new outlet needs an entry
+ * here, or it will be measured from APP_START_DATE.
+ */
+const OUTLET_RECORDS_START: Record<string, string> = {
+  "893fbb66-aaa5-4cd9-8585-33314fe5b8f5": "2026-10-13", // Patia
+};
+
+/** The first date an outlet's records count from; APP_START_DATE for all outlets combined. */
+export function outletRecordsStart(outletId?: string | null): string {
+  return (outletId && OUTLET_RECORDS_START[outletId]) || APP_START_DATE;
+}
+
+/**
  * QR + geofence attendance rollout. Before this date the check-in gate is
  * dormant (staff use the app normally); on/after it, staff must scan an outlet
  * QR within its geofence before they can use the app for the day.

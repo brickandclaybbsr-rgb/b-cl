@@ -3,7 +3,7 @@ import { ArrowLeft } from "lucide-react";
 import { requireOwner } from "@/lib/auth";
 import { getClosingBalanceForDate, getClosingBalanceRange } from "@/lib/data/reports";
 import { todayIST, daysAgoIST } from "@/lib/date";
-import { APP_START_DATE } from "@/lib/constants";
+import { APP_START_DATE, outletRecordsStart } from "@/lib/constants";
 import { getOutletContext } from "@/lib/data/outlets";
 import { OutletSwitcher } from "@/components/outlet-switcher";
 import { ClosingBalanceClient } from "./closing-balance-client";
@@ -20,7 +20,10 @@ export default async function ClosingBalancePage({
 
   const today = todayIST();
   const rawDate = String(searchParams.date ?? "").trim();
-  const date = (rawDate >= APP_START_DATE && rawDate <= today) ? rawDate : daysAgoIST(1);
+  const requested = (rawDate >= APP_START_DATE && rawDate <= today) ? rawDate : daysAgoIST(1);
+  // Nothing before the outlet's records start — jump to its first day (or today).
+  const start = outletRecordsStart(outlet.activeId);
+  const date = requested >= start ? requested : (start <= today ? start : today);
 
   const rawDays = parseInt(String(searchParams.days ?? "30"), 10);
   const rangeDays = [7, 14, 30, 60, 90].includes(rawDays) ? rawDays : 30;

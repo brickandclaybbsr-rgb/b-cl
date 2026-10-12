@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { daysAgoIST, todayIST, formatShortDate } from "@/lib/date";
+import { outletRecordsStart } from "@/lib/constants";
 import type { DailySales } from "@/lib/database.types";
 
 export function salesTotal(s: Pick<DailySales, "cash_sales" | "online_sales" | "aggregator_sales">) {
@@ -57,8 +58,8 @@ export interface TrendDay {
 
 /**
  * Last `days` days of sales, with zero-filled gaps, oldest → newest. For one
- * outlet when `outletId` is given; otherwise every outlet's figures for a day
- * are added together.
+ * outlet when `outletId` is given (skipping days before its records start);
+ * otherwise every outlet's figures for a day are added together.
  */
 export async function getSalesTrend(days = 7, outletId?: string | null): Promise<TrendDay[]> {
   const from = daysAgoIST(days - 1);
@@ -73,9 +74,11 @@ export async function getSalesTrend(days = 7, outletId?: string | null): Promise
     byDate.set(r.date, d);
   }
 
+  const start = outletRecordsStart(outletId);
   const out: TrendDay[] = [];
   for (let i = days - 1; i >= 0; i--) {
     const date = daysAgoIST(i);
+    if (date < start) continue;
     const d = byDate.get(date) ?? { cash: 0, online: 0, aggregator: 0 };
     out.push({ date, label: formatShortDate(date), ...d, total: d.cash + d.online + d.aggregator });
   }
@@ -84,16 +87,17 @@ export async function getSalesTrend(days = 7, outletId?: string | null): Promise
 
 /**
  * Dates with no sales filed for an outlet, oldest first, up to (not
- * including) `today`. Counted from the outlet's first ever filing rather than
- * the app's launch, so an outlet that opened later isn't shown months of
- * "missing" days from before it existed.
+ * including) `today`. Counted from the outlet's records start
+ * (outletRecordsStart), so an outlet that opened later isn't shown months of
+ * "missing" days from before its books began.
  */
 export async function getMissingSalesDates(outletId: string, from: string, today: string): Promise<string[]> {
-  const rows = await getSalesRange(from, today, outletId);
-  if (!rows.length) return [];
+  const start = from > outletRecordsStart(outletId) ? from : outletRecordsStart(outletId);
+  if (start >= today) return [];
+  const rows = await getSalesRange(start, today, outletId);
   const filed = new Set(rows.map((r) => r.date));
   const missing: string[] = [];
-  for (let d = new Date(rows[0].date + "T00:00:00Z"); ; d.setUTCDate(d.getUTCDate() + 1)) {
+  for (let d = new Date(start + "T00:00:00Z"); ; d.setUTCDate(d.getUTCDate() + 1)) {
     const str = d.toISOString().slice(0, 10);
     if (str >= today) break; // today can still be filed tonight
     if (!filed.has(str)) missing.push(str);

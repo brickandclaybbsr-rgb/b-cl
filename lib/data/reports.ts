@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { daysAgoIST, todayIST, datesDescending } from "@/lib/date";
 import { getSalesRange, salesTotal } from "@/lib/data/sales";
+import { outletRecordsStart } from "@/lib/constants";
 import type { EodReport, DailySales, CashExpense } from "@/lib/database.types";
 
 export interface DaySummary {
@@ -47,9 +48,11 @@ export async function getRecentDays(days = 14, outletId?: string | null): Promis
   const closeSet = new Set((closingRes.data ?? []).map((r) => r.date));
   const cashByDate = groupByDate((expensesRes.data ?? []) as CashExpense[]);
 
+  const start = outletRecordsStart(outletId);
   const out: DaySummary[] = [];
   for (let i = 0; i < days; i++) {
     const date = daysAgoIST(i);
+    if (date < start) break; // newest first — everything older is before the outlet's records
     const s = salesByDate.get(date);
     const cashOut = cashByDate.get(date) ?? [];
     out.push({
@@ -102,8 +105,10 @@ export async function getAttendanceStatusRange(
   const openSet = new Set((openingRows ?? []).map((r: any) => r.date));
   const closeSet = new Set((closingRows ?? []).map((r: any) => r.date));
 
+  const start = outletRecordsStart(outletId);
   const out: AttendanceStatusDay[] = [];
   for (const date of datesDescending(from, to)) {
+    if (date < start) break;
     out.push({ date, openingFiled: openSet.has(date), closingFiled: closeSet.has(date) });
   }
   return out;
@@ -158,19 +163,28 @@ export interface ClosingBalanceDay {
  * one outlet, or every outlet added together when `outletId` is omitted.
  */
 export async function getClosingBalanceForDate(date: string, outletId?: string | null): Promise<ClosingBalanceDay> {
-  return (await getClosingBalanceRange(date, date, outletId))[0];
+  const [day] = await getClosingBalanceRange(date, date, outletId);
+  // Before the outlet's records start there is nothing to show — not even zeros.
+  return day ?? {
+    date, openingCash: null, openingDiscrepancy: null, openingDiscrepancyReason: null,
+    closingCash: null, cashDeposited: null, closingDiscrepancyNotes: null,
+    salesCash: 0, cashOutTotal: 0, cashOut: [],
+  };
 }
 
 /**
- * Compact day-by-day closing-balance table for a date range, newest first.
- * With no `outletId`, each day's figures are the sum across outlets (a figure
- * stays null only when no outlet recorded it).
+ * Compact day-by-day closing-balance table for a date range, newest first,
+ * starting no earlier than the outlet's records start. With no `outletId`,
+ * each day's figures are the sum across outlets (a figure stays null only
+ * when no outlet recorded it).
  */
 export async function getClosingBalanceRange(
-  from: string,
+  rangeFrom: string,
   to: string,
   outletId?: string | null,
 ): Promise<ClosingBalanceDay[]> {
+  const from = rangeFrom > outletRecordsStart(outletId) ? rangeFrom : outletRecordsStart(outletId);
+  if (from > to) return [];
   const supabase = createClient();
   let opening = supabase.from("opening_checklists").select("*").eq("team", "front_desk").gte("date", from).lte("date", to);
   let closing = supabase.from("closing_checklists").select("*").eq("team", "front_desk").gte("date", from).lte("date", to);

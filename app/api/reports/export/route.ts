@@ -7,7 +7,7 @@ import {
   type ClosingBalanceDay,
 } from "@/lib/data/reports";
 import { formatINR } from "@/lib/utils";
-import { APP_START_DATE } from "@/lib/constants";
+import { APP_START_DATE, outletRecordsStart } from "@/lib/constants";
 import { getOutlets } from "@/lib/data/outlets";
 
 function fmtDate(date: string) {
@@ -32,14 +32,16 @@ export async function GET(req: NextRequest) {
   const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
   const fromRaw = searchParams.get("from") ?? "";
   const toRaw = searchParams.get("to") ?? "";
-  const from = (fromRaw >= APP_START_DATE && fromRaw <= today) ? fromRaw : APP_START_DATE;
-  const to = (toRaw >= from && toRaw <= today) ? toRaw : today;
-  const sections = new Set((searchParams.get("sections") ?? "sales,cashout,closing").split(","));
   // One outlet, or every outlet added together ("all" / anything unrecognised).
   const outlets = await getOutlets();
   const outlet = outlets.find((o) => o.id === searchParams.get("outlet")) ?? null;
   const outletId = outlet?.id ?? null;
   const outletLabel = outlet ? `Brick &amp; Clay ${outlet.name}` : "All outlets";
+  // A single outlet's report can't start before its records do.
+  const earliest = outletRecordsStart(outletId);
+  const from = (fromRaw >= earliest && fromRaw <= today) ? fromRaw : (earliest <= today ? earliest : today);
+  const to = (toRaw >= from && toRaw <= today) ? toRaw : today;
+  const sections = new Set((searchParams.get("sections") ?? "sales,cashout,closing").split(","));
   const dayCount = Math.round((new Date(to).getTime() - new Date(from).getTime()) / 86_400_000) + 1;
 
   const wantsSales = sections.has("sales");
