@@ -9,13 +9,8 @@ import { uploadPublicFile, deletePublicFile } from "@/lib/storage";
 import { whatsappNotify } from "@/lib/whatsapp-notify";
 import { notifyOwner, notifyStaff, sendPushToProfile } from "@/lib/push";
 import { SIGNATURE_DATA_URI, STAMP_DATA_URI } from "@/lib/payslip-assets";
-import {
-  buildMonthAttendance,
-  leaveBalances,
-  sickLeaveUsedInYear,
-  CL_PER_MONTH,
-  SL_PER_YEAR,
-} from "@/lib/leave-policy";
+import { renderPayslipHtml, formatINR } from "@/lib/payslip-template";
+import { buildMonthAttendance } from "@/lib/leave-policy";
 
 export type HRActionState = { ok?: boolean; error?: string; message?: string; html?: string };
 
@@ -715,10 +710,15 @@ export async function clearPayrollOverride(profileId: string, month: string): Pr
  */
 export async function renderLivePayslip(
   docId: string,
+  adminClient?: any,
 ): Promise<{ html?: string; error?: string; status?: number }> {
   try {
-    const profile = await requireProfile();
-    const supabase = createClient();
+    // Scripts pass a service-role client to render without a session. This file
+    // is "use server", so this export is also callable from a browser — but a
+    // browser can only send serialised data, never an object with methods, so
+    // only a real client (one with .from) may skip the access check below.
+    const trustedClient = typeof adminClient?.from === "function" ? adminClient : null;
+    const supabase = trustedClient || createClient();
 
     const { data: doc, error: docErr } = await supabase
       .from("staff_documents")
@@ -727,10 +727,13 @@ export async function renderLivePayslip(
       .single();
     if (docErr || !doc) return { error: "Payslip not found.", status: 404 };
 
-    // Access: staff may only view their own visible slip; owner sees all.
-    if (profile.role !== "owner") {
-      if (doc.profile_id !== profile.id || !doc.is_visible_to_staff) {
-        return { error: "Forbidden.", status: 403 };
+    if (!trustedClient) {
+      const profile = await requireProfile();
+      // Access: staff may only view their own visible slip; owner sees all.
+      if (profile.role !== "owner") {
+        if (doc.profile_id !== profile.id || !doc.is_visible_to_staff) {
+          return { error: "Forbidden.", status: 403 };
+        }
       }
     }
 
@@ -898,21 +901,6 @@ async function generatePayslipInternal(
     // Table may not exist yet — fall back to punches only.
   }
 
-  // Approved sick leave across the whole calendar year, for the 6/year balance.
-  let slUsedThisYear = 0;
-  try {
-    const { data: yearLeaves } = await supabase
-      .from("leaves")
-      .select("leave_type, start_date, end_date, status")
-      .eq("profile_id", profileId)
-      .eq("status", "approved")
-      .lte("start_date", `${year}-12-31`)
-      .gte("end_date", `${year}-01-01`);
-    slUsedThisYear = sickLeaveUsedInYear((yearLeaves ?? []) as any, year);
-  } catch {
-    slUsedThisYear = 0;
-  }
-
   // 2a-2. Manual override for this employee/month, if the owner has set one
   // (Payroll tab → Manual Overrides). Any field left blank falls back to the
   // computed value — this replaces having to hardcode a per-employee/month
@@ -1026,8 +1014,6 @@ async function generatePayslipInternal(
   // Unpaid = approved LWP + unexplained absence. Future days are never unpaid.
   const lwpCount = summary.unpaidCount;
 
-  const balances = leaveBalances({ clUsedThisMonth: clCount, slUsedThisYear });
-
   const calendarDays = summary.days.map((d) => {
     switch (d.status) {
       case "cl":      return { dayNum: d.dayNum, class: "cl-day",  statusLabel: "CL" };
@@ -1124,47 +1110,6 @@ async function generatePayslipInternal(
   const totalAllAdvances = totalAdvance + totalNextMonthAdvance;
   const netSalary = Math.max(0, grossBeforeAdvance - totalAllAdvances);
   const amountPaidNum = amountPaid ? Math.max(0, parseFloat(amountPaid) - totalAllAdvances) : netSalary;
-  const cfCount = isBiswajeetJune2026 ? 2 : balances.clRemaining;
-
-  // Build calendar grid HTML table rows
-  const startDayOfWeek = startOfMonth.getDay(); // 0 = Sun, 1 = Mon, ..., 6 = Sat
-  const mondayFirstDay = (startDayOfWeek + 6) % 7; // 0 = Mon, ..., 6 = Sun
-
-  let calendarHTML = '<thead><tr><th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th><th>Sun</th></tr></thead><tbody><tr>';
-  
-  // Add empty padding cells before day 1
-  for (let i = 0; i < mondayFirstDay; i++) {
-    calendarHTML += '<td class="empty"></td>';
-  }
-
-  let colCount = mondayFirstDay;
-
-  calendarDays.forEach((day) => {
-    if (colCount === 7) {
-      calendarHTML += '</tr><tr>';
-      colCount = 0;
-    }
-    
-    const statusSpan = day.statusLabel 
-      ? `<span class="day-status" style="background:${
-          day.class === 'cl-day' ? '#bfdbfe;color:#1e40af;' : 
-          day.class === 'sl-day' ? '#ddd6fe;color:#5b21b6;' : 
-          '#fecaca;color:#7f1d1d;'
-        }">${day.statusLabel}</span>` 
-      : `<span class="day-status" style="background:#dcfce7;color:#15803d;">P</span>`;
-      
-    calendarHTML += `<td class="${day.class}"><div class="day-num">${day.dayNum}</div>${statusSpan}</td>`;
-    colCount++;
-  });
-
-  // Add empty padding cells at the end of the month
-  if (colCount < 7) {
-    for (let i = colCount; i < 7; i++) {
-      calendarHTML += '<td class="empty"></td>';
-    }
-  }
-  calendarHTML += '</tr></tbody>';
-
   // Load corporate logo as base64 directly from local Assets folder
   let logoBase64 = "";
   try {
@@ -1179,15 +1124,31 @@ async function generatePayslipInternal(
     console.warn("Logo load failed:", logoErr);
   }
 
-  // Signature: prefer an uploaded signature (profiles.signature_url), then fall
-  // back to the embedded Soumyashree Das signature. Stamp is always embedded.
-  // See lib/payslip-assets.ts.
+  // Signature: prefer local file in public/uploads or Assets, then uploaded URL, then embedded fallback.
   let signatureBase64 = "";
   let stampBase64 = STAMP_DATA_URI;
   let signatoryName = "Soumyashree Das";
   let signatoryTitle = "Managing Director";
 
-  // Try an uploaded signature first (HR manager, else owner).
+  try {
+    const fs = require('fs');
+    const path = require('path');
+    const sigPaths = [
+      path.join(process.cwd(), 'public', 'uploads', 'Soumyashree Das Signature.png'),
+      path.join(process.cwd(), 'Assets', 'Soumyashree Das Signature.png'),
+    ];
+    for (const sp of sigPaths) {
+      if (fs.existsSync(sp)) {
+        const sigBuf = fs.readFileSync(sp);
+        signatureBase64 = `data:image/png;base64,${sigBuf.toString("base64")}`;
+        break;
+      }
+    }
+  } catch (sigErr) {
+    console.warn("Local signature load failed:", sigErr);
+  }
+
+  // Try an uploaded signature first if not loaded from disk
   if (!signatureBase64) {
     const { data: hrManagerProfile } = await supabase
       .from("profiles")
@@ -1217,366 +1178,95 @@ async function generatePayslipInternal(
     signatoryTitle = signatoryProfile?.name === "Soumyashree Das" ? "Managing Director" : "Authorized Signatory";
   }
 
-  // No uploaded signature → use the embedded Soumyashree Das signature.
+  // No uploaded signature → use Soumyashree Das signature from public/uploads or embedded asset
+  if (!signatureBase64) {
+    try {
+      const fs = await import("fs");
+      const path = await import("path");
+      const sigPath = path.join(process.cwd(), "public", "uploads", "Soumyashree Das Signature.png");
+      if (fs.existsSync(sigPath)) {
+        const buf = fs.readFileSync(sigPath);
+        signatureBase64 = `data:image/png;base64,${buf.toString("base64")}`;
+      }
+    } catch {
+      // Fallback
+    }
+  }
   if (!signatureBase64) signatureBase64 = SIGNATURE_DATA_URI;
 
-  // Helper to safely format dates from YYYY-MM-DD to DD/MM/YYYY
-  const formatDateStr = (d: string | null | undefined) => {
-    if (!d) return "Not Provided";
-    const parts = d.split("-");
-    if (parts.length !== 3) return d;
-    return `${parts[2]}/${parts[1]}/${parts[0]}`;
-  };
+  // Hand-set day counts (Payroll → Manual Overrides) can't be placed on
+  // specific dates, so the day-by-day grid is left off rather than shown
+  // disagreeing with the totals above it.
+  const countsOverridden =
+    override?.present_days != null || override?.cl_days != null || override?.lwp_days != null;
 
-  const formatCurr = (val: number) => val.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const takenOn = (d: string | null) =>
+    d ? `Taken ${new Date(d + "T00:00:00").toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}` : undefined;
+  const nextMonthLabel = new Date(nextYear, nextMonthNum - 1, 1)
+    .toLocaleDateString("en-IN", { month: "long", year: "numeric" });
 
-  // Generate Beautiful HTML Content (2-page print layout)
-  const htmlContent = `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>Payslip - ${employee.name} - ${monthLabel}</title>
-  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <style>
-    *{margin:0;padding:0;box-sizing:border-box;}
-    body{font-family:'Poppins','Segoe UI',sans-serif;color:#1a1a1a;background:#ffffff;font-size:13px;}
-    .header{background:#111111;padding:22px 40px;display:flex;align-items:center;gap:18px;border-bottom:4px solid #eab308;}
-    .logo{height:38px;}
-    .co-info{color:#ffffff;}
-    .co-name{font-size:16px;font-weight:700;letter-spacing:.5px;}
-    .co-sub{font-size:10px;opacity:.75;margin-top:2px;}
-    .doc{padding:30px 40px;max-width:900px;margin:0 auto;background:#ffffff;}
-    .doc-title{text-align:center;margin-bottom:24px;}
-    .doc-title h2{font-size:15px;font-weight:800;letter-spacing:3px;text-transform:uppercase;color:#111111;border-bottom:3px solid #eab308;padding-bottom:8px;display:inline-block;}
-    .doc-title p{font-size:11px;color:#6b7280;margin-top:5px;font-weight:500;}
-    .slbl{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#111111;border-bottom:2px solid #111111;padding-bottom:5px;margin-bottom:12px;margin-top:20px;}
-    table.info{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:4px;}
-    table.info td{padding:8px 12px;border:1px solid #e5e7eb;}
-    table.info td.lbl{background:#f9fafb;font-weight:600;color:#4b5563;width:22%;}
-    table.info td.val{color:#111111;font-weight:500;}
-    table.pay{width:100%;border-collapse:collapse;font-size:13px;margin-bottom:8px;}
-    table.pay th{background:#111111;padding:10px 14px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#ffffff;border:1px solid #111111;}
-    table.pay td{padding:11px 14px;border:1px solid #e5e7eb;}
-    table.pay .earn{color:#16a34a;font-weight:600;}
-    table.pay .deduct{color:#dc2626;font-weight:600;}
-    table.pay .net-row td{background:#fef9c3;font-weight:700;border-top:2px solid #eab308;border-bottom:2px solid #eab308;}
-    table.pay .net-lbl{font-size:14px;color:#854d0e;}
-    table.pay .net-amt{font-size:16px;color:#111111;font-weight:800;}
-    .note{font-size:10px;color:#6b7280;font-style:italic;margin-top:8px;margin-bottom:16px;}
-    .tax-note{font-size:11px;background:#fefcbf;border-left:3px solid #eab308;padding:10px 14px;color:#718096;margin-bottom:20px;border-radius:0 4px 4px 0;}
-    .sig-row{display:flex;justify-content:space-between;margin-top:36px;padding-top:16px;border-top:1px solid #e5e7eb;}
-    .sig-block{text-align:center;width:42%;}
-    .sig-space{height:48px;}
-    .sig-line{border-top:1.5px dashed #111111;margin-bottom:6px;}
-    .sig-name{font-size:12px;font-weight:700;color:#111111;}
-    .sig-title{font-size:9px;color:#6b7280;margin-top:2px;text-transform:uppercase;letter-spacing:.5px;}
-    .footer-note{font-size:9px;color:#9ca3af;text-align:center;margin-top:16px;}
-    .page-break{page-break-before:always;}
-    .att-cards{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-bottom:24px;}
-    .att-card{text-align:left;padding:14px 16px;border-radius:8px;background:#ffffff;border:1px solid #e5e7eb;box-shadow:0 1px 3px rgba(0,0,0,0.05);display:flex;flex-direction:column;justify-content:space-between;height:72px;}
-    .att-card .num{font-size:26px;font-weight:800;line-height:1;margin-bottom:4px;}
-    .att-card .lbl{font-size:9px;text-transform:uppercase;letter-spacing:.7px;color:#6b7280;font-weight:600;}
-    .att-card.present{border-left:4px solid #16a34a;} .att-card.present .num{color:#16a34a;}
-    .att-card.cl{border-left:4px solid #1d4ed8;} .att-card.cl .num{color:#1d4ed8;}
-    .att-card.sl{border-left:4px solid #6d28d9;} .att-card.sl .num{color:#6d28d9;}
-    .att-card.lwp{border-left:4px solid #991b1b;} .att-card.lwp .num{color:#991b1b;}
-    .att-card.cf{border-left:4px solid #92400e;} .att-card.cf .num{color:#92400e;}
-    table.cal{width:100%;border-collapse:collapse;font-size:11px;background:#ffffff;}
-    table.cal th{text-align:center;padding:10px 4px;background:#111111;border:1px solid #111111;font-size:9px;font-weight:700;text-transform:uppercase;color:#ffffff;letter-spacing:1px;}
-    table.cal td{text-align:left;padding:8px 10px;border:1px solid #e5e7eb;vertical-align:top;height:58px;position:relative;background:#ffffff;}
-    table.cal td .day-num{font-size:12px;font-weight:700;color:#374151;}
-    table.cal td .day-status{position:absolute;bottom:8px;right:8px;font-size:9px;padding:2px 6px;border-radius:4px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;line-height:1;}
-    table.cal td.empty{background:#f9fafb;}
-    table.cal td.present .day-num{color:#166534;}
-    table.cal td.cl-day{background:#f8fafc;} table.cal td.cl-day .day-num{color:#1d4ed8;}
-    table.cal td.sl-day{background:#fcfbfe;} table.cal td.sl-day .day-num{color:#6d28d9;}
-    table.cal td.lwp-day{background:#fffafb;} table.cal td.lwp-day .day-num{color:#991b1b;}
-    table.cal td.cf-day{background:#fffdf9;} table.cal td.cf-day .day-num{color:#92400e;}
-    .legend{display:flex;gap:18px;margin-top:16px;flex-wrap:wrap;}
-    .legend-item{display:flex;align-items:center;gap:6px;font-size:10px;color:#4b5563;font-weight:500;}
-    .legend-dot{width:12px;height:12px;border-radius:3px;border:1px solid #e5e7eb;}
-    @media print{
-      body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
-      .page-break{page-break-before:always;}
-    }
-    ${isDraft ? `
-    .draft-banner{background:#fef3c7;border-top:4px solid #f59e0b;border-bottom:4px solid #f59e0b;padding:8px 40px;text-align:center;font-size:12px;font-weight:700;color:#92400e;letter-spacing:2px;text-transform:uppercase;}
-    .draft-watermark{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-35deg);font-size:100px;font-weight:900;color:rgba(239,68,68,0.08);letter-spacing:8px;pointer-events:none;z-index:0;text-transform:uppercase;}
-    ` : ""}
-  </style>
-</head>
-<body>
-
-${isDraft ? `
-<div class="draft-watermark">DRAFT</div>
-<div class="draft-banner">&#9888;&nbsp; DRAFT PAYSLIP — For Internal Review Only &nbsp;&#9888;&nbsp; Advance Deductions Are Estimates Until Final Payment Is Confirmed</div>
-` : ""}
-
-<!-- PAGE 1 ─ SALARY SLIP -->
-<div class="header">
-  ${logoBase64 ? `<img src="${logoBase64}" class="logo" alt="Brick and Clay">` : `<strong style="font-size: 20px; color: #ffffff; letter-spacing: 0.5px;">BRICK & CLAY</strong>`}
-  <div class="co-info">
-    <div class="co-name">SS BRICK AND CLAY PRIVATE LIMITED</div>
-    <div class="co-sub"><strong>Regd. Office:</strong> Plot No. A-17/13, Unit-7, Surya Nagar, Bhubaneswar, Khordha, Odisha &ndash; 751003</div>
-    <div class="co-sub"><strong>Outlet 1:</strong> C-3, Ground Floor, Inox Block, BMC Bhawani Mall, Saheed Nagar, Bhubaneswar, Odisha &ndash; 751007</div>
-    <div class="co-sub"><strong>Outlet 2:</strong> Plot No. 516/1755, A/2, Maruti Villa, 1st Floor, KIIT Square, Patia, PS-Infocity, Bhubaneswar, Odisha &ndash; 751024</div>
-    <div class="co-sub"><strong>CIN:</strong> U52590OR2022PTC040271</div>
-  </div>
-</div>
-
-<div class="doc">
-  <div class="doc-title">
-    <h2>Salary Slip</h2>
-    <p>${monthLabel}</p>
-  </div>
-
-  <div class="slbl">Employee Information</div>
-  <table class="info">
-    <tr>
-      <td class="lbl">Employee Name</td>
-      <td class="val" colspan="3">${employee.name}</td>
-    </tr>
-    <tr>
-      <td class="lbl">Employee Code</td>
-      <td class="val">${employeeCode}</td>
-      <td class="lbl">Designation</td>
-      <td class="val">${employee.designation || "Not Provided"}</td>
-    </tr>
-    <tr>
-      <td class="lbl">Date of Birth</td>
-      <td class="val">${formatDateStr(dob)}</td>
-      <td class="lbl">Date of Joining</td>
-      <td class="val">${formatDateStr(employee.date_of_joining)}</td>
-    </tr>
-    <tr>
-      <td class="lbl">Aadhar Number</td>
-      <td class="val">${aadhar}</td>
-      <td class="lbl">PAN Number</td>
-      <td class="val">${pan}</td>
-    </tr>
-    <tr>
-      <td class="lbl">Employment Type</td>
-      <td class="val">${employee.employment_type || "Not Provided"}</td>
-      <td class="lbl">Reporting Authority</td>
-      <td class="val">${reportingAuthorityName}</td>
-    </tr>
-    <tr>
-      <td class="lbl">Work Location</td>
-      <td class="val">${employee.work_location || "Not Provided"}</td>
-      <td class="lbl">Working Hours</td>
-      <td class="val">${employee.working_hours || "Not Provided"}</td>
-    </tr>
-    <tr>
-      <td class="lbl">Assigned Outlet</td>
-      <td class="val">${assignedOutletName}</td>
-      <td class="lbl">Department</td>
-      <td class="val">${teamLabel}</td>
-    </tr>
-  </table>
-
-  <div class="slbl">Earnings &amp; Deductions</div>
-  <table class="pay">
-    <thead>
-      <tr>
-        <th style="width:50%">Description</th>
-        <th style="width:25%">Days / Basis</th>
-        <th style="width:25%">Amount</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td>Basic Salary (Gross)${isPartialMonth ? ` <span style="font-size:9px;color:#6b7280;">&mdash; pro-rated from date of joining</span>` : ""}</td>
-        <td>${isPartialMonth
-          ? `${summary.employedDays} of ${maxDay} days &times; ₹${formatCurr(dailyRate)}/day`
-          : `${maxDay}-day month`}</td>
-        <td class="earn">₹${formatCurr(effectiveBasicPay)}</td>
-      </tr>
-      ${extraDutyPayment > 0 ? `
-      <tr>
-        <td>${extraDutyLabel}</td>
-        <td>&#8212;</td>
-        <td class="earn">+ ₹${formatCurr(extraDutyPayment)}</td>
-      </tr>
-      ` : ""}
-      ${bonusAmount > 0 ? `
-      <tr>
-        <td>${bonusLabel}</td>
-        <td>&#8212;</td>
-        <td class="earn">+ ₹${formatCurr(bonusAmount)}</td>
-      </tr>
-      ` : ""}
-      ${incentiveAmount > 0 ? `
-      <tr>
-        <td>${incentiveLabel}</td>
-        <td>&#8212;</td>
-        <td class="earn">+ ₹${formatCurr(incentiveAmount)}</td>
-      </tr>
-      ` : ""}
-      ${lwpDaysForCalc > 0 ? `
-      <tr>
-        <td>Leave Without Pay (LWP)</td>
-        <td>${lwpCountDisplay} days &times; ₹${formatCurr(dailyRate)}/day</td>
-        <td class="deduct">&#8722; ₹${formatCurr(lwpDeduction)}</td>
-      </tr>
-      ` : `
-      <tr>
-        <td style="color:#9ca3af">Deductions (Tax / PF / LWP)</td>
-        <td style="color:#9ca3af">&#8212;</td>
-        <td style="color:#9ca3af">Nil</td>
-      </tr>
-      `}
-      ${otherDeductionAmount > 0 ? `
-      <tr>
-        <td>${otherDeductionLabel}</td>
-        <td>&#8212;</td>
-        <td class="deduct">&#8722; ₹${formatCurr(otherDeductionAmount)}</td>
-      </tr>
-      ` : ""}
-      ${advanceRows.length > 0 ? advanceRows.map((adv: any) => `
-      <tr>
-        <td>Advance Deduction${adv.notes ? ` (${adv.notes})` : ""}</td>
-        <td>${adv.advance_date ? new Date(adv.advance_date + "T00:00:00").toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "Advance"}</td>
-        <td class="deduct">&#8722; ₹${formatCurr(Number(adv.amount))}</td>
-      </tr>`).join("") : ""}
-      ${nextMonthAdvancesDeducted.length > 0 ? `
-      <tr style="background:#fee2e2;">
-        <td colspan="3" style="padding:6px 14px;font-size:10px;font-weight:600;color:#991b1b;letter-spacing:.3px;">
-          &#8595; Next Month Advances — Deducted (taken before salary credit)
-        </td>
-      </tr>
-      ${nextMonthAdvancesDeducted.map((adv: any) => `
-      <tr style="background:#fee2e2;">
-        <td style="color:#991b1b;">Advance (${nextMonthStr})${adv.notes ? ` — ${adv.notes}` : ""}</td>
-        <td style="color:#991b1b;">${adv.advance_date ? new Date(adv.advance_date + "T00:00:00").toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "—"}</td>
-        <td style="color:#991b1b;" class="deduct">&#8722; ₹${formatCurr(Number(adv.amount))}</td>
-      </tr>`).join("")}
-      ` : ""}
-      ${nextMonthAdvancesUpcoming.length > 0 ? `
-      <tr style="background:#fffbeb;">
-        <td colspan="3" style="padding:6px 14px;font-size:10px;font-weight:600;color:#92400e;letter-spacing:.3px;">
-          &#9432; Upcoming — will be recovered from next month's salary
-        </td>
-      </tr>
-      ${nextMonthAdvancesUpcoming.map((adv: any) => `
-      <tr style="background:#fffbeb;opacity:.85;">
-        <td style="color:#92400e;">Advance (${nextMonthStr})${adv.notes ? ` — ${adv.notes}` : ""}</td>
-        <td style="color:#92400e;">${adv.advance_date ? new Date(adv.advance_date + "T00:00:00").toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "—"}</td>
-        <td style="color:#92400e;font-style:italic;">&#8722; ₹${formatCurr(Number(adv.amount))} *</td>
-      </tr>`).join("")}
-      ` : ""}
-    </tbody>
-    <tfoot>
-      <tr class="net-row">
-        <td class="net-lbl">Net Salary (Hand Salary)</td>
-        <td><strong>${presentCountDisplay} days present</strong></td>
-        <td class="net-amt">₹${formatCurr(netSalary)}</td>
-      </tr>
-    </tfoot>
-  </table>
-
-  <div class="tax-note">
-    <strong>Tax &amp; PF Policy Note:</strong> SS Brick and Clay Private Limited has processed this payslip with zero tax/PF deductions for the current period. In-hand salary matches gross salary minus LWP days and advance deductions.
-  </div>
-
-  ${!isDraft && paymentDate && paymentReference ? `
-  <div style="background:#f0fdf4;border:1.5px solid #86efac;border-radius:6px;padding:12px 16px;margin-bottom:16px;font-size:12px;">
-    <div style="font-weight:700;color:#15803d;margin-bottom:6px;">&#10003; Payment Confirmed</div>
-    <div style="display:flex;gap:40px;color:#166534;">
-      <div><span style="font-weight:600;">Payment Date:</span> ${new Date(paymentDate + "T00:00:00").toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}</div>
-      <div><span style="font-weight:600;">Reference No.:</span> ${paymentReference}</div>
-      <div><span style="font-weight:600;">Mode:</span> ${paidThrough}</div>
-      <div><span style="font-weight:600;">Amount Paid:</span> ₹${formatCurr(amountPaidNum)}</div>
-    </div>
-  </div>
-  ` : ""}
-
-  <div class="note">
-    ${isDraft ? `&#9888; <strong>DRAFT</strong> — This payslip is for internal review only. Finalize by entering payment date and reference number.` : `* This is a system-generated salary slip and does not require a physical signature unless disputed.`}
-    ${!isDraft ? `Payment Method: ${paidThrough} | Amount Disbursed: ₹${formatCurr(amountPaidNum)}` : ""}
-    ${nextMonthAdvancesDeducted.length > 0 && isDraft ? `<br>&#8595; Next-month advances of ₹${formatCurr(totalNextMonthAdvance)} (${nextMonthStr}) are deducted in this draft as salary is credited after those advances were taken.` : ""}
-    ${nextMonthAdvancesUpcoming.length > 0 ? `<br>* Upcoming advance of ₹${formatCurr(nextMonthAdvancesUpcoming.reduce((s: number, a: any) => s + Number(a.amount), 0))} (${nextMonthStr}) will be recovered from the next month's salary.` : ""}
-  </div>
-
-  <div class="sig-row" style="align-items: flex-end;">
-    <div class="sig-block">
-      <div class="sig-space"></div>
-      <div class="sig-line"></div>
-      <div class="sig-name">${employee.name}</div>
-      <div class="sig-title">Employee Signature</div>
-    </div>
-    <div style="width: 16%; display: flex; justify-content: center; align-items: center; padding-bottom: 20px;">
-      ${stampBase64 ? `<img src="${stampBase64}" style="max-height: 70px; max-width: 70px; object-fit: contain; opacity: 0.95;" alt="Company Stamp" />` : ""}
-    </div>
-    <div class="sig-block">
-      <div class="sig-space" style="display:flex; align-items:center; justify-content:center;">
-        ${signatureBase64 ? `<img src="${signatureBase64}" style="max-height: 48px; max-width: 140px; object-fit: contain;" alt="Authorized Signature" />` : ""}
-      </div>
-      <div class="sig-line"></div>
-      <div class="sig-name">${signatoryName}</div>
-      <div class="sig-title">${signatoryTitle}</div>
-    </div>
-  </div>
-  
-  <div class="footer-note">
-    SS Brick and Clay Private Limited &#183; ${monthLabel}
-  </div>
-</div>
-
-<!-- PAGE 2 ─ ATTENDANCE REPORT -->
-<div class="page-break"></div>
-
-<div class="header">
-  ${logoBase64 ? `<img src="${logoBase64}" class="logo" alt="Brick and Clay">` : `<strong style="font-size: 20px; color: #ffffff; letter-spacing: 0.5px;">BRICK & CLAY</strong>`}
-  <div class="co-info">
-    <div class="co-name">SS BRICK AND CLAY PRIVATE LIMITED</div>
-    <div class="co-sub"><strong>Regd. Office:</strong> Plot No. A-17/13, Unit-7, Surya Nagar, Bhubaneswar, Khordha, Odisha &ndash; 751003</div>
-    <div class="co-sub"><strong>Outlet 1:</strong> C-3, Ground Floor, Inox Block, BMC Bhawani Mall, Saheed Nagar, Bhubaneswar, Odisha &ndash; 751007</div>
-    <div class="co-sub"><strong>Outlet 2:</strong> Plot No. 516/1755, A/2, Maruti Villa, 1st Floor, KIIT Square, Patia, PS-Infocity, Bhubaneswar, Odisha &ndash; 751024</div>
-    <div class="co-sub"><strong>CIN:</strong> U52590OR2022PTC040271</div>
-  </div>
-</div>
-
-<div class="doc">
-  <div class="doc-title">
-    <h2>Attendance Report</h2>
-    <p>${employee.name} &nbsp;&#124;&nbsp; ${employeeCode} &nbsp;&#124;&nbsp; ${monthLabel}</p>
-  </div>
-
-  <div class="att-cards">
-    <div class="att-card present"><div class="num">${presentCountDisplay}</div><div class="lbl">Days Present</div></div>
-    <div class="att-card cl"><div class="num">${clCountDisplay}<span style="font-size:13px;color:#6b7280;">/${CL_PER_MONTH}</span></div><div class="lbl">Weekly Off / CL</div></div>
-    <div class="att-card sl"><div class="num">${slCountDisplay}</div><div class="lbl">Sick Leave</div></div>
-    <div class="att-card lwp"><div class="num">${lwpCountDisplay}</div><div class="lbl">LWP / Absent</div></div>
-    <div class="att-card cf"><div class="num">${cfCount}</div><div class="lbl">CL Remaining</div></div>
-  </div>
-
-  <div style="margin-top:10px;font-size:10px;color:#6b7280;">
-    Sick leave used this year: <strong style="color:#111111;">${balances.slUsed}</strong> of ${SL_PER_YEAR}
-    &nbsp;&#183;&nbsp; Remaining: <strong style="color:#111111;">${balances.slRemaining}</strong>
-    &nbsp;&#183;&nbsp; Weekly Off / CL allowance: ${CL_PER_MONTH} per month
-  </div>
-
-  <div class="slbl">${monthLabel} &#8212; Daily Attendance Calendar</div>
-  <table class="cal">
-    ${calendarHTML}
-  </table>
-
-  <div class="legend">
-    <div class="legend-item"><div class="legend-dot" style="background:#dcfce7;border-color:#86efac;"></div><span>Present</span></div>
-    <div class="legend-item"><div class="legend-dot" style="background:#f8fafc;border-color:#bfdbfe;"></div><span>CL (Casual Leave / Weekly Off)</span></div>
-    <div class="legend-item"><div class="legend-dot" style="background:#fcfbfe;border-color:#ddd6fe;"></div><span>SL (Sick Leave)</span></div>
-    <div class="legend-item"><div class="legend-dot" style="background:#fffafb;border-color:#fecaca;"></div><span>LWP (Leave Without Pay / Absent)</span></div>
-    ${isPradoshJune2026 ? `<div class="legend-item"><div class="legend-dot" style="background:#fffdf9;border-color:#fde68a;"></div><span>CF (Carry Forward — paid, not counted as present)</span></div>` : ""}
-  </div>
-
-  <div class="footer-note" style="margin-top: 30px;">
-    This is an audit report compiled from QR attendance check-ins and the approved leave database.
-    SS Brick and Clay Private Limited &#183; ${monthLabel}
-  </div>
-</div>
-
-</body>
-</html>`;
+  const htmlContent = renderPayslipHtml({
+    period: monthLabel,
+    status: isDraft ? "draft" : "final",
+    employee: {
+      name: employee.name,
+      code: employeeCode,
+      designation: employee.designation,
+      department: teamLabel === "Not Assigned" ? null : teamLabel,
+      outlet: assignedOutletName === "Not Assigned" ? null : assignedOutletName,
+      joined: employee.date_of_joining,
+      pan,
+      aadhar,
+    },
+    attendance: [
+      { label: "Present", value: presentCountDisplay },
+      { label: "Leave", value: clCountDisplay },
+      ...(slCountDisplay > 0 ? [{ label: "Sick leave", value: slCountDisplay }] : []),
+      { label: "Unpaid", value: lwpCountDisplay },
+      { label: "Days in month", value: maxDay },
+    ],
+    earnings: [
+      {
+        label: "Basic salary",
+        detail: isPartialMonth ? `${summary.employedDays} of ${maxDay} days, from date of joining` : `${maxDay}-day month`,
+        amount: effectiveBasicPay,
+      },
+      ...(extraDutyPayment > 0 ? [{ label: extraDutyLabel, amount: extraDutyPayment }] : []),
+      ...(bonusAmount > 0 ? [{ label: bonusLabel, amount: bonusAmount }] : []),
+      ...(incentiveAmount > 0 ? [{ label: incentiveLabel, amount: incentiveAmount }] : []),
+    ],
+    deductions: [
+      ...(lwpDaysForCalc > 0
+        ? [{ label: "Unpaid leave (LWP)", detail: `${lwpCountDisplay} days × ${formatINR(dailyRate)}`, amount: lwpDeduction }]
+        : []),
+      ...(otherDeductionAmount > 0 ? [{ label: otherDeductionLabel, amount: otherDeductionAmount }] : []),
+      ...advanceRows.map((a) => ({ label: "Advance", detail: takenOn(a.advance_date), amount: Number(a.amount) })),
+    ],
+    net: netSalary,
+    notes: nextMonthAdvancesUpcoming.map(
+      (a) => `${formatINR(Number(a.amount))} advance will be recovered from ${nextMonthLabel} salary.`,
+    ),
+    payment: !isDraft && paymentDate && paymentReference
+      ? { date: paymentDate, mode: paidThrough, reference: paymentReference, amount: amountPaidNum }
+      : undefined,
+    calendar: countsOverridden
+      ? undefined
+      : {
+          leadingBlanks: (startOfMonth.getDay() + 6) % 7, // Monday-first week
+          days: calendarDays.map((c) => ({
+            dayNum: c.dayNum,
+            label: c.class === "present" ? "P" : c.statusLabel,
+            kind:
+              c.class === "present" ? "present"
+              : c.class === "cl-day" || c.class === "sl-day" ? "leave"
+              : c.class === "lwp-day" ? "unpaid"
+              : c.class === "cf-day" ? "other"
+              : "none",
+          })),
+        },
+    signatory: { name: signatoryName, title: signatoryTitle, signature: signatureBase64, stamp: stampBase64 },
+    logo: logoBase64 || undefined,
+  });
 
   // Live render path: return the freshly-built HTML without touching storage or
   // the document record. Used by /api/payslip to render slips from current data.
