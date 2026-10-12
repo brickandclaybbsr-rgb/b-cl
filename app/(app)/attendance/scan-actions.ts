@@ -12,6 +12,12 @@ import { haversineMeters } from "@/lib/geo";
  * `redirectTo` lets a workflow send the user somewhere after a successful scan
  * (e.g. attendance → the role-based opening checklist).
  */
+/**
+ * Most a poor fix may widen a geofence by. Beyond this the reading is too
+ * vague to prove presence, however honestly it was reported.
+ */
+const GEOFENCE_ACCURACY_CAP_M = 250;
+
 export type ScanResult = {
   ok?: boolean;
   error?: string;
@@ -42,7 +48,7 @@ export type ScanResult = {
  */
 export async function handleScan(
   token: string,
-  coords?: { latitude: number; longitude: number },
+  coords?: { latitude: number; longitude: number; accuracy?: number },
   opts?: { confirmCheckout?: boolean },
 ): Promise<ScanResult> {
   const cleaned = token.trim();
@@ -84,7 +90,7 @@ export async function handleScan(
  */
 async function handleAttendanceScan(
   qr: any,
-  coords?: { latitude: number; longitude: number },
+  coords?: { latitude: number; longitude: number; accuracy?: number },
   opts?: { confirmCheckout?: boolean },
 ): Promise<ScanResult> {
   const profile = await requireProfile();
@@ -123,9 +129,21 @@ async function handleAttendanceScan(
   // out at the other site works and the row keeps the outlet they started at.
 
   const distance = haversineMeters(coords.latitude, coords.longitude, outlet.latitude, outlet.longitude);
-  if (distance > outlet.radius_m) {
+
+  // Allow for how good the fix actually is. The QR is scanned indoors, so the
+  // device often reports a wifi/cell position tens to hundreds of metres out —
+  // an honest reading of "somewhere near here", not someone marking attendance
+  // from home. Judging that against the bare radius rejected people standing at
+  // the counter. The allowance is capped so a wildly uncertain fix still can't
+  // wave through a scan from across town.
+  const reported = Number.isFinite(coords.accuracy as number) ? Math.max(0, coords.accuracy as number) : 0;
+  const allowance = outlet.radius_m + Math.min(reported, GEOFENCE_ACCURACY_CAP_M);
+
+  if (distance > allowance) {
     return {
-      error: `You appear to be ${Math.round(distance)}m from ${outlet.name}. Move within ${outlet.radius_m}m of the outlet to mark attendance.`,
+      error: reported > outlet.radius_m
+        ? `Your location is only accurate to about ${Math.round(reported)}m right now, and reads ${Math.round(distance)}m from ${outlet.name}. Step outside or near a window for a moment and scan again.`
+        : `You appear to be ${Math.round(distance)}m from ${outlet.name}. Move within ${outlet.radius_m}m of the outlet to mark attendance.`,
     };
   }
 

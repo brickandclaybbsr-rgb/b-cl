@@ -45,7 +45,12 @@ export async function hapticLight() {
   }
 }
 
-export type Coords = { latitude: number; longitude: number };
+export type Coords = { latitude: number; longitude: number; accuracy?: number };
+
+/** Good enough to stop waiting for a better fix. */
+const GOOD_ACCURACY_M = 50;
+/** Total time to spend trying before giving up on a position entirely. */
+const FIX_BUDGET_MS = 12_000;
 
 /**
  * Get the device's current position.
@@ -78,12 +83,29 @@ export async function getCurrentCoords(): Promise<Coords> {
         );
       }
 
-      const pos = await Geolocation.getCurrentPosition({
-        enableHighAccuracy: true,
-        timeout: 15000,
-        maximumAge: 0,
-      });
-      return { latitude: pos.coords.latitude, longitude: pos.coords.longitude };
+      // Staged, not all-or-nothing. The QR is scanned INSIDE the restaurant,
+      // where a true GPS lock often never arrives — the old single attempt
+      // (high accuracy, maximumAge 0, 15s) simply failed there, and staff gave
+      // up and had the day marked by hand later. Fall back to a coarse or
+      // recent fix instead; the server widens the geofence by the reported
+      // accuracy, so a rough position taken at the outlet still passes.
+      const attempts = [
+        { enableHighAccuracy: true, timeout: 8000, maximumAge: 15_000 },
+        { enableHighAccuracy: false, timeout: 8000, maximumAge: 120_000 },
+      ];
+      for (const options of attempts) {
+        try {
+          const pos = await Geolocation.getCurrentPosition(options);
+          return {
+            latitude: pos.coords.latitude,
+            longitude: pos.coords.longitude,
+            accuracy: pos.coords.accuracy ?? undefined,
+          };
+        } catch {
+          // Try the next strategy, then the WebView API below.
+        }
+      }
+      throw new Error("plugin returned no position");
     } catch (err: any) {
       // A genuine permission refusal should surface to the user as-is.
       if (typeof err?.message === "string" && err.message.includes("Location permission is required")) {
@@ -102,17 +124,59 @@ function browserCoords(): Promise<Coords> {
     throw new Error("This device can't share its location, which is required to mark attendance.");
   }
 
+  // watchPosition rather than getCurrentPosition: indoors the first fix is
+  // usually a coarse network one that then improves over a few seconds. Taking
+  // the BEST fix inside a time budget — and settling early once it is good
+  // enough — succeeds in places where a single high-accuracy call just times
+  // out. Only an outright permission refusal fails fast; "position
+  // unavailable" keeps waiting, because a later fix may still arrive.
   return new Promise<Coords>((resolve, reject) => {
-    navigator.geolocation.getCurrentPosition(
-      (pos) => resolve({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
-      (err) => {
-        const msg =
-          err?.code === 1
-            ? "Location permission is blocked. Allow location for this app (Settings → Apps → B&CL Ops → Permissions → Location), then try again."
-            : "Couldn't read your location. Make sure location/GPS is switched on, then try again.";
-        reject(new Error(msg));
+    let best: GeolocationPosition | null = null;
+    let settled = false;
+    let watchId: number | null = null;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+
+    const cleanup = () => {
+      if (timer !== null) clearTimeout(timer);
+      if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+    };
+
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      if (best) {
+        resolve({
+          latitude: best.coords.latitude,
+          longitude: best.coords.longitude,
+          accuracy: best.coords.accuracy ?? undefined,
+        });
+      } else {
+        reject(new Error("Couldn't read your location. Make sure location/GPS is switched on, then try again."));
+      }
+    };
+
+    const fail = (message: string) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      reject(new Error(message));
+    };
+
+    timer = setTimeout(finish, FIX_BUDGET_MS);
+
+    watchId = navigator.geolocation.watchPosition(
+      (pos) => {
+        if (!best || pos.coords.accuracy < best.coords.accuracy) best = pos;
+        if (pos.coords.accuracy <= GOOD_ACCURACY_M) finish();
       },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 },
+      (err) => {
+        if (err?.code === 1) {
+          fail("Location permission is blocked. Allow location for this app (Settings → Apps → B&CL Ops → Permissions → Location), then try again.");
+        }
+        // Otherwise keep waiting — the budget timer decides when to stop.
+      },
+      { enableHighAccuracy: true, timeout: FIX_BUDGET_MS, maximumAge: 30_000 },
     );
   });
 }
