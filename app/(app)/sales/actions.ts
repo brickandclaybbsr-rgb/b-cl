@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireProfile } from "@/lib/auth";
 import { todayIST, daysAgoIST, nowIST, formatDateLabel } from "@/lib/date";
-import { APP_START_DATE } from "@/lib/constants";
+import { APP_START_DATE, DEFAULT_OUTLET_ID } from "@/lib/constants";
 import { toNumber, toInt } from "@/lib/utils";
 import { whatsappNotify } from "@/lib/whatsapp-notify";
 import { notifyOwner } from "@/lib/push";
@@ -45,8 +45,12 @@ export async function submitSales(
   const online_sales     = card_sales + upi_sales;
   const aggregator_sales = zomato_gold_sales + zomato_sales + swiggy_sales + swiggy_dineout_sales + eazy_diner_sales;
 
+  const rawOutletId = String(formData.get("outlet_id") ?? "").trim();
+  const outlet_id = rawOutletId || profile.outlet_id || DEFAULT_OUTLET_ID;
+
   const { error } = await supabase.from("daily_sales").insert({
     date,
+    outlet_id,
     submitted_by: profile.id,
     opening_cash,
     cash_sales,
@@ -73,7 +77,7 @@ export async function submitSales(
 
   if (error) {
     if (error.code === "23505") {
-      return { error: `Sales for ${date === today ? "today" : formatDateLabel(date)} are already submitted.` };
+      return { error: `Sales for ${date === today ? "today" : formatDateLabel(date)} are already submitted for this outlet.` };
     }
     return { error: error.message };
   }
@@ -117,9 +121,13 @@ export async function updateSales(
   const online_sales     = card_sales + upi_sales;
   const aggregator_sales = zomato_gold_sales + zomato_sales + swiggy_sales + swiggy_dineout_sales + eazy_diner_sales;
 
+  const rawOutletId = String(formData.get("outlet_id") ?? "").trim();
+  const outlet_id = rawOutletId || profile.outlet_id || DEFAULT_OUTLET_ID;
+
   const admin = createAdminClient();
-  const { error } = await admin.from("daily_sales").upsert({
+  const payload = {
     date,
+    outlet_id,
     submitted_by: profile.id,
     opening_cash:        toNumber(formData.get("opening_cash")),
     cash_sales,
@@ -137,7 +145,12 @@ export async function updateSales(
     complimentary_count: toInt(formData.get("complimentary_count")),
     complimentary_value: toNumber(formData.get("complimentary_value")),
     notes:               String(formData.get("notes") ?? "").trim() || null,
-  }, { onConflict: "date" });
+  };
+
+  let { error } = await admin.from("daily_sales").upsert(payload, { onConflict: "date,outlet_id" });
+  if (error && (error.code === "42P10" || error.message?.includes("ON CONFLICT"))) {
+    ({ error } = await admin.from("daily_sales").upsert(payload, { onConflict: "date" }));
+  }
 
   if (error) return { error: error.message };
 

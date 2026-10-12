@@ -94,11 +94,13 @@ async function fetchChecklist<T>(
   table: "opening_checklists" | "closing_checklists",
   date: string,
   team?: string | null,
+  outletId?: string | null,
 ): Promise<T | null> {
   const run = async (client: ReturnType<typeof createAdminClient> | ReturnType<typeof createClient>) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let q = (client as any).from(table).select("*").eq("date", date);
     if (team !== undefined) q = q.eq("team", team ?? "all");
+    if (outletId) q = q.eq("outlet_id", outletId);
     const { data } = await q.order("submitted_at", { ascending: true });
     return (data as T[] | null)?.[0] ?? null;
   };
@@ -112,20 +114,23 @@ async function fetchChecklist<T>(
 /**
  * Get an opening checklist for a date.
  * - Pass `team` to get only that team's record.
+ * - Pass `outletId` to scope to a specific outlet.
  * - Omit `team` to get any record (first submitted, for owner/dashboard).
  */
 export async function getOpeningChecklist(
   date: string,
   team?: string | null,
+  outletId?: string | null,
 ): Promise<OpeningChecklist | null> {
-  return fetchChecklist<OpeningChecklist>("opening_checklists", date, team);
+  return fetchChecklist<OpeningChecklist>("opening_checklists", date, team, outletId);
 }
 
 export async function getClosingChecklist(
   date: string,
   team?: string | null,
+  outletId?: string | null,
 ): Promise<ClosingChecklist | null> {
-  return fetchChecklist<ClosingChecklist>("closing_checklists", date, team);
+  return fetchChecklist<ClosingChecklist>("closing_checklists", date, team, outletId);
 }
 
 /** All filed closing dates for a team within a date range — used to find missing dates. */

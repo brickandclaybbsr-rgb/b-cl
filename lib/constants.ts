@@ -8,6 +8,14 @@
 export const APP_START_DATE = "2026-06-14";
 
 /**
+ * Saheed Nagar, the original outlet. Daily records (sales, checklists, cash
+ * outs) from before Patia opened belong here, and it is the fallback for
+ * anyone without an assigned outlet. Matches the column default in
+ * supabase/migrations/20260927_multi_outlet_daily_records.sql.
+ */
+export const DEFAULT_OUTLET_ID = "e840db26-9c52-4212-a484-2b41175646f0";
+
+/**
  * QR + geofence attendance rollout. Before this date the check-in gate is
  * dormant (staff use the app normally); on/after it, staff must scan an outlet
  * QR within its geofence before they can use the app for the day.

@@ -8,6 +8,7 @@ import {
 } from "@/lib/data/reports";
 import { formatINR } from "@/lib/utils";
 import { APP_START_DATE } from "@/lib/constants";
+import { getOutlets } from "@/lib/data/outlets";
 
 function fmtDate(date: string) {
   return new Date(date + "T00:00:00").toLocaleDateString("en-IN", {
@@ -34,6 +35,11 @@ export async function GET(req: NextRequest) {
   const from = (fromRaw >= APP_START_DATE && fromRaw <= today) ? fromRaw : APP_START_DATE;
   const to = (toRaw >= from && toRaw <= today) ? toRaw : today;
   const sections = new Set((searchParams.get("sections") ?? "sales,cashout,closing").split(","));
+  // One outlet, or every outlet added together ("all" / anything unrecognised).
+  const outlets = await getOutlets();
+  const outlet = outlets.find((o) => o.id === searchParams.get("outlet")) ?? null;
+  const outletId = outlet?.id ?? null;
+  const outletLabel = outlet ? `Brick &amp; Clay ${outlet.name}` : "All outlets";
   const dayCount = Math.round((new Date(to).getTime() - new Date(from).getTime()) / 86_400_000) + 1;
 
   const wantsSales = sections.has("sales");
@@ -43,8 +49,8 @@ export async function GET(req: NextRequest) {
   const needsCombined = wantsDaily || wantsCashout;
 
   const [combined, attendance, leaves] = await Promise.all([
-    needsCombined ? getClosingBalanceRange(from, to) : Promise.resolve([] as ClosingBalanceDay[]),
-    sections.has("attendance") ? getAttendanceStatusRange(from, to) : Promise.resolve([]),
+    needsCombined ? getClosingBalanceRange(from, to, outletId) : Promise.resolve([] as ClosingBalanceDay[]),
+    sections.has("attendance") ? getAttendanceStatusRange(from, to, outletId) : Promise.resolve([]),
     sections.has("leaves") ? getLeavesInRange(from, to) : Promise.resolve([]),
   ]);
   // getClosingBalanceRange returns newest-first; reports read best oldest→newest.
@@ -287,7 +293,7 @@ export async function GET(req: NextRequest) {
 
   <div class="title-block">
     <h1>Business Report</h1>
-    <p>${rangeLabel} &middot; ${dayCount} day${dayCount === 1 ? "" : "s"} &middot; Generated ${new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}</p>
+    <p>${outletLabel} &middot; ${rangeLabel} &middot; ${dayCount} day${dayCount === 1 ? "" : "s"} &middot; Generated ${new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}</p>
   </div>
 
   ${summaryHTML}

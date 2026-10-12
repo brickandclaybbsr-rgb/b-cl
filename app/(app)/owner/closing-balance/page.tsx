@@ -4,6 +4,8 @@ import { requireOwner } from "@/lib/auth";
 import { getClosingBalanceForDate, getClosingBalanceRange } from "@/lib/data/reports";
 import { todayIST, daysAgoIST } from "@/lib/date";
 import { APP_START_DATE } from "@/lib/constants";
+import { getOutletContext } from "@/lib/data/outlets";
+import { OutletSwitcher } from "@/components/outlet-switcher";
 import { ClosingBalanceClient } from "./closing-balance-client";
 
 export const metadata = { title: "Closing Balance Report" };
@@ -11,9 +13,10 @@ export const metadata = { title: "Closing Balance Report" };
 export default async function ClosingBalancePage({
   searchParams,
 }: {
-  searchParams: { date?: string; days?: string };
+  searchParams: { date?: string; days?: string; outlet?: string };
 }) {
-  await requireOwner();
+  const profile = await requireOwner();
+  const outlet = await getOutletContext(profile, searchParams.outlet);
 
   const today = todayIST();
   const rawDate = String(searchParams.date ?? "").trim();
@@ -24,8 +27,8 @@ export default async function ClosingBalancePage({
   const rangeFrom = daysAgoIST(rangeDays - 1);
 
   const [selectedDay, range] = await Promise.all([
-    getClosingBalanceForDate(date),
-    getClosingBalanceRange(rangeFrom, today),
+    getClosingBalanceForDate(date, outlet.activeId),
+    getClosingBalanceRange(rangeFrom, today, outlet.activeId),
   ]);
 
   return (
@@ -50,6 +53,8 @@ export default async function ClosingBalancePage({
           Export PDF
         </Link>
       </div>
+
+      <OutletSwitcher outlets={outlet.outlets} activeId={outlet.activeId} canSwitch={outlet.canSwitch} className="" />
 
       <ClosingBalanceClient
         selectedDate={date}

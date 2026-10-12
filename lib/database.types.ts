@@ -73,6 +73,7 @@ export type OpeningChecklist = {
   id: string;
   date: string;
   team: string;
+  outlet_id?: string | null;
   submitted_by: string | null;
   items: ChecklistLine[];
   opening_cash: number | null;
@@ -88,6 +89,7 @@ export type ClosingChecklist = {
   id: string;
   date: string;
   team: string;
+  outlet_id?: string | null;
   submitted_by: string | null;
   items: ChecklistLine[];
   closing_cash: number | null;
@@ -102,6 +104,7 @@ export type ClosingChecklist = {
 export type DailySales = {
   id: string;
   date: string;
+  outlet_id?: string | null;
   submitted_by: string | null;
   opening_cash: number;
   cash_sales: number;
@@ -271,6 +274,7 @@ export type PayrollAdvance = {
 export type CashExpense = {
   id: string;
   date: string;
+  outlet_id?: string | null;
   person_name: string;
   amount: number;
   category: "withdrawal" | "advance" | "expense" | "other" | "deposit";

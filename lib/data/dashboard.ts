@@ -39,9 +39,11 @@ export interface TodaySnapshot {
  *  - Pass `team` for the staff dashboard so they only see their own team's state.
  *  - Pass no argument (or `undefined`) for the owner dashboard — this fetches
  *    BOTH kitchen and front_desk records separately so every team's status is
- *    visible regardless of submission order. */
+ *    visible regardless of submission order.
+ *  - Pass `outletId` to scope checklists and sales to one outlet. */
 export async function getTodaySnapshot(
   team?: "kitchen" | "front_desk" | null,
+  outletId?: string | null,
 ): Promise<TodaySnapshot> {
   const date = todayIST();
 
@@ -61,14 +63,14 @@ export async function getTodaySnapshot(
     pendingOrders,
   ] = await Promise.all([
     // Legacy single record — still used by the staff dashboard path
-    getOpeningChecklist(date, team ?? undefined),
-    getClosingChecklist(date, team ?? undefined),
+    getOpeningChecklist(date, team ?? undefined, outletId),
+    getClosingChecklist(date, team ?? undefined, outletId),
     // Per-team records — only fetched when owner view (avoids extra queries for staff)
-    isOwnerView ? getOpeningChecklist(date, "kitchen") : Promise.resolve(null),
-    isOwnerView ? getOpeningChecklist(date, "front_desk") : Promise.resolve(null),
-    isOwnerView ? getClosingChecklist(date, "kitchen") : Promise.resolve(null),
-    isOwnerView ? getClosingChecklist(date, "front_desk") : Promise.resolve(null),
-    getSales(date),
+    isOwnerView ? getOpeningChecklist(date, "kitchen", outletId) : Promise.resolve(null),
+    isOwnerView ? getOpeningChecklist(date, "front_desk", outletId) : Promise.resolve(null),
+    isOwnerView ? getClosingChecklist(date, "kitchen", outletId) : Promise.resolve(null),
+    isOwnerView ? getClosingChecklist(date, "front_desk", outletId) : Promise.resolve(null),
+    getSales(date, outletId),
     getLatestStockSnapshot(),
     countPendingOrders(),
   ]);

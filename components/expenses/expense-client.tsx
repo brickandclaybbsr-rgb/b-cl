@@ -70,6 +70,7 @@ export function ExpenseClient({
   canDeleteAll,
   previousGroups,
   staffNames = [],
+  outletId,
 }: {
   entries: CashExpense[];
   isOwner: boolean;
@@ -80,6 +81,8 @@ export function ExpenseClient({
   previousGroups?: { date: string; entries: CashExpense[] }[];
   /** Staff names for the Advance autocomplete — must match a profile name exactly to auto-link to payroll. */
   staffNames?: string[];
+  /** Outlet new entries are filed under — the one being viewed. */
+  outletId?: string;
 }) {
   const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
   const isToday = viewingDate === today;
@@ -129,6 +132,7 @@ export function ExpenseClient({
           notes: r.notes.trim(),
         })),
         viewingDate,
+        outletId,
       );
       if (result.error) {
         toast.error(result.error);
@@ -324,6 +328,7 @@ export function ExpenseClient({
         <>
           <form ref={formRef} action={singleFormAction} className="space-y-4">
             <input type="hidden" name="date" value={viewingDate} />
+            {outletId && <input type="hidden" name="outlet_id" value={outletId} />}
             <Card className="space-y-4 p-4">
               <div className="space-y-1.5">
                 <Label htmlFor="person_name">Person / Purpose</Label>

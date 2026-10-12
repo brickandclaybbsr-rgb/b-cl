@@ -1,7 +1,9 @@
 import { requireProfile } from "@/lib/auth";
 import { todayIST, daysAgoIST, nowIST, formatDateLabel, formatTimeIST } from "@/lib/date";
 import { APP_START_DATE } from "@/lib/constants";
-import { getSales, getSalesRange } from "@/lib/data/sales";
+import { getSales, getSalesRange, getMissingSalesDates } from "@/lib/data/sales";
+import { getOutletContext } from "@/lib/data/outlets";
+import { OutletSwitcher } from "@/components/outlet-switcher";
 import { getProfileNameMap, getStaff } from "@/lib/data/profiles";
 import { getCashExpensesByDate, getRecentCashExpenses } from "@/lib/data/expenses";
 import type { CashExpense } from "@/lib/database.types";
@@ -19,9 +21,10 @@ export const metadata = { title: "Daily sales" };
 export default async function SalesPage({
   searchParams,
 }: {
-  searchParams: { tab?: string; date?: string; edit?: string };
+  searchParams: { tab?: string; date?: string; edit?: string; outlet?: string };
 }) {
   const profile = await requireProfile();
+  const isOwner = profile.role === "owner";
   const isKitchenOnly = profile.team === "kitchen";
   const isHeadChef = profile.team === "head_chef";
   const showLast7Days = profile.team === "front_desk" || profile.team === "head_chef";
@@ -29,8 +32,12 @@ export default async function SalesPage({
   const canSeeYesterday = profile.team === "front_desk" || profile.team === "head_chef";
   const canEditSales = profile.team === "front_desk" || profile.team === "head_chef";
 
+  // Sales and cash out are per outlet: the owner picks one, staff see their own.
+  const outlet = await getOutletContext(profile, searchParams.outlet);
+  const activeOutletId = outlet.activeId;
+  const switcher = <OutletSwitcher outlets={outlet.outlets} activeId={outlet.activeId} canSwitch={outlet.canSwitch} />;
+
   if (searchParams.tab === "expenses") {
-    const isOwner = profile.role === "owner";
     const today = todayIST();
     const rawDate = String(searchParams.date ?? "").trim();
     const expenseDate = (rawDate >= APP_START_DATE && rawDate <= today) ? rawDate : today;
@@ -38,7 +45,7 @@ export default async function SalesPage({
     const staffNames = (await getStaff()).filter((s) => s.role !== "owner").map((s) => s.name);
 
     if (isViewingToday) {
-      const allRecent = await getRecentCashExpenses(7);
+      const allRecent = await getRecentCashExpenses(7, activeOutletId);
       const todayEntries = allRecent.filter((e) => e.date === today);
       const prevMap = new Map<string, CashExpense[]>();
       for (const e of allRecent) {
@@ -57,8 +64,10 @@ export default async function SalesPage({
             subtitle={isOwner ? "Today's cash out" : "Log cash withdrawals & expenses"}
           />
           <SalesTabs />
+          {switcher}
           <ExpenseClient
             entries={todayEntries}
+            outletId={activeOutletId}
             isOwner={isOwner}
             viewingDate={today}
             canDelete={canSeeYesterday}
@@ -70,7 +79,7 @@ export default async function SalesPage({
       );
     }
 
-    const entries = await getCashExpensesByDate(expenseDate);
+    const entries = await getCashExpensesByDate(expenseDate, activeOutletId);
     return (
       <div className="space-y-5">
         <PageHeader
@@ -78,7 +87,8 @@ export default async function SalesPage({
           subtitle={isOwner ? "Today's cash out" : "Log cash withdrawals & expenses"}
         />
         <SalesTabs />
-        <ExpenseClient entries={entries} isOwner={isOwner} viewingDate={expenseDate} canDelete={canSeeYesterday} canDeleteAll={isOwner || isHeadChef} staffNames={staffNames} />
+        {switcher}
+        <ExpenseClient entries={entries} outletId={activeOutletId} isOwner={isOwner} viewingDate={expenseDate} canDelete={canSeeYesterday} canDeleteAll={isOwner || isHeadChef} staffNames={staffNames} />
       </div>
     );
   }
@@ -94,23 +104,14 @@ export default async function SalesPage({
     return today;
   })();
 
-  // Fetch all sales in the window to find missing dates
-  const [allSalesInWindow, existing] = await Promise.all([
-    getSalesRange(windowStart, today),
-    getSales(requestedDate),
+  // Days this outlet has no sales entry for (oldest first), the requested day's
+  // entry, and the last week's entries for the history accordion
+  const [missingDates, existing, lastWeekSales] = await Promise.all([
+    getMissingSalesDates(activeOutletId, windowStart, today),
+    getSales(requestedDate, activeOutletId),
+    showLast7Days ? getSalesRange(daysAgoIST(6), today, activeOutletId) : Promise.resolve([]),
   ]);
 
-  const filedDates = new Set(allSalesInWindow.map((s) => s.date));
-
-  // All dates from launch with no sales entry (oldest first)
-  const missingDates: string[] = [];
-  for (let d = new Date(windowStart + "T00:00:00Z"); ; d.setUTCDate(d.getUTCDate() + 1)) {
-    const str = d.toISOString().slice(0, 10);
-    if (str >= today) break; // today can still be filed tonight — never show as missing
-    if (!filedDates.has(str)) missingDates.push(str);
-  }
-
-  const isOwner = profile.role === "owner";
   const isSubmitter = existing?.submitted_by === profile.id;
   const viewingToday = requestedDate === today;
   const yesterday = daysAgoIST(1);
@@ -182,6 +183,8 @@ export default async function SalesPage({
       <PageHeader title="Daily Sales" subtitle={formatDateLabel(requestedDate)} />
       <SalesTabs />
 
+      {switcher}
+
       {/* Missing dates banner — hidden for kitchen team and when gate card already lists them */}
       {otherMissing.length > 0 && !isKitchenOnly && !gateForToday && <MissingDatesBanner missing={otherMissing} />}
 
@@ -213,7 +216,7 @@ export default async function SalesPage({
 
       {existing ? (
         editMode ? (
-          <SalesForm date={requestedDate} editMode initialValues={existing} profileTeam={profile.team} />
+          <SalesForm date={requestedDate} editMode initialValues={existing} profileTeam={profile.team} outletId={activeOutletId} />
         ) : (
           <>
             <SalesView
@@ -282,15 +285,12 @@ export default async function SalesPage({
           </p>
         </Card>
       ) : (
-        <SalesForm date={requestedDate} profileTeam={profile.team} />
+        <SalesForm date={requestedDate} profileTeam={profile.team} outletId={activeOutletId} />
       )}
 
       {/* Last 7 days accordion — front_desk and head_chef only */}
       {showLast7Days && (() => {
-        const cutoff = daysAgoIST(6);
-        const recent = allSalesInWindow
-          .filter((s) => s.date >= cutoff)
-          .sort((a, b) => b.date.localeCompare(a.date));
+        const recent = [...lastWeekSales].sort((a, b) => b.date.localeCompare(a.date));
         if (recent.length === 0) return null;
         return (
           <div className="mt-8">

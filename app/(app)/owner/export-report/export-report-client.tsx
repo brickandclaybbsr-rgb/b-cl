@@ -5,6 +5,7 @@ import { IndianRupee, Wallet, ClipboardCheck, CalendarClock, FileDown } from "lu
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import type { OutletOption } from "@/lib/data/outlets";
 
 const SECTIONS: { key: string; label: string; description: string; icon: typeof IndianRupee }[] = [
   { key: "sales", label: "Daily Sales (Cash)", description: "Cash sales per day", icon: IndianRupee },
@@ -22,8 +23,16 @@ function daysAgoIST(days: number) {
   return d.toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
 }
 
-export function ExportReportClient() {
+export function ExportReportClient({
+  outlets,
+  defaultOutletId,
+}: {
+  outlets: OutletOption[];
+  defaultOutletId: string;
+}) {
   const today = todayIST();
+  // "all" adds every outlet's figures together; otherwise one outlet.
+  const [outlet, setOutlet] = useState<string>(outlets.length > 1 ? defaultOutletId : "all");
   const [from, setFrom] = useState(daysAgoIST(29));
   const [to, setTo] = useState(today);
   const [selected, setSelected] = useState<Record<string, boolean>>({
@@ -35,12 +44,34 @@ export function ExportReportClient() {
 
   const href = (() => {
     const sections = Object.entries(selected).filter(([, v]) => v).map(([k]) => k).join(",");
-    const params = new URLSearchParams({ from, to, sections });
+    const params = new URLSearchParams({ from, to, sections, outlet });
     return `/api/reports/export?${params.toString()}`;
   })();
 
   return (
     <div className="space-y-5">
+      {outlets.length > 1 && (
+        <Card className="p-4 space-y-3">
+          <h2 className="text-xs font-bold uppercase tracking-wider text-content-secondary">Outlet</h2>
+          <div className="flex flex-wrap gap-1.5">
+            {[...outlets.map((o) => ({ id: o.id, name: o.name })), { id: "all", name: "Both outlets" }].map((o) => (
+              <button
+                key={o.id}
+                type="button"
+                onClick={() => setOutlet(o.id)}
+                className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors ${
+                  outlet === o.id
+                    ? "border-warm bg-warm text-bg-base"
+                    : "border-border text-content-secondary hover:text-content-primary"
+                }`}
+              >
+                {o.name}
+              </button>
+            ))}
+          </div>
+        </Card>
+      )}
+
       <Card className="p-4 space-y-3">
         <h2 className="text-xs font-bold uppercase tracking-wider text-content-secondary">Date Range</h2>
         <div className="grid grid-cols-2 gap-3">

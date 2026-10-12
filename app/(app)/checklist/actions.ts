@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { DEFAULT_OUTLET_ID } from "@/lib/constants";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireProfile, isHeadChef } from "@/lib/auth";
@@ -70,12 +71,16 @@ export async function submitOpeningChecklist(
   const config = await getChecklistConfig("opening", profile.role === "owner" ? null : team);
   const items = buildItems(config, formData);
 
+  const rawOutletId = String(formData.get("outlet_id") ?? "").trim();
+  const outletId = rawOutletId || profile.outlet_id || DEFAULT_OUTLET_ID;
+
   const openingCashRaw = formData.get("opening_cash");
   const discrepancyRaw = formData.get("cash_discrepancy");
   const photoUrl = await uploadChecklistPhoto(formData, date, "opening", teamKey);
   const basePayload = {
     date,
     team: teamKey,
+    outlet_id: outletId,
     submitted_by: profile.id,
     items,
     opening_cash: openingCashRaw === null || openingCashRaw === "" ? null : toNumber(openingCashRaw),
@@ -90,7 +95,11 @@ export async function submitOpeningChecklist(
   async function tryInsert(payload: typeof basePayload & Partial<typeof discrepancyPayload>, isUpsert = false) {
     if (isUpsert) {
       const admin = createAdminClient();
-      return admin.from("opening_checklists").upsert(payload, { onConflict: "date,team" });
+      let res = await admin.from("opening_checklists").upsert(payload, { onConflict: "date,team,outlet_id" });
+      if (res.error && (res.error.code === "42P10" || res.error.message?.includes("ON CONFLICT"))) {
+        res = await admin.from("opening_checklists").upsert(payload, { onConflict: "date,team" });
+      }
+      return res;
     }
     return supabase.from("opening_checklists").insert(payload);
   }
@@ -109,7 +118,7 @@ export async function submitOpeningChecklist(
     }
     if (error) {
       if (error.code === "23505") {
-        return { error: "Your team's opening checklist for today is already submitted." };
+        return { error: "Your team's opening checklist for today is already submitted for this outlet." };
       }
       return { error: error.message };
     }
@@ -141,6 +150,9 @@ export async function submitClosingChecklist(
   const config = await getChecklistConfig("closing", profile.role === "owner" ? null : team);
   const items = buildItems(config, formData);
 
+  const rawOutletId = String(formData.get("outlet_id") ?? "").trim();
+  const outletId = rawOutletId || profile.outlet_id || DEFAULT_OUTLET_ID;
+
   const closingCashRaw = formData.get("closing_cash");
   const depositedRaw = formData.get("cash_deposited");
   const photoUrl = await uploadChecklistPhoto(formData, date, "closing", teamKey);
@@ -148,6 +160,7 @@ export async function submitClosingChecklist(
   const payload = {
     date,
     team: teamKey,
+    outlet_id: outletId,
     submitted_by: profile.id,
     items,
     closing_cash: closingCashRaw === null || closingCashRaw === "" ? null : toNumber(closingCashRaw),
@@ -160,15 +173,20 @@ export async function submitClosingChecklist(
 
   if (formData.get("_edit_mode") === "1" && isHeadChef(profile)) {
     const admin = createAdminClient();
-    const { error } = await admin
+    let { error } = await admin
       .from("closing_checklists")
-      .upsert(payload, { onConflict: "date,team" });
+      .upsert(payload, { onConflict: "date,team,outlet_id" });
+    if (error && (error.code === "42P10" || error.message?.includes("ON CONFLICT"))) {
+      ({ error } = await admin
+        .from("closing_checklists")
+        .upsert(payload, { onConflict: "date,team" }));
+    }
     if (error) return { error: error.message };
   } else {
     const { error } = await supabase.from("closing_checklists").insert(payload);
     if (error) {
       if (error.code === "23505") {
-        return { error: "Your team's closing checklist for today is already submitted." };
+        return { error: "Your team's closing checklist for today is already submitted for this outlet." };
       }
       return { error: error.message };
     }

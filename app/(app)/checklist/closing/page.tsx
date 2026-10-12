@@ -7,6 +7,8 @@ import {
   getClosingChecklist,
 } from "@/lib/data/checklists";
 import { getProfileNameMap } from "@/lib/data/profiles";
+import { getOutletContext } from "@/lib/data/outlets";
+import { OutletSwitcher } from "@/components/outlet-switcher";
 import { PageHeader } from "@/components/page-header";
 import { ChecklistTabs } from "@/components/checklists/checklist-tabs";
 import { ChecklistForm } from "@/components/checklists/checklist-form";
@@ -20,10 +22,13 @@ export const metadata = { title: "Closing checklist" };
 export default async function ClosingChecklistPage({
   searchParams,
 }: {
-  searchParams: { edit?: string; date?: string };
+  searchParams: { edit?: string; date?: string; outlet?: string };
 }) {
   const profile = await requireProfile();
   const date = todayIST();
+  // Checklists are per outlet: the owner picks one, staff file for their own.
+  const outlet = await getOutletContext(profile, searchParams.outlet);
+  const outletId = outlet.activeId;
 
   const isOwner = profile.role === "owner";
   const headChef = isHeadChef(profile);
@@ -78,8 +83,8 @@ export default async function ClosingChecklistPage({
   // ── Head chef: sees both kitchen and front desk ──────────────────────────
   if (headChef) {
     const [kitchenRecord, frontDeskRecord, nameMap, kitchenConfig, frontDeskConfig] = await Promise.all([
-      getClosingChecklist(date, "kitchen"),
-      getClosingChecklist(date, "front_desk"),
+      getClosingChecklist(date, "kitchen", outletId),
+      getClosingChecklist(date, "front_desk", outletId),
       getProfileNameMap(),
       getChecklistConfig("closing", "kitchen"),
       getChecklistConfig("closing", "front_desk"),
@@ -115,7 +120,7 @@ export default async function ClosingChecklistPage({
             config={kitchenConfig}
             action={submitClosingChecklist}
             team="kitchen"
-            hiddenFields={kitchenEditMode ? { _edit_mode: "1" } : undefined}
+            hiddenFields={{ ...(kitchenEditMode ? { _edit_mode: "1" } : {}), outlet_id: outletId }}
             reminderSales
           />
         )}
@@ -135,7 +140,7 @@ export default async function ClosingChecklistPage({
             config={frontDeskConfig}
             action={submitClosingChecklist}
             team="front_desk"
-            hiddenFields={{ _team_override: "front_desk" }}
+            hiddenFields={{ _team_override: "front_desk", outlet_id: outletId }}
           />
         )}
       </div>
@@ -145,8 +150,8 @@ export default async function ClosingChecklistPage({
   // ── Owner: sees both teams ───────────────────────────────────────────────
   if (isOwner) {
     const [kitchenRecord, frontDeskRecord, nameMap, kitchenConfig, frontDeskConfig] = await Promise.all([
-      getClosingChecklist(date, "kitchen"),
-      getClosingChecklist(date, "front_desk"),
+      getClosingChecklist(date, "kitchen", outletId),
+      getClosingChecklist(date, "front_desk", outletId),
       getProfileNameMap(),
       getChecklistConfig("closing", "kitchen"),
       getChecklistConfig("closing", "front_desk"),
@@ -156,6 +161,7 @@ export default async function ClosingChecklistPage({
       <div>
         <PageHeader title="Closing Checklist" subtitle={formatDateLabel(date)} />
         <ChecklistTabs />
+        <OutletSwitcher outlets={outlet.outlets} activeId={outlet.activeId} canSwitch={outlet.canSwitch} />
 
         <p className="mb-2 text-xs font-bold uppercase tracking-wider text-warm">Kitchen</p>
         {kitchenRecord ? (
@@ -171,6 +177,7 @@ export default async function ClosingChecklistPage({
             config={kitchenConfig}
             action={submitClosingChecklist}
             team="kitchen"
+            hiddenFields={{ outlet_id: outletId }}
           />
         )}
 
@@ -188,7 +195,7 @@ export default async function ClosingChecklistPage({
             config={frontDeskConfig}
             action={submitClosingChecklist}
             team="front_desk"
-            hiddenFields={{ _team_override: "front_desk" }}
+            hiddenFields={{ _team_override: "front_desk", outlet_id: outletId }}
           />
         )}
       </div>
@@ -203,8 +210,8 @@ export default async function ClosingChecklistPage({
   const isFilingPastDate = filingDate !== date;
 
   const [existing, otherExisting] = await Promise.all([
-    getClosingChecklist(filingDate, teamKey),
-    otherTeam ? getClosingChecklist(filingDate, otherTeam) : Promise.resolve(null),
+    getClosingChecklist(filingDate, teamKey, outletId),
+    otherTeam ? getClosingChecklist(filingDate, otherTeam, outletId) : Promise.resolve(null),
   ]);
 
   const isSubmitter = existing?.submitted_by === profile.id;
@@ -270,6 +277,7 @@ export default async function ClosingChecklistPage({
           config={config}
           action={submitClosingChecklist}
           team={myTeam}
+          hiddenFields={{ outlet_id: outletId }}
           reminderSales={myTeam === "front_desk"}
           promptCheckout={promptCheckout}
         />
@@ -288,7 +296,7 @@ export default async function ClosingChecklistPage({
             config={otherConfig}
             action={submitClosingChecklist}
             team={otherTeam}
-            hiddenFields={{ _team_override: otherTeam }}
+            hiddenFields={{ _team_override: otherTeam, outlet_id: outletId }}
           />
         </div>
       )}

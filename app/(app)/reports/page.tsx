@@ -21,16 +21,23 @@ import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/empty-state";
 import { SalesTrendChart } from "@/components/charts/sales-trend-chart";
 import { DailyList } from "@/components/reports/daily-list";
+import { getOutletContext } from "@/lib/data/outlets";
+import { OutletSwitcher } from "@/components/outlet-switcher";
 
 export const metadata = { title: "Reports" };
 
-export default async function ReportsPage() {
-  await requireOwner();
+export default async function ReportsPage({
+  searchParams,
+}: {
+  searchParams: { outlet?: string };
+}) {
+  const profile = await requireOwner();
+  const outlet = await getOutletContext(profile, searchParams.outlet);
   const [days, trend, log, cashEntries] = await Promise.all([
-    getRecentDays(14),
-    getSalesTrend(7),
+    getRecentDays(14, outlet.activeId),
+    getSalesTrend(7, outlet.activeId),
     getEodLog(14),
-    getRecentCashExpenses(14),
+    getRecentCashExpenses(14, outlet.activeId),
   ]);
 
   const withSales = days.filter((d) => d.total > 0);
@@ -50,7 +57,9 @@ export default async function ReportsPage() {
       <div className="flex items-center justify-between pb-1">
         <div>
           <h1 className="text-xl font-bold tracking-tight">Reports</h1>
-          <p className="text-xs text-content-secondary mt-0.5">Last 14 days</p>
+          <p className="text-xs text-content-secondary mt-0.5">
+            Last 14 days{outlet.active ? ` · ${outlet.active.name}` : ""}
+          </p>
         </div>
         <div className="flex gap-2">
           <Link
@@ -67,6 +76,8 @@ export default async function ReportsPage() {
           </Link>
         </div>
       </div>
+
+      <OutletSwitcher outlets={outlet.outlets} activeId={outlet.activeId} canSwitch={outlet.canSwitch} className="" />
 
       {/* ── Tab switcher — pill style ──────────────────────────────────── */}
       <div className="flex gap-1 rounded-xl bg-bg-elevated p-1">

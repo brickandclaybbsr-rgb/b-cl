@@ -1,12 +1,14 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { requireOwner } from "@/lib/auth";
+import { getOutletContext } from "@/lib/data/outlets";
 import { ExportReportClient } from "./export-report-client";
 
 export const metadata = { title: "Export Report" };
 
 export default async function ExportReportPage() {
-  await requireOwner();
+  const profile = await requireOwner();
+  const outlet = await getOutletContext(profile);
 
   return (
     <div className="container mx-auto max-w-2xl space-y-5 pb-16">
@@ -25,7 +27,7 @@ export default async function ExportReportPage() {
         </div>
       </div>
 
-      <ExportReportClient />
+      <ExportReportClient outlets={outlet.outlets} defaultOutletId={outlet.activeId} />
     </div>
   );
 }

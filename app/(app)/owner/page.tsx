@@ -14,12 +14,14 @@ import {
 } from "lucide-react";
 import { requireOwner } from "@/lib/auth";
 import { getTodaySnapshot } from "@/lib/data/dashboard";
-import { getSalesTrend, getSalesRange } from "@/lib/data/sales";
+import { getSalesTrend, getMissingSalesDates } from "@/lib/data/sales";
 import { getTodayActivity } from "@/lib/data/activity";
 import { getTodayCashExpenses } from "@/lib/data/expenses";
 import { formatDateLabel, formatTimeIST } from "@/lib/date";
 import { APP_START_DATE } from "@/lib/constants";
 import { getProfileNameMap } from "@/lib/data/profiles";
+import { getOutletContext } from "@/lib/data/outlets";
+import { OutletSwitcher } from "@/components/outlet-switcher";
 import { formatINR } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
 import { SalesTrendChart } from "@/components/charts/sales-trend-chart";
@@ -46,31 +48,29 @@ async function rejectLeave(formData: FormData) {
   revalidatePath("/owner");
 }
 
-export default async function OwnerDashboard() {
-  await requireOwner();
+export default async function OwnerDashboard({
+  searchParams,
+}: {
+  searchParams: { outlet?: string };
+}) {
+  const profile = await requireOwner();
+  // Sales, checklists and cash out below are for the outlet picked in the switcher.
+  const outlet = await getOutletContext(profile, searchParams.outlet);
 
   const supabase = createClient();
   const [snap, trend, activity, nameMap, cashExpenses, leavesResult] = await Promise.all([
-    getTodaySnapshot(),
-    getSalesTrend(7),
+    getTodaySnapshot(undefined, outlet.activeId),
+    getSalesTrend(7, outlet.activeId),
     getTodayActivity(),
     getProfileNameMap(),
-    getTodayCashExpenses(),
+    getTodayCashExpenses(outlet.activeId),
     supabase.from("leaves").select("*").eq("status", "pending").order("submitted_at", { ascending: true }),
   ]);
 
   const pendingLeaves = (leavesResult.data ?? []) as StaffLeave[];
 
-  const salesWindowRecords = await getSalesRange(APP_START_DATE, snap.date);
+  const missingSalesDates = await getMissingSalesDates(outlet.activeId, APP_START_DATE, snap.date);
   const alerts = snap.lowItems.length + snap.outItems.length;
-
-  const filedSalesDates = new Set(salesWindowRecords.map((s) => s.date));
-  const missingSalesDates: string[] = [];
-  for (let d = new Date(APP_START_DATE + "T00:00:00Z"); ; d.setUTCDate(d.getUTCDate() + 1)) {
-    const str = d.toISOString().slice(0, 10);
-    if (str >= snap.date) break;
-    if (!filedSalesDates.has(str)) missingSalesDates.push(str);
-  }
 
   const cash = Number(snap.sales?.cash_sales ?? 0);
   const online = Number(snap.sales?.online_sales ?? 0);
@@ -88,6 +88,8 @@ export default async function OwnerDashboard() {
         </div>
         <SendReportButton size="sm" variant="secondary" />
       </div>
+
+      <OutletSwitcher outlets={outlet.outlets} activeId={outlet.activeId} canSwitch={outlet.canSwitch} className="" />
 
       {/* ── Missing sales alert ─────────────────────────────────────────────── */}
       {missingSalesDates.length > 0 && (

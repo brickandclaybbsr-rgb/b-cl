@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireProfile, canDeleteFinancialRecords } from "@/lib/auth";
 import { todayIST } from "@/lib/date";
+import { DEFAULT_OUTLET_ID } from "@/lib/constants";
 import { syncAdvanceOnInsert, syncAdvanceOnUpdate } from "@/lib/advance-linking";
 
 export type ExpenseFormState = { ok?: boolean; error?: string };
@@ -34,10 +35,14 @@ export async function addCashExpense(
   // Only allow today or past dates (no future filing)
   const date = (dateRaw && dateRaw <= today) ? dateRaw : today;
 
+  const rawOutletId = String(formData.get("outlet_id") ?? "").trim();
+  const outlet_id = rawOutletId || profile.outlet_id || DEFAULT_OUTLET_ID;
+
   const { data: inserted, error } = await supabase
     .from("cash_expenses")
     .insert({
       date,
+      outlet_id,
       person_name,
       amount,
       category: category,
@@ -106,6 +111,7 @@ export async function updateCashExpense(
 export async function addMultipleCashExpenses(
   rows: Array<{ person_name: string; amount: string; category: string; notes: string }>,
   date: string,
+  outletId?: string,
 ): Promise<ExpenseFormState> {
   const profile = await requireProfile();
   const supabase = createClient();
@@ -113,7 +119,7 @@ export async function addMultipleCashExpenses(
   const safeDate = date && date <= today ? date : today;
 
   const inserts: Array<{
-    date: string; person_name: string; amount: number;
+    date: string; outlet_id?: string; person_name: string; amount: number;
     category: "withdrawal" | "advance" | "expense" | "other" | "deposit";
     notes: string | null; submitted_by: string;
   }> = [];
@@ -126,7 +132,15 @@ export async function addMultipleCashExpenses(
       ? categoryRaw : "withdrawal") as "withdrawal" | "advance" | "expense" | "other" | "deposit";
     const notes = row.notes.trim();
     if (!person_name || isNaN(amount) || amount <= 0) continue;
-    inserts.push({ date: safeDate, person_name, amount, category, notes: notes || null, submitted_by: profile.id });
+    inserts.push({
+      date: safeDate,
+      outlet_id: outletId || profile.outlet_id || DEFAULT_OUTLET_ID,
+      person_name,
+      amount,
+      category,
+      notes: notes || null,
+      submitted_by: profile.id,
+    });
   }
 
   if (!inserts.length) return { error: "No valid entries to save." };

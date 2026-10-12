@@ -28,11 +28,13 @@ export function SalesForm({
   editMode,
   initialValues,
   profileTeam,
+  outletId,
 }: {
   date?: string;
   editMode?: boolean;
   initialValues?: DailySales;
   profileTeam?: string | null;
+  outletId?: string | null;
 }) {
   const action = editMode ? updateSales : submitSales;
   const [state, formAction] = useFormState<SalesFormState, FormData>(action, {});
@@ -154,6 +156,7 @@ export function SalesForm({
 
     <form ref={formRef} action={formAction} onSubmit={handleSubmit} className="space-y-4">
       {date && <input type="hidden" name="_date" value={date} />}
+      {outletId && <input type="hidden" name="outlet_id" value={outletId} />}
 
       {/* Opening Cash */}
       <Card className="space-y-3 p-4">

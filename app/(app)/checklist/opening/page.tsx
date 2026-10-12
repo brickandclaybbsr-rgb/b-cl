@@ -7,6 +7,8 @@ import {
 } from "@/lib/data/checklists";
 import { getProfileNameMap } from "@/lib/data/profiles";
 import { getSales } from "@/lib/data/sales";
+import { getOutletContext } from "@/lib/data/outlets";
+import { OutletSwitcher } from "@/components/outlet-switcher";
 import { PageHeader } from "@/components/page-header";
 import { ChecklistTabs } from "@/components/checklists/checklist-tabs";
 import { ChecklistForm } from "@/components/checklists/checklist-form";
@@ -21,11 +23,14 @@ export const metadata = { title: "Opening checklist" };
 export default async function OpeningChecklistPage({
   searchParams,
 }: {
-  searchParams: { edit?: string };
+  searchParams: { edit?: string; outlet?: string };
 }) {
   const profile = await requireProfile();
   const date = todayIST();
-  const prevSales = await getSales(daysAgoIST(1));
+  // Checklists are per outlet: the owner picks one, staff file for their own.
+  const outlet = await getOutletContext(profile, searchParams.outlet);
+  const outletId = outlet.activeId;
+  const prevSales = await getSales(daysAgoIST(1), outletId);
 
   const isOwner = profile.role === "owner";
   const headChef = isHeadChef(profile);
@@ -62,8 +67,8 @@ export default async function OpeningChecklistPage({
   // ── Head chef: sees both kitchen and front desk ──────────────────────────
   if (headChef) {
     const [kitchenRecord, frontDeskRecord, nameMap, kitchenConfig, frontDeskConfig] = await Promise.all([
-      getOpeningChecklist(date, "kitchen"),
-      getOpeningChecklist(date, "front_desk"),
+      getOpeningChecklist(date, "kitchen", outletId),
+      getOpeningChecklist(date, "front_desk", outletId),
       getProfileNameMap(),
       getChecklistConfig("opening", "kitchen"),
       getChecklistConfig("opening", "front_desk"),
@@ -99,7 +104,7 @@ export default async function OpeningChecklistPage({
             config={kitchenConfig}
             action={submitOpeningChecklist}
             team="kitchen"
-            hiddenFields={kitchenEditMode ? { _edit_mode: "1" } : undefined}
+            hiddenFields={{ ...(kitchenEditMode ? { _edit_mode: "1" } : {}), outlet_id: outletId }}
           />
         )}
 
@@ -120,7 +125,7 @@ export default async function OpeningChecklistPage({
               config={frontDeskConfig}
               action={submitOpeningChecklist}
               team="front_desk"
-              hiddenFields={{ _team_override: "front_desk" }}
+              hiddenFields={{ _team_override: "front_desk", outlet_id: outletId }}
               prevClosingBalance={prevSales?.closing_balance}
             />
           </>
@@ -132,8 +137,8 @@ export default async function OpeningChecklistPage({
   // ── Owner: sees both teams ───────────────────────────────────────────────
   if (isOwner) {
     const [kitchenRecord, frontDeskRecord, nameMap, kitchenConfig, frontDeskConfig] = await Promise.all([
-      getOpeningChecklist(date, "kitchen"),
-      getOpeningChecklist(date, "front_desk"),
+      getOpeningChecklist(date, "kitchen", outletId),
+      getOpeningChecklist(date, "front_desk", outletId),
       getProfileNameMap(),
       getChecklistConfig("opening", "kitchen"),
       getChecklistConfig("opening", "front_desk"),
@@ -143,6 +148,7 @@ export default async function OpeningChecklistPage({
       <div>
         <PageHeader title="Opening Checklist" subtitle={formatDateLabel(date)} />
         <ChecklistTabs />
+        <OutletSwitcher outlets={outlet.outlets} activeId={outlet.activeId} canSwitch={outlet.canSwitch} />
 
         <p className="mb-2 text-xs font-bold uppercase tracking-wider text-warm">Kitchen</p>
         {kitchenRecord ? (
@@ -158,6 +164,7 @@ export default async function OpeningChecklistPage({
             config={kitchenConfig}
             action={submitOpeningChecklist}
             team="kitchen"
+            hiddenFields={{ outlet_id: outletId }}
           />
         )}
 
@@ -177,7 +184,7 @@ export default async function OpeningChecklistPage({
               config={frontDeskConfig}
               action={submitOpeningChecklist}
               team="front_desk"
-              hiddenFields={{ _team_override: "front_desk" }}
+              hiddenFields={{ _team_override: "front_desk", outlet_id: outletId }}
               prevClosingBalance={prevSales?.closing_balance}
             />
           </>
@@ -188,8 +195,8 @@ export default async function OpeningChecklistPage({
 
   // ── Regular staff ────────────────────────────────────────────────────────
   const [existing, otherExisting] = await Promise.all([
-    getOpeningChecklist(date, teamKey),
-    otherTeam ? getOpeningChecklist(date, otherTeam) : Promise.resolve(null),
+    getOpeningChecklist(date, teamKey, outletId),
+    otherTeam ? getOpeningChecklist(date, otherTeam, outletId) : Promise.resolve(null),
   ]);
 
   const isSubmitter = existing?.submitted_by === profile.id;
@@ -246,6 +253,7 @@ export default async function OpeningChecklistPage({
             config={config}
             action={submitOpeningChecklist}
             team={myTeam}
+            hiddenFields={{ outlet_id: outletId }}
             prevClosingBalance={myTeam === "front_desk" ? prevSales?.closing_balance : undefined}
           />
         </>
@@ -265,7 +273,7 @@ export default async function OpeningChecklistPage({
             config={otherConfig}
             action={submitOpeningChecklist}
             team={otherTeam}
-            hiddenFields={{ _team_override: otherTeam }}
+            hiddenFields={{ _team_override: otherTeam, outlet_id: outletId }}
           />
         </div>
       )}

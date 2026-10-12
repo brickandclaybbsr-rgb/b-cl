@@ -5,6 +5,8 @@ import { getRecentCashExpenses } from "@/lib/data/expenses";
 import { deleteCashExpense } from "@/app/(app)/expenses/actions";
 import { Card } from "@/components/ui/card";
 import { formatINR } from "@/lib/utils";
+import { getOutletContext } from "@/lib/data/outlets";
+import { OutletSwitcher } from "@/components/outlet-switcher";
 import { CashOutList } from "./cashout-list";
 import type { CashExpense } from "@/lib/database.types";
 
@@ -16,9 +18,14 @@ function dateLabel(date: string) {
   });
 }
 
-export default async function CashOutPage() {
-  await requireOwner();
-  const entries = await getRecentCashExpenses(30);
+export default async function CashOutPage({
+  searchParams,
+}: {
+  searchParams: { outlet?: string };
+}) {
+  const profile = await requireOwner();
+  const outlet = await getOutletContext(profile, searchParams.outlet);
+  const entries = await getRecentCashExpenses(30, outlet.activeId);
 
   const deposits = entries.filter((e) => e.category === "deposit");
   const outEntries = entries.filter((e) => e.category !== "deposit");
@@ -70,6 +77,8 @@ export default async function CashOutPage() {
           <p className="text-xs text-content-secondary">Last 30 days</p>
         </div>
       </div>
+
+      <OutletSwitcher outlets={outlet.outlets} activeId={outlet.activeId} canSwitch={outlet.canSwitch} className="" />
 
       {/* ── Hero card — total + 3 chips ──────────────────────────── */}
       {entries.length > 0 ? (

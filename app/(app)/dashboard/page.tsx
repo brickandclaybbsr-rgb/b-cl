@@ -13,11 +13,11 @@ import {
 } from "lucide-react";
 import { requireProfile } from "@/lib/auth";
 import { getTodaySnapshot } from "@/lib/data/dashboard";
-import { getSalesRange, getSales, salesTotal } from "@/lib/data/sales";
+import { getMissingSalesDates, getSales, salesTotal } from "@/lib/data/sales";
 import { getCashExpensesByDate } from "@/lib/data/expenses";
 import { getProfileNameMap } from "@/lib/data/profiles";
 import { formatDateLabel, formatTimeIST, daysAgoIST } from "@/lib/date";
-import { APP_START_DATE } from "@/lib/constants";
+import { APP_START_DATE, DEFAULT_OUTLET_ID } from "@/lib/constants";
 import { formatINR } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/server";
 import { getMyAttendance } from "@/lib/data/attendance";
@@ -42,7 +42,9 @@ export default async function StaffDashboard() {
   const myTeam: "kitchen" | "front_desk" | undefined =
     profile.team === "head_chef" ? "kitchen"
     : (profile.team as "kitchen" | "front_desk" | null | undefined) ?? undefined;
-  const snap = await getTodaySnapshot(myTeam);
+  // Staff see their own outlet's day; records from before the second outlet sit under the default.
+  const outletId = profile.outlet_id ?? DEFAULT_OUTLET_ID;
+  const snap = await getTodaySnapshot(myTeam, outletId);
   const firstName = profile.name.split(" ")[0];
   const alerts = snap.lowItems.length + snap.outItems.length;
   const kitchenOnly = profile.team === "kitchen";
@@ -53,19 +55,10 @@ export default async function StaffDashboard() {
     ? await getMyAttendance(profile.id, 60).catch(() => null)
     : null;
 
-  // Fetch sales range (front desk / owner only — skip for kitchen)
-  const salesInWindow = !kitchenOnly
-    ? await getSalesRange(APP_START_DATE, snap.date)
+  // Days this outlet has no sales entry for (front desk / head chef — skip for kitchen)
+  const missingSalesDates = !kitchenOnly
+    ? await getMissingSalesDates(outletId, APP_START_DATE, snap.date)
     : [];
-
-  // Dates from launch with no sales entry (front desk only)
-  const filedSalesDates = new Set(salesInWindow.map((s) => s.date));
-  const missingSalesDates: string[] = [];
-  for (let d = new Date(APP_START_DATE + "T00:00:00Z"); ; d.setUTCDate(d.getUTCDate() + 1)) {
-    const str = d.toISOString().slice(0, 10);
-    if (str >= snap.date) break;
-    if (!filedSalesDates.has(str)) missingSalesDates.push(str);
-  }
 
   const tasks = [
     {
@@ -137,8 +130,8 @@ export default async function StaffDashboard() {
   const yesterday = daysAgoIST(1);
   const [yesterdaySales, yesterdayCashOut, nameMap] = canSeeYesterday
     ? await Promise.all([
-        getSales(yesterday),
-        getCashExpensesByDate(yesterday),
+        getSales(yesterday, outletId),
+        getCashExpensesByDate(yesterday, outletId),
         getProfileNameMap(),
       ])
     : [null, [], {}];

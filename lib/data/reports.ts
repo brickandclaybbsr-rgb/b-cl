@@ -17,29 +17,35 @@ export interface DaySummary {
   cashOutTotal: number;
 }
 
-/** Per-day operational summary for the last `days` days, newest first. */
-export async function getRecentDays(days = 14): Promise<DaySummary[]> {
+/**
+ * Per-day operational summary for the last `days` days, newest first — for one
+ * outlet, or every outlet added together when `outletId` is omitted.
+ */
+export async function getRecentDays(days = 14, outletId?: string | null): Promise<DaySummary[]> {
   const supabase = createClient();
   const from = daysAgoIST(days - 1);
   const to = todayIST();
 
-  const [sales, opening, closing, expenses] = await Promise.all([
-    getSalesRange(from, to),
-    supabase.from("opening_checklists").select("date").gte("date", from).lte("date", to),
-    supabase.from("closing_checklists").select("date").gte("date", from).lte("date", to),
-    supabase.from("cash_expenses").select("*").gte("date", from).lte("date", to).order("submitted_at", { ascending: true }),
+  let opening = supabase.from("opening_checklists").select("date").gte("date", from).lte("date", to);
+  let closing = supabase.from("closing_checklists").select("date").gte("date", from).lte("date", to);
+  let expenses = supabase.from("cash_expenses").select("*").gte("date", from).lte("date", to);
+  if (outletId) {
+    opening = opening.eq("outlet_id", outletId);
+    closing = closing.eq("outlet_id", outletId);
+    expenses = expenses.eq("outlet_id", outletId);
+  }
+
+  const [sales, openingRes, closingRes, expensesRes] = await Promise.all([
+    getSalesRange(from, to, outletId),
+    opening,
+    closing,
+    expenses.order("submitted_at", { ascending: true }),
   ]);
 
-  const salesByDate = new Map(sales.map((s) => [s.date, s]));
-  const openSet = new Set((opening.data ?? []).map((r) => r.date));
-  const closeSet = new Set((closing.data ?? []).map((r) => r.date));
-
-  // Group cash expenses by date
-  const cashByDate = new Map<string, CashExpense[]>();
-  for (const e of (expenses.data ?? []) as CashExpense[]) {
-    if (!cashByDate.has(e.date)) cashByDate.set(e.date, []);
-    cashByDate.get(e.date)!.push(e);
-  }
+  const salesByDate = sumSalesByDate(sales);
+  const openSet = new Set((openingRes.data ?? []).map((r) => r.date));
+  const closeSet = new Set((closingRes.data ?? []).map((r) => r.date));
+  const cashByDate = groupByDate((expensesRes.data ?? []) as CashExpense[]);
 
   const out: DaySummary[] = [];
   for (let i = 0; i < days; i++) {
@@ -80,14 +86,21 @@ export interface AttendanceStatusDay {
 }
 
 /** Whether the opening/closing checklist was filed on each day in the range. */
-export async function getAttendanceStatusRange(from: string, to: string): Promise<AttendanceStatusDay[]> {
+export async function getAttendanceStatusRange(
+  from: string,
+  to: string,
+  outletId?: string | null,
+): Promise<AttendanceStatusDay[]> {
   const supabase = createClient();
-  const [{ data: opening }, { data: closing }] = await Promise.all([
-    supabase.from("opening_checklists").select("date").gte("date", from).lte("date", to),
-    supabase.from("closing_checklists").select("date").gte("date", from).lte("date", to),
-  ]);
-  const openSet = new Set((opening ?? []).map((r: any) => r.date));
-  const closeSet = new Set((closing ?? []).map((r: any) => r.date));
+  let opening = supabase.from("opening_checklists").select("date").gte("date", from).lte("date", to);
+  let closing = supabase.from("closing_checklists").select("date").gte("date", from).lte("date", to);
+  if (outletId) {
+    opening = opening.eq("outlet_id", outletId);
+    closing = closing.eq("outlet_id", outletId);
+  }
+  const [{ data: openingRows }, { data: closingRows }] = await Promise.all([opening, closing]);
+  const openSet = new Set((openingRows ?? []).map((r: any) => r.date));
+  const closeSet = new Set((closingRows ?? []).map((r: any) => r.date));
 
   const out: AttendanceStatusDay[] = [];
   for (const date of datesDescending(from, to)) {
@@ -141,73 +154,101 @@ export interface ClosingBalanceDay {
 /**
  * Full closing-balance picture for one specific date: opening/closing cash
  * figures (from the front-desk checklist, which is the team that handles
- * cash), that day's cash sales, and every cash-out entry with its total.
+ * cash), that day's cash sales, and every cash-out entry with its total. For
+ * one outlet, or every outlet added together when `outletId` is omitted.
  */
-export async function getClosingBalanceForDate(date: string): Promise<ClosingBalanceDay> {
-  const supabase = createClient();
-
-  const [{ data: opening }, { data: closing }, sales, cashOut] = await Promise.all([
-    supabase.from("opening_checklists").select("*").eq("date", date).eq("team", "front_desk").maybeSingle(),
-    supabase.from("closing_checklists").select("*").eq("date", date).eq("team", "front_desk").maybeSingle(),
-    getSalesRange(date, date),
-    (async () => {
-      const { data } = await supabase.from("cash_expenses").select("*").eq("date", date).order("submitted_at", { ascending: true });
-      return (data ?? []) as CashExpense[];
-    })(),
-  ]);
-
-  return {
-    date,
-    openingCash: opening?.opening_cash ?? null,
-    openingDiscrepancy: opening?.cash_discrepancy ?? null,
-    openingDiscrepancyReason: opening?.cash_discrepancy_reason ?? null,
-    closingCash: closing?.closing_cash ?? null,
-    cashDeposited: closing?.cash_deposited ?? null,
-    closingDiscrepancyNotes: closing?.discrepancy_notes ?? null,
-    salesCash: sales[0] ? Number(sales[0].cash_sales) : 0,
-    cashOutTotal: cashOut.reduce((sum, e) => sum + Number(e.amount), 0),
-    cashOut,
-  };
+export async function getClosingBalanceForDate(date: string, outletId?: string | null): Promise<ClosingBalanceDay> {
+  return (await getClosingBalanceRange(date, date, outletId))[0];
 }
 
-/** Compact day-by-day closing-balance table for a date range, newest first. */
-export async function getClosingBalanceRange(from: string, to: string): Promise<ClosingBalanceDay[]> {
+/**
+ * Compact day-by-day closing-balance table for a date range, newest first.
+ * With no `outletId`, each day's figures are the sum across outlets (a figure
+ * stays null only when no outlet recorded it).
+ */
+export async function getClosingBalanceRange(
+  from: string,
+  to: string,
+  outletId?: string | null,
+): Promise<ClosingBalanceDay[]> {
   const supabase = createClient();
+  let opening = supabase.from("opening_checklists").select("*").eq("team", "front_desk").gte("date", from).lte("date", to);
+  let closing = supabase.from("closing_checklists").select("*").eq("team", "front_desk").gte("date", from).lte("date", to);
+  let expenses = supabase.from("cash_expenses").select("*").gte("date", from).lte("date", to);
+  if (outletId) {
+    opening = opening.eq("outlet_id", outletId);
+    closing = closing.eq("outlet_id", outletId);
+    expenses = expenses.eq("outlet_id", outletId);
+  }
 
   const [{ data: openingRows }, { data: closingRows }, sales, { data: expenseRows }] = await Promise.all([
-    supabase.from("opening_checklists").select("*").eq("team", "front_desk").gte("date", from).lte("date", to),
-    supabase.from("closing_checklists").select("*").eq("team", "front_desk").gte("date", from).lte("date", to),
-    getSalesRange(from, to),
-    supabase.from("cash_expenses").select("*").gte("date", from).lte("date", to),
+    opening,
+    closing,
+    getSalesRange(from, to, outletId),
+    expenses.order("submitted_at", { ascending: true }),
   ]);
 
-  const openingByDate = new Map((openingRows ?? []).map((r: any) => [r.date, r]));
-  const closingByDate = new Map((closingRows ?? []).map((r: any) => [r.date, r]));
-  const salesByDate = new Map(sales.map((s) => [s.date, s]));
-  const cashOutByDate = new Map<string, CashExpense[]>();
-  for (const e of (expenseRows ?? []) as CashExpense[]) {
-    if (!cashOutByDate.has(e.date)) cashOutByDate.set(e.date, []);
-    cashOutByDate.get(e.date)!.push(e);
-  }
+  const openingByDate = groupByDate((openingRows ?? []) as any[]);
+  const closingByDate = groupByDate((closingRows ?? []) as any[]);
+  const salesByDate = sumSalesByDate(sales);
+  const cashOutByDate = groupByDate((expenseRows ?? []) as CashExpense[]);
 
   const out: ClosingBalanceDay[] = [];
   for (const date of datesDescending(from, to)) {
-    const opening = openingByDate.get(date) as any;
-    const closing = closingByDate.get(date) as any;
+    const opens = openingByDate.get(date) ?? [];
+    const closes = closingByDate.get(date) ?? [];
     const sale = salesByDate.get(date);
     const cashOut = cashOutByDate.get(date) ?? [];
     out.push({
       date,
-      openingCash: opening?.opening_cash ?? null,
-      openingDiscrepancy: opening?.cash_discrepancy ?? null,
-      openingDiscrepancyReason: opening?.cash_discrepancy_reason ?? null,
-      closingCash: closing?.closing_cash ?? null,
-      cashDeposited: closing?.cash_deposited ?? null,
-      closingDiscrepancyNotes: closing?.discrepancy_notes ?? null,
+      openingCash: sumOrNull(opens.map((r) => r.opening_cash)),
+      openingDiscrepancy: sumOrNull(opens.map((r) => r.cash_discrepancy)),
+      openingDiscrepancyReason: joinOrNull(opens.map((r) => r.cash_discrepancy_reason)),
+      closingCash: sumOrNull(closes.map((r) => r.closing_cash)),
+      cashDeposited: sumOrNull(closes.map((r) => r.cash_deposited)),
+      closingDiscrepancyNotes: joinOrNull(closes.map((r) => r.discrepancy_notes)),
       salesCash: sale ? Number(sale.cash_sales) : 0,
       cashOutTotal: cashOut.reduce((sum, e) => sum + Number(e.amount), 0),
       cashOut,
     });
   }
   return out;
+}
+
+/* ─────────────────────────── helpers ─────────────────────────── */
+
+function groupByDate<T extends { date: string }>(rows: T[]): Map<string, T[]> {
+  const m = new Map<string, T[]>();
+  for (const r of rows) {
+    if (!m.has(r.date)) m.set(r.date, []);
+    m.get(r.date)!.push(r);
+  }
+  return m;
+}
+
+/** One sales row per date, with every outlet's amounts for that date added together. */
+function sumSalesByDate(rows: DailySales[]): Map<string, DailySales> {
+  const m = new Map<string, DailySales>();
+  for (const r of rows) {
+    const prev = m.get(r.date);
+    m.set(r.date, prev
+      ? {
+          ...prev,
+          cash_sales: Number(prev.cash_sales) + Number(r.cash_sales),
+          online_sales: Number(prev.online_sales) + Number(r.online_sales),
+          aggregator_sales: Number(prev.aggregator_sales) + Number(r.aggregator_sales),
+        }
+      : r);
+  }
+  return m;
+}
+
+function sumOrNull(values: Array<number | string | null | undefined>): number | null {
+  const present = values.filter((v) => v !== null && v !== undefined && v !== "");
+  return present.length ? present.reduce<number>((t, v) => t + Number(v), 0) : null;
+}
+
+function joinOrNull(values: Array<string | null | undefined>): string | null {
+  const present = values.filter((v): v is string => !!v && v.trim() !== "");
+  return present.length ? present.join(" · ") : null;
 }
