@@ -34,8 +34,15 @@ export async function getOutletContext(profile: Profile, requested?: string | nu
   const canSwitch = profile.role === "owner";
   const isOutlet = (id?: string | null): id is string => !!id && outlets.some((o) => o.id === id);
 
-  const remembered = canSwitch ? cookies().get(ACTIVE_OUTLET_COOKIE)?.value : undefined;
-  const activeId = [requested, remembered, profile.outlet_id].find(isOutlet)
+  // Only the owner may look at an outlet other than their own. For everyone
+  // else BOTH the query string and the cookie are ignored — otherwise a staff
+  // member could read another branch's sales, checklists and cash outs just by
+  // putting ?outlet=<other branch> in the address bar.
+  const chosen = canSwitch
+    ? [requested, cookies().get(ACTIVE_OUTLET_COOKIE)?.value]
+    : [];
+
+  const activeId = [...chosen, profile.outlet_id].find(isOutlet)
     ?? (isOutlet(DEFAULT_OUTLET_ID) ? DEFAULT_OUTLET_ID : outlets[0]?.id ?? DEFAULT_OUTLET_ID);
 
   return { outlets, activeId, active: outlets.find((o) => o.id === activeId) ?? null, canSwitch };

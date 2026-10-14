@@ -35,8 +35,13 @@ export async function addCashExpense(
   // Only allow today or past dates (no future filing)
   const date = (dateRaw && dateRaw <= today) ? dateRaw : today;
 
+  // Only the owner may file against another outlet (they can switch branch in
+  // the UI). For staff the submitted value is ignored and their own outlet is
+  // used, so a hand-crafted form cannot post a cash out onto the other branch.
   const rawOutletId = String(formData.get("outlet_id") ?? "").trim();
-  const outlet_id = rawOutletId || profile.outlet_id || DEFAULT_OUTLET_ID;
+  const outlet_id = profile.role === "owner"
+    ? (rawOutletId || profile.outlet_id || DEFAULT_OUTLET_ID)
+    : (profile.outlet_id || DEFAULT_OUTLET_ID);
 
   const { data: inserted, error } = await supabase
     .from("cash_expenses")
@@ -134,7 +139,11 @@ export async function addMultipleCashExpenses(
     if (!person_name || isNaN(amount) || amount <= 0) continue;
     inserts.push({
       date: safeDate,
-      outlet_id: outletId || profile.outlet_id || DEFAULT_OUTLET_ID,
+      // Same rule as the single insert: staff always file against their own
+      // outlet, whatever the client sent.
+      outlet_id: profile.role === "owner"
+        ? (outletId || profile.outlet_id || DEFAULT_OUTLET_ID)
+        : (profile.outlet_id || DEFAULT_OUTLET_ID),
       person_name,
       amount,
       category,
