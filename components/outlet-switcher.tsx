@@ -8,9 +8,10 @@ import { setActiveOutlet } from "@/app/(app)/outlet-actions";
 import type { OutletOption } from "@/lib/data/outlets";
 
 /**
- * Saheed Nagar | Patia toggle for the owner; a plain outlet badge for staff.
- * The owner's choice is remembered server-side, so every daily-records screen
- * (dashboard, sales, cash out, checklists, closing balance) follows it.
+ * Saheed Nagar | Patia toggle for the owner and the head chef, who both work
+ * across branches; a plain outlet badge for everyone else. The choice is
+ * remembered server-side, so every daily-records screen (dashboard, sales,
+ * cash out, checklists, closing balance) follows it.
  */
 export function OutletSwitcher({
   outlets,
@@ -77,7 +78,7 @@ export function OutletSwitcher({
               disabled={pending}
               onClick={() => choose(o.id)}
               className={`flex items-center gap-1 rounded-md px-3 py-1 font-semibold transition-colors ${
-                isActive ? "bg-warm text-bg-base shadow-sm" : "text-content-secondary hover:text-content-primary"
+                isActive ? "bg-warm text-bg-primary shadow-sm" : "text-content-secondary hover:text-content-primary"
               }`}
             >
               {isActive && <MapPin className="size-3" />}

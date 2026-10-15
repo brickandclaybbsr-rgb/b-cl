@@ -117,7 +117,7 @@ export function CheckInScreen({ name, redirectTo, embedded }: { name: string; re
   return (
     <div className={cn(
       "flex flex-col items-center justify-center px-5",
-      embedded ? "min-h-[70dvh] py-4" : "min-h-[100dvh] bg-bg-base py-8",
+      embedded ? "min-h-[70dvh] py-4" : "min-h-[100dvh] bg-bg-primary py-8",
     )}>
       <div className="w-full max-w-sm space-y-6">
         <div className="flex flex-col items-center gap-3 text-center">

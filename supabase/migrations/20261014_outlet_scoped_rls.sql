@@ -39,7 +39,9 @@ as $$
 $$;
 
 -- May the caller touch a row belonging to this outlet? The owner may see every
--- branch; everyone else only their own.
+-- branch, and so may the head chef, who runs the kitchen across both rather
+-- than sitting at one. Everyone else is limited to their own outlet.
+-- Mirrors canViewAllOutlets() in lib/data/outlets.ts — keep the two in step.
 create or replace function public.can_see_outlet(target uuid)
 returns boolean
 language sql
@@ -48,6 +50,7 @@ set search_path = public
 stable
 as $$
   select public.is_owner()
+      or public.is_head_chef()
       or target is null
       or target = public.my_outlet_id();
 $$;

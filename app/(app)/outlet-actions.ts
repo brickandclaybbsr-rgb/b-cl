@@ -2,12 +2,21 @@
 
 import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
-import { requireOwner } from "@/lib/auth";
-import { ACTIVE_OUTLET_COOKIE, getOutlets } from "@/lib/data/outlets";
+import { requireProfile } from "@/lib/auth";
+import { ACTIVE_OUTLET_COOKIE, canViewAllOutlets, getOutlets } from "@/lib/data/outlets";
 
-/** Remember which outlet the owner is viewing, across every screen. */
+/**
+ * Remember which outlet the viewer is looking at, across every screen.
+ *
+ * Owner and head chef only — this used to call requireOwner(), which redirects
+ * rather than returning, so a head chef switching branch was bounced to the
+ * dashboard instead of being told no.
+ */
 export async function setActiveOutlet(outletId: string): Promise<{ ok?: boolean; error?: string }> {
-  await requireOwner();
+  const profile = await requireProfile();
+  if (!canViewAllOutlets(profile)) {
+    return { error: "You can only work in your own outlet." };
+  }
   const outlets = await getOutlets();
   if (!outlets.some((o) => o.id === outletId)) return { error: "Unknown outlet." };
 

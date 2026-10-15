@@ -14,11 +14,22 @@ export async function getOutlets(): Promise<OutletOption[]> {
   return (data ?? []) as OutletOption[];
 }
 
+/**
+ * May this person look at outlets other than their own?
+ *
+ * The owner, and the head chef — who runs the kitchen across both branches
+ * rather than sitting at one, so he needs each outlet's day in front of him.
+ * Everyone else is pinned to the outlet on their profile.
+ */
+export function canViewAllOutlets(profile: Pick<Profile, "role" | "team">): boolean {
+  return profile.role === "owner" || profile.team === "head_chef";
+}
+
 export interface OutletContext {
   outlets: OutletOption[];
   activeId: string;
   active: OutletOption | null;
-  /** Only the owner chooses which outlet to view; staff see their own. */
+  /** Owner and head chef choose which outlet to view; staff see their own. */
   canSwitch: boolean;
 }
 
@@ -31,7 +42,7 @@ export interface OutletContext {
  */
 export async function getOutletContext(profile: Profile, requested?: string | null): Promise<OutletContext> {
   const outlets = await getOutlets();
-  const canSwitch = profile.role === "owner";
+  const canSwitch = canViewAllOutlets(profile);
   const isOutlet = (id?: string | null): id is string => !!id && outlets.some((o) => o.id === id);
 
   // Only the owner may look at an outlet other than their own. For everyone

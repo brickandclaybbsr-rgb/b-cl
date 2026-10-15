@@ -61,7 +61,7 @@ export function ExportReportClient({
                 onClick={() => setOutlet(o.id)}
                 className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors ${
                   outlet === o.id
-                    ? "border-warm bg-warm text-bg-base"
+                    ? "border-warm bg-warm text-bg-primary"
                     : "border-border text-content-secondary hover:text-content-primary"
                 }`}
               >
