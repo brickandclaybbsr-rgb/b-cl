@@ -139,7 +139,10 @@ export default async function ProfilePage() {
   } else {
     // Fetch all configuration settings for Owner
     const [staffData, stockData, vendorsData, openingData, closingData, ownerWaData, punchoutData, tasksData] = await Promise.all([
-      getStaff(),
+      // Staff management lists deactivated accounts too — it renders the
+      // "inactive" badge and the activate/deactivate switch, so filtering them
+      // out here left no way to turn an account back on.
+      getStaff({ includeInactive: true }),
       getAllStockItems(),
       getAllVendors(),
       getAllChecklistItems("opening"),
